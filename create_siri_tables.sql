@@ -12,7 +12,8 @@ CREATE TABLE active_trips_norway (
 	lon float,
 	bearing varchar,
 	delay varchar,
-	locationtime varchar,
+	nextstop varchar,
+	locationtime integer,
 	collectedtime integer
 );
 CREATE INDEX tripid_norway_idx ON active_trips_norway (datedvehiclejourney);
