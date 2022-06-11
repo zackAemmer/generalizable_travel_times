@@ -1,4 +1,5 @@
 # Additional files
+config.py
 secret.py
 .DS_Store
 
