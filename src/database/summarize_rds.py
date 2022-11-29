@@ -26,11 +26,6 @@ import psycopg2
 import pytz
 from sklearn.neighbors import BallTree
 
-from transit_vis.src import config as cfg
-
-
-TZ = pytz.timezone('America/Los_Angeles')
-
 
 def convert_cursor_to_tabular(query_result_cursor):
     """Converts a cursor returned by a SQL execution to a Pandas dataframe.
@@ -92,10 +87,10 @@ def connect_to_rds():
         config.py.
     """
     conn = psycopg2.connect(
-        host=cfg.HOST,
-        database=cfg.DATABASE,
-        user=cfg.UID,
-        password=cfg.PWD)
+        host=os.getenv('HOST'),
+        database=os.getenv('DATABASE'),
+        user=os.getenv('UID'),
+        password=os.getenv('PWD'))
     return conn
 
 def get_results_by_time(conn, start_time, end_time, rds_limit):
@@ -156,12 +151,12 @@ def update_gtfs_route_info():
         A string with the location of the folder where the GTFS data is saved.
     """
     url = 'http://metro.kingcounty.gov/GTFS/google_transit.zip'
-    zip_location = './transit_vis/data/google_transit'
+    zip_location = './data/kcm_gtfs'
     req = requests.get(url, allow_redirects=True)
-    with open('./transit_vis/data/google_transit.zip', 'wb') as g_file:
+    with open('./data/kcm_gtfs/google_transit.zip', 'wb') as g_file:
         g_file.write(req.content)
-    with ZipFile('./transit_vis/data/google_transit.zip', 'r') as zip_obj:
-        zip_obj.extractall('./transit_vis/data/google_transit')
+    with ZipFile('./data/kcm_gtfs/google_transit.zip', 'r') as zip_obj:
+        zip_obj.extractall('./data/kcm_gtfs')
     return zip_location
 
 def preprocess_trip_data(daily_results):
@@ -402,9 +397,9 @@ def connect_to_dynamo_table(table_name):
     """
     dynamodb = boto3.resource(
         'dynamodb',
-        region_name=cfg.REGION,
-        aws_access_key_id=cfg.ACCESS_ID,
-        aws_secret_access_key=cfg.ACCESS_KEY)
+        region_name=os.getenv('REGION'),
+        aws_access_key_id=os.getenv('ACCESS_ID'),
+        aws_secret_access_key=os.getenv('ACCESS_KEY'))
     table = dynamodb.Table(table_name)
     return table
 
@@ -431,7 +426,7 @@ def upload_to_dynamo(dynamodb_table, to_upload, end_time):
             values to.
     """
     # Get formatted date to assign to speed data
-    collection_date = datetime.utcfromtimestamp(end_time).replace(tzinfo=pytz.utc).astimezone(TZ).strftime('%m_%d_%Y-%H:%M')
+    collection_date = datetime.utcfromtimestamp(end_time).replace(tzinfo=pytz.utc).astimezone(pytz.timezone(os.getenv('TZ'))).strftime('%m_%d_%Y-%H:%M')
     # Create column for hour of day when data point was collected
     to_upload['hour_of_day'] = pd.to_datetime(to_upload['locationtime'], unit='s').dt.tz_localize('UTC').dt.tz_convert(tz='America/Los_Angeles').dt.strftime('%-H').astype(int)
 
@@ -531,7 +526,7 @@ def summarize_rds(geojson_name, dynamodb_table_name, rds_limit, split_data, upda
                 end_time = start_time
                 continue
             print(f"Processing queried RDS data...{i+1}/{split_data}")
-            daily_results = preprocess_trip_data(daily_results)
+            # daily_results = preprocess_trip_data(daily_results)
             all_daily_results.append(daily_results)
             del daily_results
             end_time = start_time
@@ -544,19 +539,19 @@ def summarize_rds(geojson_name, dynamodb_table_name, rds_limit, split_data, upda
             print("No data found.")
             continue
 
-        print(f"Loading route segments from {geojson_name}")
-        # Load the route segments shapefile
-        with open(f'{geojson_name}.geojson', 'r') as shapefile:
-            kcm_routes = json.load(shapefile)
+        # print(f"Loading route segments from {geojson_name}")
+        # # Load the route segments shapefile
+        # with open(f'{geojson_name}.geojson', 'r') as shapefile:
+        #     kcm_routes = json.load(shapefile)
 
-        # Find the closest segment w/matching route for each speed in daily results
-        print("Matching speeds to segments...")
-        daily_results = assign_results_to_segments(kcm_routes, daily_results)
+        # # Find the closest segment w/matching route for each speed in daily results
+        # print("Matching speeds to segments...")
+        # daily_results = assign_results_to_segments(kcm_routes, daily_results)
 
         # Save the processed data for the user as .csv if specified
         if save_locally:
-            outdir = "./transit_vis/data/to_upload"
-            outfile = datetime.utcfromtimestamp(start_time).replace(tzinfo=pytz.utc).astimezone(TZ).strftime('%m_%d_%Y')
+            outdir = "./data/kcm_tracks"
+            outfile = datetime.utcfromtimestamp(start_time).replace(tzinfo=pytz.utc).astimezone(pytz.timezone(os.getenv('TZ'))).strftime('%m_%d_%Y')
             if not os.path.exists(outdir):
                 os.mkdir(outdir)
             print("Saving processed speeds to data folder...")
@@ -571,25 +566,3 @@ def summarize_rds(geojson_name, dynamodb_table_name, rds_limit, split_data, upda
         print(f"Date: {day} Number of tracks: {len(daily_results)}")
 
     return len(daily_results)
-
-if __name__ == "__main__":
-    # Collect from current-start_back_days-numdays -> current-start_back_days
-    date_list = []
-    start_back_days = 1
-    num_days = 7*30
-    current_day = datetime.now()
-    start_day = current_day - timedelta(days=start_back_days)
-    for x in range (0, num_days):
-        date_list.append((start_day - timedelta(days=x)).strftime('%Y-%m-%d'))
-    print(date_list)
-
-    NUM_SEGMENTS_UPDATED = summarize_rds(
-        geojson_name='./transit_vis/data/streets_routes_0001buffer',
-        dynamodb_table_name='KCM_Bus_Routes',
-        rds_limit=0,
-        split_data=3,
-        update_gtfs=True,
-        save_locally=True,
-        save_dates=date_list,
-        upload=False)
-    print(f"Number of tracks for last day: {NUM_SEGMENTS_UPDATED}")
