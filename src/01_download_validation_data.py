@@ -23,8 +23,6 @@ if __name__ == "__main__":
     # Print dates data is to be downloaded for
     print(date_list)
 
-    print(os.getenv('PWD'))
-
     # Download the data
     NUM_TRACKS = summarize_rds.summarize_rds(
         dynamodb_table_name='KCM_Bus_Routes',
