@@ -11,6 +11,7 @@ from zipfile import ZipFile
 
 import numpy as np
 import pandas as pd
+import pickle
 
 
 def get_validation_dates(validation_path):
@@ -33,6 +34,8 @@ def extract_validation_trips(validation_path):
         hour = labels[4].split("_")[1]
         minute = labels[5]
         day_data = pd.read_csv(f"./data/kcm_validation_tracks/{labels}")
+        with open('10M.pkl', 'rb') as f:
+            df = pickle.load(f)
     # Get the tracks for the route id and time of the validation data +/- amount
 
     return vehicle_id

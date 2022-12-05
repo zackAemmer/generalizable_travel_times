@@ -22,6 +22,7 @@ from zipfile import ZipFile
 import boto3
 import numpy as np
 import pandas as pd
+import pickle
 import psycopg2
 import pytz
 from sklearn.neighbors import BallTree
@@ -472,7 +473,7 @@ def upload_to_dynamo(dynamodb_table, to_upload, end_time):
             )
     return
 
-def summarize_rds(geojson_name, dynamodb_table_name, rds_limit, split_data, update_gtfs, save_locally, save_dates, upload):
+def summarize_rds(geojson_name, dynamodb_table_name, rds_limit, split_data, update_gtfs, save_locally, save_dates, upload, outdir=None):
     """Queries 24hrs of data from RDS, calculates speeds, and uploads them.
 
     Runs daily to take 24hrs worth of data stored in the data warehouse
@@ -550,12 +551,13 @@ def summarize_rds(geojson_name, dynamodb_table_name, rds_limit, split_data, upda
 
         # Save the processed data for the user as .csv if specified
         if save_locally:
-            outdir = "./data/kcm_tracks"
             outfile = datetime.utcfromtimestamp(start_time).replace(tzinfo=pytz.utc).astimezone(pytz.timezone(os.getenv('TZ'))).strftime('%m_%d_%Y')
             if not os.path.exists(outdir):
                 os.mkdir(outdir)
             print("Saving processed speeds to data folder...")
-            daily_results.to_csv(f"{outdir}/{outfile}.csv", index=False)
+            # daily_results.to_csv(f"{outdir}/{outfile}.csv", index=False)
+            with open(f"{outdir}/{outfile}.pkl", 'wb') as f:
+                pickle.dump(daily_results, f)
 
         # Upload to dynamoDB
         if upload:
