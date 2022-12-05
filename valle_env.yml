@@ -1,0 +1,15 @@
+name: valle
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9.7
+  - boto3
+  - requests
+  - python-dotenv
+  - numpy
+  - pandas
+  - psycopg2-binary
+  - libpq
+  - pytz
+  - scikit-learn
