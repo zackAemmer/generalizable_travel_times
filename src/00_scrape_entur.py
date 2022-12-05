@@ -135,7 +135,7 @@ def upload_to_rds(to_upload, conn, collected_time):
             conn.rollback()
     return query_str
 
-def main_function():
+if __name__ == "__main__":
     # Limited to 4 requests/minute, otherwise need publish/subscribe
     endpoint = 'https://api.entur.io/realtime/v1/rest/vm'
     conn = connect_to_rds()
@@ -155,6 +155,3 @@ def main_function():
         args_str = upload_to_rds(vehicle_statuses, conn, current_epoch)
         time.sleep(20)
     conn.close()
-
-if __name__ == "__main__":
-    main_function()

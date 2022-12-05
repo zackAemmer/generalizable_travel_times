@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Gathers the last 24hrs of speed data, aggregates it, and uploads it.
 
 This module takes speeds from a SQL data-warehouse and summarizes them to then
@@ -67,14 +66,6 @@ def convert_cursor_to_tabular(query_result_cursor):
     else:
         daily_results.columns = colnames
     daily_results = daily_results.dropna()
-    daily_results['tripid'] = daily_results['tripid'].astype(int)
-    daily_results['vehicleid'] = daily_results['vehicleid'].astype(int)
-    daily_results['orientation'] = daily_results['orientation'].astype(int)
-    daily_results['scheduledeviation'] = daily_results['scheduledeviation'].astype(int)
-    daily_results['closeststop'] = daily_results['closeststop'].astype(int)
-    daily_results['nextstop'] = daily_results['nextstop'].astype(int)
-    daily_results['locationtime'] = daily_results['locationtime'].astype(int)
-    daily_results['collectedtime'] = daily_results['collectedtime'].astype(int)
     return daily_results
 
 def connect_to_rds():
@@ -95,7 +86,7 @@ def connect_to_rds():
         password=os.getenv('DB_PASSWORD'))
     return conn
 
-def get_results_by_time(conn, start_time, end_time, rds_limit):
+def get_results_by_time(conn, start_time, end_time, rds_limit, table_name, unique_trip_col):
     """Queries the last x days worth of data from the RDS data warehouse.
 
     Uses the database connection to execute a query for the specified times of
@@ -122,19 +113,19 @@ def get_results_by_time(conn, start_time, end_time, rds_limit):
     # Database has index on locationtime attribute
     if rds_limit > 0:
         query_text = f" \
-            SELECT DISTINCT ON (tripid, locationtime) * \
-            FROM active_trips_study \
+            SELECT DISTINCT ON ({unique_trip_col}, locationtime) * \
+            FROM {table_name} \
             WHERE locationtime \
             BETWEEN {start_time} AND {end_time} \
-            ORDER BY tripid, locationtime, collectedtime ASC \
+            ORDER BY {unique_trip_col}, locationtime, collectedtime ASC \
             LIMIT {rds_limit};"
     else:
         query_text = f" \
-            SELECT DISTINCT ON (tripid, locationtime) * \
-            FROM active_trips_study \
+            SELECT DISTINCT ON ({unique_trip_col}, locationtime) * \
+            FROM {table_name} \
             WHERE locationtime \
             BETWEEN {start_time} AND {end_time} \
-            ORDER BY tripid, locationtime, collectedtime ASC;"
+            ORDER BY {unique_trip_col}, locationtime, collectedtime ASC;"
     with conn.cursor() as curs:
         curs.execute(query_text)
         daily_results = convert_cursor_to_tabular(curs)
@@ -384,97 +375,13 @@ def assign_results_to_segments(kcm_routes, daily_results):
     to_upload = to_upload[columns_to_keep]
     return to_upload
 
-def connect_to_dynamo_table(table_name):
-    """Connects to the dynamodb table specified using details from config.py.
-
-    Uses the AWS login information stored in config.py to attempt a connection
-    to dynamodb using the boto3 library, then creates a connection to the
-    specified table.
-
-    Args:
-        table_name: The name of the table on the dynamodb resource to connect.
-
-    Returns:
-        A boto3 Table object pointing to the dynamodb table specified.
-    """
-    dynamodb = boto3.resource(
-        'dynamodb',
-        region_name=os.getenv('REGION'),
-        aws_access_key_id=os.getenv('ACCESS_ID'),
-        aws_secret_access_key=os.getenv('ACCESS_KEY'))
-    table = dynamodb.Table(table_name)
-    return table
-
 def percentile(n):
     def percentile_(x):
         return np.percentile(x, n)
     percentile_.__name__ = 'pct_%s' % n
     return percentile_
 
-def upload_to_dynamo(dynamodb_table, to_upload, end_time):
-    """Uploads the speeds gathered and processed from the RDS to dynamodb.
-
-    Groups all bus speed observations by route/segment ids and calculates additional
-    statistics. Uploads the results to dynamodb; replaces speed_m_s
-    with the latest value, and appends to historic_speeds which keeps track of
-    past average daily speeds for each segment.
-
-    Args:
-        dynamodb_table: A boto3 Table pointing to a dynamodb table that has been
-            initialized to contain the same segments as to_upload.
-        to_upload: A Pandas Dataframe to be uploaded to dynamodb containing
-            seg ids, and their average data.
-        end_time: An epoch time integer that represents the date to assign the
-            values to.
-    """
-    # Get formatted date to assign to speed data
-    collection_date = datetime.utcfromtimestamp(end_time).replace(tzinfo=pytz.utc).astimezone(pytz.timezone(os.getenv('TZ'))).strftime('%m_%d_%Y-%H:%M')
-    # Create column for hour of day when data point was collected
-    to_upload['hour_of_day'] = pd.to_datetime(to_upload['locationtime'], unit='s').dt.tz_localize('UTC').dt.tz_convert(tz='America/Los_Angeles').dt.strftime('%-H').astype(int)
-
-    # 3 Table updates; one am, one pm, one with all data
-    time_periods = ['AM','PM','FULL_DAY']
-    times = [[6,9], [16,19], [0,23]] #6-9am, 4-7pm
-    for i, time_range in enumerate(times):
-        print(f"{time_range[0]}-{time_range[1]}{time_periods[i]}...{i+1}/{len(time_periods)}")
-        # Filter by the time period
-        filtered_to_upload = to_upload[((to_upload['hour_of_day'] > time_range[0]) & (to_upload['hour_of_day'] < time_range[1]))]
-
-        # Aggregate the observed bus speeds by their nearest segment ids
-        filtered_to_upload = filtered_to_upload[['seg_compkey', 'seg_route_id', 'speed_m_s', 'deviation_change_s', 'seg_length']].copy()
-        filtered_to_upload.dropna(inplace=True)
-        filtered_to_upload = filtered_to_upload.groupby(['seg_compkey']).agg(['median', 'var', 'count', percentile(95), percentile(5)]).reset_index()
-        filtered_to_upload = filtered_to_upload.loc[filtered_to_upload[('seg_route_id', 'count')] > 1]
-        filtered_to_upload = filtered_to_upload.to_dict(orient='records')
-
-        # Update each route/segment id in the dynamodb with its new value
-        for segment in filtered_to_upload:
-            dynamodb_table.update_item(
-                Key={
-                    'compkey': segment[('seg_compkey', '')]
-                },
-                UpdateExpression=f"SET " \
-                    f"med_speed_m_s.{time_periods[i]}= :med_speed_val," \
-                    f"var_speed_m_s.{time_periods[i]}= :var_speed_val," \
-                    f"pct_speed_95_m_s.{time_periods[i]}= :pct_speed_95_val," \
-                    f"pct_speed_5_m_s.{time_periods[i]}= :pct_speed_5_val," \
-                    f"med_deviation_s.{time_periods[i]}= :med_deviation_val," \
-                    f"var_deviation_s.{time_periods[i]}= :var_deviation_val," \
-                    f"num_traversals.{time_periods[i]}= :count_val," \
-                    f"date_updated.{time_periods[i]}= :date_val",
-                ExpressionAttributeValues={
-                    ':med_speed_val': ''+str(segment[('speed_m_s', 'median')]),
-                    ':var_speed_val': ''+str(segment[('speed_m_s', 'var')]),
-                    ':pct_speed_95_val': ''+str(segment[('speed_m_s', 'pct_95')]),
-                    ':pct_speed_5_val': ''+str(segment[('speed_m_s', 'pct_5')]),
-                    ':med_deviation_val': ''+str(segment[('deviation_change_s', 'median')]),
-                    ':var_deviation_val': ''+str(segment[('deviation_change_s', 'var')]),
-                    ':count_val': ''+str(segment[('speed_m_s', 'count')]),
-                    ':date_val': ''+str(collection_date)}
-            )
-    return
-
-def summarize_rds(dynamodb_table_name, rds_limit, split_data, update_gtfs, save_locally, save_dates, upload, outdir=None):
+def summarize_rds(rds_limit, split_data, update_gtfs, save_locally, save_dates, table_name, unique_trip_col, outdir=None):
     """Queries 24hrs of data from RDS, calculates speeds, and uploads them.
 
     Runs daily to take 24hrs worth of data stored in the data warehouse
@@ -516,13 +423,12 @@ def summarize_rds(dynamodb_table_name, rds_limit, split_data, update_gtfs, save_
 
     for day in save_dates:
         end_time = round(datetime.strptime(day, '%Y-%m-%d').timestamp()) + (24*60*60)
-        end_time_upload = end_time
         print(f"Querying {day} data from RDS (~5mins if no limit specified)...")
         all_daily_results = []
         # Break up the query into {split_data} pieces
         for i in range(0, split_data):
             start_time = int(round(end_time - (24*60*60/split_data), 0))
-            daily_results = get_results_by_time(conn, start_time, end_time, rds_limit)
+            daily_results = get_results_by_time(conn, start_time, end_time, rds_limit, table_name, unique_trip_col)
             if daily_results is None:
                 print(f"No results found for {start_time}")
                 end_time = start_time
@@ -543,18 +449,12 @@ def summarize_rds(dynamodb_table_name, rds_limit, split_data, update_gtfs, save_
 
         # Save the processed data for the user if specified
         if save_locally:
-            outfile = datetime.utcfromtimestamp(start_time).replace(tzinfo=pytz.utc).astimezone(pytz.timezone(os.getenv('TZ'))).strftime('%m_%d_%Y')
+            outfile = datetime.utcfromtimestamp(start_time).replace(tzinfo=pytz.utc).astimezone(pytz.timezone(os.getenv('TZ'))).strftime('%Y_%m_%d')
             if not os.path.exists(outdir):
                 os.mkdir(outdir)
             print("Saving processed speeds to data folder...")
             with open(f"{outdir}/{outfile}.pkl", 'wb') as f:
                 pickle.dump(daily_results, f)
-
-        # Upload to dynamoDB
-        if upload:
-            print("Aggregating and Uploading segment data to dynamoDB...")
-            table = connect_to_dynamo_table(dynamodb_table_name)
-            upload_to_dynamo(table, daily_results, end_time_upload)
 
         print(f"Date: {day} Number of tracks: {len(daily_results)}")
 
