@@ -88,10 +88,11 @@ def connect_to_rds():
         config.py.
     """
     conn = psycopg2.connect(
-        host=os.getenv('HOST'),
-        database=os.getenv('DATABASE'),
-        user=os.getenv('UID'),
-        password=os.getenv('PWD'))
+        host=os.getenv('DB_HOST'),
+        database=os.getenv('DB_NAME'),
+        port=os.getenv('DB_PORT'),
+        user=os.getenv('DB_UID'),
+        password=os.getenv('DB_PASSWORD'))
     return conn
 
 def get_results_by_time(conn, start_time, end_time, rds_limit):
@@ -473,7 +474,7 @@ def upload_to_dynamo(dynamodb_table, to_upload, end_time):
             )
     return
 
-def summarize_rds(geojson_name, dynamodb_table_name, rds_limit, split_data, update_gtfs, save_locally, save_dates, upload, outdir=None):
+def summarize_rds(dynamodb_table_name, rds_limit, split_data, update_gtfs, save_locally, save_dates, upload, outdir=None):
     """Queries 24hrs of data from RDS, calculates speeds, and uploads them.
 
     Runs daily to take 24hrs worth of data stored in the data warehouse
