@@ -13,15 +13,15 @@ if __name__ == "__main__":
     # Norway collection began: 2022/2/10
     # KCM collection began: 2020/9/24
     date_list = []
-    start_back_days = 1
-    num_days = 307
+    start_back_days = 307
+    num_days = 600
     current_day = datetime.now()
     start_day = current_day - timedelta(days=start_back_days)
     for x in range (0, num_days):
         date_list.append((start_day - timedelta(days=x)).strftime('%Y-%m-%d'))
 
     # Print dates data is to be downloaded for
-    print(date_list)
+    print(f"Date start: {date_list[0]}, date end: {date_list[-1]}")
 
     # Download the data
     NUM_TRACKS = summarize_rds.summarize_rds(
@@ -30,7 +30,7 @@ if __name__ == "__main__":
         update_gtfs=False,
         save_locally=True,
         save_dates=date_list,
-        table_name='active_trips_norway',
-        unique_trip_col='datedvehiclejourney',
-        outdir='./data/nwy_all')
+        table_name='active_trips_study',
+        unique_trip_col='tripid',
+        outdir='./data/kcm_all')
     print(f"Number of tracks for last day: {NUM_TRACKS}")
