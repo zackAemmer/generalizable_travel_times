@@ -1,9 +1,11 @@
 name: valle
 channels:
+  - apple
   - conda-forge
   - defaults
 dependencies:
   - python=3.9.7
+  - pip
   - boto3
   - requests
   - python-dotenv
@@ -13,3 +15,12 @@ dependencies:
   - libpq
   - pytz
   - scikit-learn
+  - pytorch
+  - torchvision
+  - ipykernel
+  - geopandas
+  - osmnx
+  - contextily
+  # - pip:
+    # - tensorflow-macos
+    # - tensorflow-metal

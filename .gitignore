@@ -4,6 +4,8 @@ secret.py
 .DS_Store
 /docs/*
 /data/*
+/plots/*
+/src/models/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
