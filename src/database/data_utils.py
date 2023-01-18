@@ -22,7 +22,11 @@ def haversine(lon1, lat1, lon2, lat2):
     Calculate the great circle distance in meters between two points 
     on the earth (specified in decimal degrees)
     """
-    # convert decimal degrees to radians 
+    # convert decimal degrees to radians
+    lon1 = float(lon1)
+    lon2 = float(lon2)
+    lat1 = float(lat1)
+    lat2 = float(lat2)
     lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
 
     # haversine formula 
@@ -92,6 +96,9 @@ def calculate_trace_df(data, file_col, tripid_col, locid_col, lat_col, lon_col, 
     use_coord_dist: whether or not to calculate lat/lon distances vs odometer
     Returns: combination of original point values, and new _diff values
     """
+    # Deal with cases where strings are passed
+    for col in diff_cols:
+        data[col] = data[col].astype(float)
     # Get in order by locationtime
     df = data.sort_values([file_col, tripid_col, locid_col], ascending=True)
     # Calculate differences between consecutive locations
@@ -159,3 +166,29 @@ def get_consecutive_values(shape_data):
     # Unique id for each lat/lon -> lat/lon segment
     route_shape_data['segment_id'] = route_shape_data['point_id'] + '_' + route_shape_data['point_id_shift']
     return route_shape_data
+
+def map_to_deeptte(trace_data):
+    """
+    Reshape pandas dataframe to the json format needed to use deeptte.
+    trace_data: dataframe with bus trajectories
+    Returns: path to json file where deeptte trajectories are saved
+    """
+    # group by the desired column
+    groups = trace_data.groupby(['file','tripid'])
+    # create an empty dictionary to store the JSON data
+    result = {}
+    for name, group in groups:
+        result[name] = {
+            'time_gap': group['time_cumulative'].tolist(),
+            'dist': max(group['dist_cumulative']),
+            'lats': group['lat'].tolist(),
+            'driverID': max(group['vehicleid']),
+            'weekID': group['weekID'].tolist(),
+            'states': [1.0 for x in group['vehicleid']],
+            'timeID': group['timeID'].tolist(),
+            'dateID': group['dateID'].tolist(),
+            'time': max(group['time_cumulative'].tolist()),
+            'lngs': group['lon'].tolist(),
+            'dist_gap': group['dist_cumulative'].tolist()
+        }
+    return result
