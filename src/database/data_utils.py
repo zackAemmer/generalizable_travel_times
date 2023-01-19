@@ -111,6 +111,28 @@ def calculate_trace_df(data, file_col, tripid_col, locid_col, lat_col, lon_col, 
         hav.columns = ["lat1","lon1","lat2","lon2"]
         traces['dist_calc'] = hav.apply(lambda x: haversine(x.lon1, x.lat1, x.lon2, x.lat2), axis=1)
     traces.dropna(inplace=True)
+
+    # Calculate and remove speeds that are unreasonable
+    traces['speed_m_s'] = traces['dist_calc'] / traces['locationtime_diff']
+    traces = traces.loc[traces['speed_m_s']>0]
+    traces = traces.loc[traces['speed_m_s']<35]
+    traces['dist_calc_km'] = traces['dist_calc'] / 1000.0
+    # Get time from trip start
+    traces['time_cumulative'] = traces.groupby(['file','tripid'])['locationtime'].transform(lambda x: x - x.iloc[0])
+    traces['dist_cumulative'] = traces.groupby(['file','tripid'])['dist_calc_km'].cumsum()
+    traces['dist_cumulative'] = traces.groupby(['file','tripid'])['dist_cumulative'].transform(lambda x: x - x.iloc[0])
+    # Only keep trajectories with at least 10 points
+    traces = traces.groupby(['file','tripid']).filter(lambda x: len(x) > 10)
+    # Time values for deeptte
+    traces['datetime'] = (pd.to_datetime(traces['locationtime'], unit='s')) 
+    traces['dateID'] = (traces['datetime'].dt.day)
+    traces['weekID'] = (traces['datetime'].dt.dayofweek)
+    traces['timeID'] = (traces['datetime'].dt.hour * 60) + (traces['datetime'].dt.minute)
+
+    # Recode vehicle id to start from 0
+    mapping = {v:k for k,v in enumerate(set(traces['vehicleid'].values.flatten()))}
+    recode = [mapping[y] for y in traces['vehicleid'].values.flatten()]
+    traces['vehicleid_recode'] = recode
     return traces
 
 def get_unique_line_geometries(shape_data):
@@ -182,11 +204,11 @@ def map_to_deeptte(trace_data):
             'time_gap': group['time_cumulative'].tolist(),
             'dist': max(group['dist_cumulative']),
             'lats': group['lat'].tolist(),
-            'driverID': max(group['vehicleid']),
-            'weekID': group['weekID'].tolist(),
+            'driverID': max(group['vehicleid_recode']),
+            'weekID': max(group['weekID']),
             'states': [1.0 for x in group['vehicleid']],
-            'timeID': group['timeID'].tolist(),
-            'dateID': group['dateID'].tolist(),
+            'timeID': max(group['timeID']),
+            'dateID': max(group['dateID']),
             'time': max(group['time_cumulative'].tolist()),
             'lngs': group['lon'].tolist(),
             'dist_gap': group['dist_cumulative'].tolist()
