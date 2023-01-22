@@ -1,9 +1,8 @@
-#!/usr/bin/env python3
-"""Functions for processing and working with tracked bus data.
+"""
+Functions for processing and working with tracked bus data.
 """
 
-
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 import json
 from math import radians, cos, sin, asin, sqrt
 import os
@@ -62,6 +61,28 @@ def extract_validation_trips(validation_path):
     # Get the tracks for the route id and time of the validation data +/- amount
     return vehicle_id
 
+def get_date_list(start, n_days):
+    year, month, day = start.split("_")
+    base = date(int(year), int(month), int(day))
+    date_list = [base + timedelta(days=x) for x in range(n_days)]
+    return [f"{date.strftime('%Y_%m_%d')}.pkl" for date in date_list]
+
+def combine_specific_folder_data(folder, file_list):
+    """
+    Combine all the daily .pkl files containing feed data into a single dataframe.
+    folder: the folder to search in
+    file_list: the file names to read and combine
+    Returns: a dataframe of all data concatenated together, a column 'file' is added
+    """
+    data_list = []
+    for file in file_list:
+        with open(folder+'/'+file, 'rb') as f:
+            data = pickle.load(f)
+            data['file'] = file
+            data_list.append(data)
+    data = pd.concat(data_list, axis=0)
+    return data
+
 def combine_all_folder_data(folder, n_sample=None):
     """
     Combine all the daily .pkl files containing feed data into a single dataframe.
@@ -118,21 +139,17 @@ def calculate_trace_df(data, file_col, tripid_col, locid_col, lat_col, lon_col, 
     traces = traces.loc[traces['speed_m_s']<35]
     traces['dist_calc_km'] = traces['dist_calc'] / 1000.0
     # Get time from trip start
-    traces['time_cumulative'] = traces.groupby(['file','tripid'])['locationtime'].transform(lambda x: x - x.iloc[0])
-    traces['dist_cumulative'] = traces.groupby(['file','tripid'])['dist_calc_km'].cumsum()
-    traces['dist_cumulative'] = traces.groupby(['file','tripid'])['dist_cumulative'].transform(lambda x: x - x.iloc[0])
+    traces['time_cumulative'] = traces.groupby([file_col, tripid_col])['locationtime'].transform(lambda x: x - x.iloc[0])
+    traces['dist_cumulative'] = traces.groupby([file_col, tripid_col])['dist_calc_km'].cumsum()
+    traces['dist_cumulative'] = traces.groupby([file_col, tripid_col])['dist_cumulative'].transform(lambda x: x - x.iloc[0])
     # Only keep trajectories with at least 10 points
-    traces = traces.groupby(['file','tripid']).filter(lambda x: len(x) > 10)
+    traces = traces.groupby([file_col, tripid_col]).filter(lambda x: len(x) > 10)
     # Time values for deeptte
     traces['datetime'] = (pd.to_datetime(traces['locationtime'], unit='s')) 
     traces['dateID'] = (traces['datetime'].dt.day)
     traces['weekID'] = (traces['datetime'].dt.dayofweek)
     traces['timeID'] = (traces['datetime'].dt.hour * 60) + (traces['datetime'].dt.minute)
 
-    # Recode vehicle id to start from 0
-    mapping = {v:k for k,v in enumerate(set(traces['vehicleid'].values.flatten()))}
-    recode = [mapping[y] for y in traces['vehicleid'].values.flatten()]
-    traces['vehicleid_recode'] = recode
     return traces
 
 def get_unique_line_geometries(shape_data):
@@ -189,14 +206,14 @@ def get_consecutive_values(shape_data):
     route_shape_data['segment_id'] = route_shape_data['point_id'] + '_' + route_shape_data['point_id_shift']
     return route_shape_data
 
-def map_to_deeptte(trace_data):
+def map_to_deeptte(trace_data, file_col, tripid_col):
     """
     Reshape pandas dataframe to the json format needed to use deeptte.
     trace_data: dataframe with bus trajectories
     Returns: path to json file where deeptte trajectories are saved
     """
     # group by the desired column
-    groups = trace_data.groupby(['file','tripid'])
+    groups = trace_data.groupby([file_col, tripid_col])
     # create an empty dictionary to store the JSON data
     result = {}
     for name, group in groups:
@@ -206,7 +223,7 @@ def map_to_deeptte(trace_data):
             'lats': group['lat'].tolist(),
             'driverID': max(group['vehicleid_recode']),
             'weekID': max(group['weekID']),
-            'states': [1.0 for x in group['vehicleid']],
+            'states': [1.0 for x in group['vehicleid_recode']],
             'timeID': max(group['timeID']),
             'dateID': max(group['dateID']),
             'time': max(group['time_cumulative'].tolist()),
