@@ -2,13 +2,10 @@
 Functions for processing and working with tracked bus data.
 """
 
-from datetime import date, datetime, timezone, timedelta
-import json
+from datetime import date, timedelta
 from math import radians, cos, sin, asin, sqrt
 import os
 from random import sample
-import requests
-from zipfile import ZipFile
 
 import geopandas
 import numpy as np
@@ -19,7 +16,8 @@ import shapely.geometry
 def haversine(lon1, lat1, lon2, lat2):
     """
     Calculate the great circle distance in meters between two points 
-    on the earth (specified in decimal degrees)
+    on the earth (specified in decimal degrees).
+    Returns: float distance in meters
     """
     # convert decimal degrees to radians
     lon1 = float(lon1)
@@ -37,6 +35,11 @@ def haversine(lon1, lat1, lon2, lat2):
     return c * r * 1000
 
 def get_validation_dates(validation_path):
+    """
+    Get a list of date strings corresponding to all trace files stored in a folder.
+    validation_path: string containing the path to the folder
+    Returns: list of date strings
+    """
     dates = []
     files = os.listdir(validation_path)
     for file in files:
@@ -44,24 +47,13 @@ def get_validation_dates(validation_path):
         dates.append(labels[2] + "-" + labels[3] + "-" + labels[4].split("_")[0])
     return dates
 
-def extract_validation_trips(validation_path):
-    files = os.listdir(validation_path)
-    for file in files:
-        labels = file.split("-")
-        vehicle_id = labels[0]
-        route_num = labels[1]
-        year = labels[2]
-        month = labels[3]
-        day = labels[4].split("_")[0]
-        hour = labels[4].split("_")[1]
-        minute = labels[5]
-        day_data = pd.read_csv(f"./data/kcm_validation_tracks/{labels}")
-        with open('10M.pkl', 'rb') as f:
-            df = pickle.load(f)
-    # Get the tracks for the route id and time of the validation data +/- amount
-    return vehicle_id
-
 def get_date_list(start, n_days):
+    """
+    Get a list of date strings starting at a given day and continuing for n days.
+    start: date string formatted as 'yyyy_mm_dd'
+    n_days: int number of days forward to include from start day
+    Returns: list of date strings
+    """
     year, month, day = start.split("_")
     base = date(int(year), int(month), int(day))
     date_list = [base + timedelta(days=x) for x in range(n_days)]
@@ -104,7 +96,7 @@ def combine_all_folder_data(folder, n_sample=None):
     data = pd.concat(data_list, axis=0)
     return data
 
-def calculate_trace_df(data, file_col, tripid_col, locid_col, lat_col, lon_col, diff_cols, use_coord_dist=False):
+def calculate_trace_df(data, file_col, tripid_col, locid_col, lat_col, lon_col, diff_cols, timezone, use_coord_dist=False):
     """
     Calculate difference in metrics between two consecutive trip points.
     data: pandas df with all bus trips
@@ -114,6 +106,7 @@ def calculate_trace_df(data, file_col, tripid_col, locid_col, lat_col, lon_col, 
     lat_col: column name with latitude
     lon_col: column name with longitude
     diff_cols: list of column names to calculate metrics across
+    timezone: string for timezone the data were collected in
     use_coord_dist: whether or not to calculate lat/lon distances vs odometer
     Returns: combination of original point values, and new _diff values
     """
@@ -145,7 +138,7 @@ def calculate_trace_df(data, file_col, tripid_col, locid_col, lat_col, lon_col, 
     # Only keep trajectories with at least 10 points
     traces = traces.groupby([file_col, tripid_col]).filter(lambda x: len(x) > 10)
     # Time values for deeptte
-    traces['datetime'] = (pd.to_datetime(traces['locationtime'], unit='s')) 
+    traces['datetime'] = pd.to_datetime(traces['locationtime'], unit='s', utc=True).map(lambda x: x.tz_convert(timezone))
     traces['dateID'] = (traces['datetime'].dt.day)
     traces['weekID'] = (traces['datetime'].dt.dayofweek)
     traces['timeID'] = (traces['datetime'].dt.hour * 60) + (traces['datetime'].dt.minute)
@@ -231,3 +224,52 @@ def map_to_deeptte(trace_data, file_col, tripid_col):
             'dist_gap': group['dist_cumulative'].tolist()
         }
     return result
+
+def resample_deeptte_gps(deeptte_data, n_samples):
+    """
+    Resamples tracked gps points evenly to specified count.
+    deeptte_data: json loaded from a training/testing file formatted for DeepTTE
+    n_samples: the number of gps points to resample each record to
+    Returns: dataframe with lat, lon, dist, and time resampled. Each timestep is averaged or linearly interpolated.
+    """
+    all_res = []
+    for i in range(0, len(deeptte_data)):
+        time_gaps = deeptte_data[i]['time_gap']
+        lats = [float(x) for x in deeptte_data[i]['lats']]
+        lngs = [float(x) for x in deeptte_data[i]['lngs']]
+        dists = [float(x) for x in deeptte_data[i]['dist_gap']]
+        z = pd.DataFrame({"time_gaps":time_gaps, "lat":lats, "lng":lngs, "dist":dists})
+        z.index = pd.to_datetime(z['time_gaps'], unit='s')
+        first = z.index.min()
+        last = z.index.max()
+        secs = int((last-first).total_seconds())
+        secs_per_sample = secs // n_samples
+        periodsize = '{:f}S'.format(secs_per_sample)
+        result = z.resample(periodsize).mean()
+        result = result.interpolate(method='linear')
+        result = result.iloc[0:n_samples,:]
+        result['deeptte_index'] = i
+        all_res.append(result)
+    return pd.concat(all_res, axis=0)
+
+def format_deeptte_to_features(deeptte_data, resampled_deeptte_data):
+    """
+    Reformat the DeepTTE json format into a numpy array that can be used for modeling with sklearn.
+    deeptte_data: json loaded from a training/testing file formatted for DeepTTE
+    resampled_deeptte_data: resampled dataframe from 'resample_deeptte_gps' in which all tracks have the same length
+    Returns: 2d numpy array (samples x features) and 1d numpy array (tt true values). Each point in a trace has a set of resampled features, which are concatenated such that each value at each point is its own feature.
+    """
+    # Gather the trip attribute features
+    timeIDs = np.array([x['timeID'] for x in deeptte_data]).reshape(len(deeptte_data),1)
+    weekIDs = np.array([x['weekID'] for x in deeptte_data]).reshape(len(deeptte_data),1)
+    dateIDs = np.array([x['dateID'] for x in deeptte_data]).reshape(len(deeptte_data),1)
+    driverIDs = np.array([x['driverID'] for x in deeptte_data]).reshape(len(deeptte_data),1)
+    dists = np.array([x['dist'] for x in deeptte_data]).reshape(len(deeptte_data),1)
+    df = np.concatenate((timeIDs, weekIDs, dateIDs, driverIDs, dists), axis=1) # X
+    times = np.array([x['time'] for x in deeptte_data]).reshape(len(deeptte_data),1).ravel() # y
+    # Add resampled features (each point is own feature)
+    # resampled_features = resampled_deeptte_data.groupby("deeptte_index").apply(lambda x: np.concatenate([x['dist'].values, x['lat'].values, x['lng'].values]))
+    resampled_features = resampled_deeptte_data.groupby("deeptte_index").apply(lambda x: np.concatenate([x['lat'].values, x['lng'].values]))
+    resampled_features = np.array([x for x in resampled_features])
+    df = np.hstack((df, resampled_features))
+    return df, times
