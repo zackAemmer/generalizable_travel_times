@@ -15,6 +15,7 @@ dependencies:
   - libpq
   - pytz
   - scikit-learn
+  - seaborn
   - pytorch
   - torchvision
   - ipykernel
