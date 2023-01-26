@@ -273,3 +273,22 @@ def format_deeptte_to_features(deeptte_data, resampled_deeptte_data):
     resampled_features = np.array([x for x in resampled_features])
     df = np.hstack((df, resampled_features))
     return df, times
+
+def extract_operator():    
+    folder = '../data/nwy_all/'
+    new_folder = '../data/atb_all/'
+    files = os.listdir(folder)
+    for file in files:
+        if file != ".DS_Store":
+            with open(folder+'/'+file, 'rb') as f:
+                data = pickle.load(f)
+                data = data[data['datasource']=='ATB']
+            with open(f"{new_folder}/{file}", 'wb') as f:
+                pickle.dump(data, f)
+
+def map_to_network(traces, segments, n_sample):
+    # Sample from the traces, match to the network
+    traces_n = traces.sample(n_sample)
+    # There are duplicates when distance to segments is tied; just take first
+    traces_n = geopandas.sjoin_nearest(traces_n, segments, distance_col="join_dist").drop_duplicates(['tripid','locationtime'])
+    return traces_n
