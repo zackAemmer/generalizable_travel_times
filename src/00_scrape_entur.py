@@ -9,16 +9,16 @@ import numpy as np
 import pandas as pd
 import psycopg2
 
-import config as secret
+# import config as secret
 
 
-def connect_to_rds():
-    conn = psycopg2.connect(
-        host=secret.HOST,
-        database=secret.DATABASE,
-        user=secret.UID,
-        password=secret.PWD)
-    return conn
+# def connect_to_rds():
+#     conn = psycopg2.connect(
+#         host=secret.HOST,
+#         database=secret.DATABASE,
+#         user=secret.UID,
+#         password=secret.PWD)
+#     return conn
 
 def get_epoch_and_cet_24hr():
     # Get the UTC/GMT epoch, and the CET hour of day
@@ -138,7 +138,7 @@ def upload_to_rds(to_upload, conn, collected_time):
 if __name__ == "__main__":
     # Limited to 4 requests/minute, otherwise need publish/subscribe
     endpoint = 'https://api.entur.io/realtime/v1/rest/vm'
-    conn = connect_to_rds()
+    # conn = connect_to_rds()
     current_hour, current_epoch = get_epoch_and_cet_24hr()
     while current_hour < 19:
         # Call Entur SIRI API (returns XML)
@@ -152,6 +152,6 @@ if __name__ == "__main__":
         clean_active_trips(vehicle_statuses) # Modifies in-place by deleting elements to save memory
 
         current_hour, current_epoch = get_epoch_and_cet_24hr()
-        args_str = upload_to_rds(vehicle_statuses, conn, current_epoch)
+        # args_str = upload_to_rds(vehicle_statuses, conn, current_epoch)
         time.sleep(20)
-    conn.close()
+    # conn.close()

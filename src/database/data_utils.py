@@ -113,6 +113,8 @@ def calculate_trace_df(data, file_col, tripid_col, locid_col, lat_col, lon_col, 
     # Deal with cases where strings are passed
     for col in diff_cols:
         data[col] = data[col].astype(float)
+    data[lat_col] = data[lat_col].astype(float)
+    data[lon_col] = data[lon_col].astype(float)
     # Get in order by locationtime
     df = data.sort_values([file_col, tripid_col, locid_col], ascending=True)
     # Calculate differences between consecutive locations

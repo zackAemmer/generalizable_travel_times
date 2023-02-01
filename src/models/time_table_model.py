@@ -13,14 +13,17 @@ class TimeTableModel:
 
     def predict_using_schedule_only(self, traces):
         # Calculate baseline for test data from GTFS timetables
+        # If the trip is not in the time tables, we cannot make a prediction
+        traces_cp = traces[traces[self.tripid_col].isin(self.gtfs_data['trip_id'])].copy()
+        num_lost = (len(traces) - len(traces_cp)) / len(traces)
         # Get the present time for each point
-        locations_dt = pd.to_datetime(traces['locationtime'], unit="s", utc=True).map(lambda x: x.tz_convert(self.timezone))
-        traces['actual_time_from_midnight'] = locations_dt.dt.hour*60*60 + locations_dt.dt.minute*60 + locations_dt.dt.second
+        locations_dt = pd.to_datetime(traces_cp['locationtime'], unit="s", utc=True).map(lambda x: x.tz_convert(self.timezone))
+        traces_cp['actual_time_from_midnight'] = locations_dt.dt.hour*60*60 + locations_dt.dt.minute*60 + locations_dt.dt.second
         # Get first/last point of each trace
-        start_locations = traces.groupby(["file","tripid"]).nth([0]).reset_index()
-        end_locations = traces.groupby(["file","tripid"]).nth([-1]).reset_index()
+        start_locations = traces_cp.groupby(["file",self.tripid_col]).nth([0]).reset_index()
+        end_locations = traces_cp.groupby(["file",self.tripid_col]).nth([-1]).reset_index()
         # Cross join all endpoints to all stops that trip uses
-        df = pd.merge(end_locations, self.gtfs_data, left_on=["tripid"], right_on=["trip_id"])
+        df = pd.merge(end_locations, self.gtfs_data, left_on=[self.tripid_col], right_on=["trip_id"])
         # Get geometry for every endpoint, and every stop combination
         end_points = [shapely.Point(x,y) for x,y in zip(df.lon, df.lat)]
         end_points = geopandas.GeoDataFrame(crs='epsg:4326', geometry=end_points)
@@ -28,15 +31,15 @@ class TimeTableModel:
         stop_points = geopandas.GeoDataFrame(crs='epsg:4326', geometry=stop_points)
         # Group by file/trip and keep only the minimum distance stop
         df['dist_to_stop'] = [x.distance(y) for x,y in zip(end_points.geometry, stop_points.geometry)]
-        df = df.sort_values(['file','tripid','dist_to_stop'])
-        df = df.groupby(["file","tripid"]).nth([0]).reset_index()
+        df = df.sort_values(['file',self.tripid_col,'dist_to_stop'])
+        df = df.groupby(["file",self.tripid_col]).nth([0]).reset_index()
         # Calculate the arrival time in seconds since midnight for closest stop
         df['arrival_s'] = [int(x[0])*60*60 + int(x[1])*60 + int(x[2]) for x in df['arrival_time'].str.split(":")]
         # The predicted travel time starts at the trace start, and goes until the arrival at the nearest stop
         preds = df['arrival_s'] - start_locations['actual_time_from_midnight']
         # The actual travel time ends at exactly when the final trace was taken
         labels = df['actual_time_from_midnight'] - start_locations['actual_time_from_midnight']
-        return preds, labels
+        return preds, labels, num_lost
 
     def predict_using_shapefiles(self, traces):
         # Join the GTFS info to the trace data
@@ -71,10 +74,10 @@ class TimeTableModel:
         return z
 
     def merge_gtfs_files(self):
-        z = pd.read_csv(self.gtfs_folder+"trips.txt")
-        st = pd.read_csv(self.gtfs_folder+"stop_times.txt")
+        z = pd.read_csv(self.gtfs_folder+"trips.txt", low_memory=False)
+        st = pd.read_csv(self.gtfs_folder+"stop_times.txt", low_memory=False)
+        sl = pd.read_csv(self.gtfs_folder+"stops.txt", low_memory=False)
         z = pd.merge(z,st,on="trip_id")
-        sl = pd.read_csv(self.gtfs_folder+"stops.txt")
         z = pd.merge(z,sl,on="stop_id")
         gtfs_data = z.sort_values(['trip_id','stop_sequence'])
         return gtfs_data
