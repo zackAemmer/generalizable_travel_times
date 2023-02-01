@@ -142,6 +142,8 @@ def calculate_trace_df(data, file_col, tripid_col, locid_col, lat_col, lon_col, 
     traces['dateID'] = (traces['datetime'].dt.day)
     traces['weekID'] = (traces['datetime'].dt.dayofweek)
     traces['timeID'] = (traces['datetime'].dt.hour * 60) + (traces['datetime'].dt.minute)
+    # Sort before returning
+    traces = traces.sort_values([file_col,tripid_col,locid_col])
 
     return traces
 

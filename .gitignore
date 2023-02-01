@@ -5,7 +5,6 @@ secret.py
 /docs/*
 /data/*
 /plots/*
-/src/models/*
 /results/*
 
 # Byte-compiled / optimized / DLL files
