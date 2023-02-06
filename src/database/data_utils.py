@@ -13,26 +13,14 @@ import pandas as pd
 import pickle
 import shapely.geometry
 
-def haversine(lon1, lat1, lon2, lat2):
-    """
-    Calculate the great circle distance in meters between two points 
-    on the earth (specified in decimal degrees).
-    Returns: float distance in meters
-    """
-    # convert decimal degrees to radians
-    lon1 = float(lon1)
-    lon2 = float(lon2)
-    lat1 = float(lat1)
-    lat2 = float(lat2)
-    lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
-
-    # haversine formula 
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-    c = 2 * asin(sqrt(a))
-    r = 6371 # Radius of earth in kilometers. Use 3956 for miles. Determines return value units.
-    return c * r * 1000
+def spherical_dist(pos1, pos2, r=6371000):
+    pos1 = pos1 * np.pi / 180
+    pos2 = pos2 * np.pi / 180
+    cos_lat1 = np.cos(pos1[..., 0])
+    cos_lat2 = np.cos(pos2[..., 0])
+    cos_lat_d = np.cos(pos1[..., 0] - pos2[..., 0])
+    cos_lon_d = np.cos(pos1[..., 1] - pos2[..., 1])
+    return r * np.arccos(cos_lat_d - cos_lat1 * cos_lat2 * (1 - cos_lon_d))
 
 def get_validation_dates(validation_path):
     """
@@ -59,26 +47,39 @@ def get_date_list(start, n_days):
     date_list = [base + timedelta(days=x) for x in range(n_days)]
     return [f"{date.strftime('%Y_%m_%d')}.pkl" for date in date_list]
 
-def combine_specific_folder_data(folder, file_list):
+def combine_specific_folder_data(folder, file_list, given_names, feature_lookup):
     """
     Combine all the daily .pkl files containing feed data into a single dataframe.
     folder: the folder to search in
     file_list: the file names to read and combine
-    Returns: a dataframe of all data concatenated together, a column 'file' is added
+    given_names: list of the names of the features in the raw data
+    feature_lookup: dict mapping feature names : data types
+    Returns: a dataframe of all data concatenated together, a column 'file' is added, also a list of all dates with no data.
     """
     data_list = []
+    no_data_list = []
     for file in file_list:
-        with open(folder+'/'+file, 'rb') as f:
-            data = pickle.load(f)
-            data['file'] = file
-            data_list.append(data)
+        try:
+            with open(folder+'/'+file, 'rb') as f:
+                data = pickle.load(f)
+                data['file'] = file
+                # Get unified column names, data types
+                data = data[given_names]
+                data.columns = feature_lookup.keys()
+                data = data.astype(feature_lookup)
+                data_list.append(data)
+        except FileNotFoundError:
+            no_data_list.append(file)
     data = pd.concat(data_list, axis=0)
-    return data
+    data = data.sort_values(['file','trip_id','locationtime'], ascending=True)
+    return data, no_data_list
 
-def combine_all_folder_data(folder, n_sample=None):
+def combine_all_folder_data(folder, given_names, feature_lookup, n_sample=None):
     """
     Combine all the daily .pkl files containing feed data into a single dataframe.
     folder: the folder full of .pkl files to combine
+    given_names: list of the names of the features in the raw data
+    feature_lookup: dict mapping feature names : data types
     n_sample: the number of files to sample from the folder (all if false)
     Returns: a dataframe of all data concatenated together, a column 'file' is added
     """
@@ -91,62 +92,50 @@ def combine_all_folder_data(folder, n_sample=None):
         if file != ".DS_Store":
             with open(folder+'/'+file, 'rb') as f:
                 data = pickle.load(f)
+                # Get unified column names, data types
+                data = data[given_names]
+                data.columns = feature_lookup.keys()
+                data = data.astype(feature_lookup)
                 data['file'] = file
                 data_list.append(data)
     data = pd.concat(data_list, axis=0)
+    data = data.sort_values(['file','trip_id','locationtime'],ascending=True).dropna()
     return data
 
-def calculate_trace_df(data, file_col, tripid_col, locid_col, lat_col, lon_col, diff_cols, timezone, use_coord_dist=False):
+def calculate_trace_df(data, timezone):
     """
     Calculate difference in metrics between two consecutive trip points.
     data: pandas df with all bus trips
-    file_col: column name that separates each pkl file
-    tripid_col: column name that has unique trip ids
-    locid_col: column name that has the time of the observation
-    lat_col: column name with latitude
-    lon_col: column name with longitude
-    diff_cols: list of column names to calculate metrics across
     timezone: string for timezone the data were collected in
-    use_coord_dist: whether or not to calculate lat/lon distances vs odometer
     Returns: combination of original point values, and new _diff values
     """
-    # Deal with cases where strings are passed
-    for col in diff_cols:
-        data[col] = data[col].astype(float)
-    data[lat_col] = data[lat_col].astype(float)
-    data[lon_col] = data[lon_col].astype(float)
-    # Get in order by locationtime
-    df = data.sort_values([file_col, tripid_col, locid_col], ascending=True)
-    # Calculate differences between consecutive locations
-    diff = df.groupby([file_col, tripid_col])[diff_cols].diff()
-    diff.columns = [colname+'_diff' for colname in diff.columns]
-    traces = pd.concat([df, diff], axis=1)
-    if use_coord_dist:
-        shift = df.groupby([file_col, tripid_col]).shift()
-        hav = pd.concat([df[[lat_col,lon_col]], shift[[lat_col,lon_col]]], axis=1)
-        hav.columns = ["lat1","lon1","lat2","lon2"]
-        traces['dist_calc'] = hav.apply(lambda x: haversine(x.lon1, x.lat1, x.lon2, x.lat2), axis=1)
-    traces.dropna(inplace=True)
-
+    # Calculate differences between consecutive locations; drops first point in every trajectory
+    shifted = data[['file','trip_id','locationtime','lat','lon']].groupby(['file','trip_id']).shift()
+    shifted.columns = [colname+'_prev' for colname in shifted.columns]
+    traces = pd.concat([data, shifted], axis=1).dropna()
+    # Shifting makes everything a float; revert back where necessary
+    traces['locationtime_prev'] = traces['locationtime_prev'].astype(int)
+    # Calculate GPS distance
+    end_points = np.array((traces.lon, traces.lat)).T
+    start_points = np.array((traces.lon_prev, traces.lat_prev)).T
+    traces['dist_calc_m'] = spherical_dist(end_points, start_points)
+    traces['dist_calc_km'] = traces['dist_calc_m'] / 1000.0
     # Calculate and remove speeds that are unreasonable
-    traces['speed_m_s'] = traces['dist_calc'] / traces['locationtime_diff']
+    traces['time_calc_s'] = traces['locationtime'] - traces['locationtime_prev']
+    traces['speed_m_s'] = traces['dist_calc_m'] / traces['time_calc_s']
     traces = traces.loc[traces['speed_m_s']>0]
     traces = traces.loc[traces['speed_m_s']<35]
-    traces['dist_calc_km'] = traces['dist_calc'] / 1000.0
-    # Get time from trip start
-    traces['time_cumulative'] = traces.groupby([file_col, tripid_col])['locationtime'].transform(lambda x: x - x.iloc[0])
-    traces['dist_cumulative'] = traces.groupby([file_col, tripid_col])['dist_calc_km'].cumsum()
-    traces['dist_cumulative'] = traces.groupby([file_col, tripid_col])['dist_cumulative'].transform(lambda x: x - x.iloc[0])
     # Only keep trajectories with at least 10 points
-    traces = traces.groupby([file_col, tripid_col]).filter(lambda x: len(x) > 10)
+    traces = traces.groupby(['file', 'trip_id']).filter(lambda x: len(x) > 10)
+    # Get cumulative values from trip start
+    traces['time_cumulative_s'] = traces.locationtime - traces.groupby(['file','trip_id']).locationtime.transform('min')
+    traces['dist_cumulative_km'] = traces.groupby(['file','trip_id'])['dist_calc_km'].cumsum()
+    traces['dist_cumulative_km'] = traces.dist_cumulative_km - traces.groupby(['file','trip_id']).dist_cumulative_km.transform('min')
     # Time values for deeptte
     traces['datetime'] = pd.to_datetime(traces['locationtime'], unit='s', utc=True).map(lambda x: x.tz_convert(timezone))
     traces['dateID'] = (traces['datetime'].dt.day)
     traces['weekID'] = (traces['datetime'].dt.dayofweek)
     traces['timeID'] = (traces['datetime'].dt.hour * 60) + (traces['datetime'].dt.minute)
-    # Sort before returning
-    traces = traces.sort_values([file_col,tripid_col,locid_col])
-
     return traces
 
 def get_unique_line_geometries(shape_data):
@@ -203,29 +192,29 @@ def get_consecutive_values(shape_data):
     route_shape_data['segment_id'] = route_shape_data['point_id'] + '_' + route_shape_data['point_id_shift']
     return route_shape_data
 
-def map_to_deeptte(trace_data, file_col, tripid_col):
+def map_to_deeptte(trace_data):
     """
     Reshape pandas dataframe to the json format needed to use deeptte.
     trace_data: dataframe with bus trajectories
     Returns: path to json file where deeptte trajectories are saved
     """
     # group by the desired column
-    groups = trace_data.groupby([file_col, tripid_col])
+    groups = trace_data.groupby(['file', 'trip_id'])
     # create an empty dictionary to store the JSON data
     result = {}
     for name, group in groups:
         result[name] = {
-            'time_gap': group['time_cumulative'].tolist(),
-            'dist': max(group['dist_cumulative']),
+            'time_gap': group['time_cumulative_s'].tolist(),
+            'dist': max(group['dist_cumulative_km']),
             'lats': group['lat'].tolist(),
-            'driverID': max(group['vehicleid_recode']),
+            'driverID': max(group['vehicle_id_recode']),
             'weekID': max(group['weekID']),
-            'states': [1.0 for x in group['vehicleid_recode']],
+            'states': [1.0 for x in group['vehicle_id_recode']],
             'timeID': max(group['timeID']),
             'dateID': max(group['dateID']),
-            'time': max(group['time_cumulative'].tolist()),
+            'time': max(group['time_cumulative_s'].tolist()),
             'lngs': group['lon'].tolist(),
-            'dist_gap': group['dist_cumulative'].tolist()
+            'dist_gap': group['dist_cumulative_km'].tolist()
         }
     return result
 
