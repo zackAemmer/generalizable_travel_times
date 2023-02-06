@@ -13,7 +13,11 @@ import pandas as pd
 import pickle
 import shapely.geometry
 
-from models import time_table_model
+
+def calculate_gps_dist(lons1, lats1, lons2, lats2):
+    end_points = np.array((lons1, lats1)).T
+    start_points = np.array((lons2, lats2)).T
+    return spherical_dist(end_points, start_points)
 
 def spherical_dist(pos1, pos2, r=6371000):
     pos1 = pos1 * np.pi / 180
