@@ -3,13 +3,15 @@ import numpy as np
 import pandas as pd
 import shapely.geometry
 
+from database import data_utils
+
 
 class TimeTableModel:
     def __init__(self, gtfs_folder, timezone, tripid_col):
         self.gtfs_folder = gtfs_folder
         self.timezone = timezone
         self.tripid_col = tripid_col
-        self.gtfs_data = self.merge_gtfs_files()
+        self.gtfs_data = data_utils.merge_gtfs_files(self.gtfs_folder)
 
     def predict_using_schedule_only(self, traces):
         # Calculate baseline for test data from GTFS timetables
@@ -72,15 +74,6 @@ class TimeTableModel:
         z.plot(ax=ax)
         stop_geometry.plot(ax=ax, marker="x")
         return z
-
-    def merge_gtfs_files(self):
-        z = pd.read_csv(self.gtfs_folder+"trips.txt", low_memory=False)
-        st = pd.read_csv(self.gtfs_folder+"stop_times.txt", low_memory=False)
-        sl = pd.read_csv(self.gtfs_folder+"stops.txt", low_memory=False)
-        z = pd.merge(z,st,on="trip_id")
-        z = pd.merge(z,sl,on="stop_id")
-        gtfs_data = z.sort_values(['trip_id','stop_sequence'])
-        return gtfs_data
 
     def shapes_to_segments(self, gtfs_folder):
         shapes = pd.read_csv(gtfs_folder+"shapes.txt")

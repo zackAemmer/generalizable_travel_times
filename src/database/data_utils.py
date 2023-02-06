@@ -13,6 +13,8 @@ import pandas as pd
 import pickle
 import shapely.geometry
 
+from models import time_table_model
+
 def spherical_dist(pos1, pos2, r=6371000):
     pos1 = pos1 * np.pi / 180
     pos2 = pos2 * np.pi / 180
@@ -126,7 +128,7 @@ def calculate_trace_df(data, timezone):
     traces = traces.loc[traces['speed_m_s']>0]
     traces = traces.loc[traces['speed_m_s']<35]
     # Only keep trajectories with at least 10 points
-    traces = traces.groupby(['file', 'trip_id']).filter(lambda x: len(x) > 10)
+    traces = traces.groupby(['file','trip_id']).filter(lambda x: len(x) > 10)
     # Get cumulative values from trip start
     traces['time_cumulative_s'] = traces.locationtime - traces.groupby(['file','trip_id']).locationtime.transform('min')
     traces['dist_cumulative_km'] = traces.groupby(['file','trip_id'])['dist_calc_km'].cumsum()
@@ -137,6 +139,22 @@ def calculate_trace_df(data, timezone):
     traces['weekID'] = (traces['datetime'].dt.dayofweek)
     traces['timeID'] = (traces['datetime'].dt.hour * 60) + (traces['datetime'].dt.minute)
     return traces
+
+def clean_trace_df_w_timetables(trace_df, gtfs_folder):
+    # Read in GTFS files
+    gtfs_data = merge_gtfs_files(gtfs_folder)
+    # Remove any trips that are not in the GTFS
+    trace_df = trace_df[trace_df['trip_id'].isin(gtfs_data.trip_id)]
+    # Match the first data point of each trajectory to first stop in its trip
+    first_points_and_stops = pd.merge(trace_df.drop_duplicates(['file','trip_id']), gtfs_data.drop_duplicates(['trip_id']), on='trip_id')
+    end_points = np.array((first_points_and_stops.lon, first_points_and_stops.lat)).T
+    start_points = np.array((first_points_and_stops.stop_lon, first_points_and_stops.stop_lat)).T
+    first_points_and_stops['stop_distances_m'] = spherical_dist(end_points, start_points)
+    # Remove the 95th percentile of distances and up
+    first_points_and_stops = first_points_and_stops[first_points_and_stops['stop_distances_m'] < np.quantile(first_points_and_stops['stop_distances_m'], .95)]
+    first_points_and_stops = first_points_and_stops[['file','trip_id']].drop_duplicates()
+    trace_df = pd.merge(trace_df, first_points_and_stops, on=['file','trip_id'])    
+    return trace_df
 
 def get_unique_line_geometries(shape_data):
     """
@@ -285,3 +303,12 @@ def map_to_network(traces, segments, n_sample):
     # There are duplicates when distance to segments is tied; just take first
     traces_n = geopandas.sjoin_nearest(traces_n, segments, distance_col="join_dist").drop_duplicates(['tripid','locationtime'])
     return traces_n
+
+def merge_gtfs_files(gtfs_folder):
+    z = pd.read_csv(gtfs_folder+"trips.txt", low_memory=False)
+    st = pd.read_csv(gtfs_folder+"stop_times.txt", low_memory=False)
+    sl = pd.read_csv(gtfs_folder+"stops.txt", low_memory=False)
+    z = pd.merge(z,st,on="trip_id")
+    z = pd.merge(z,sl,on="stop_id")
+    gtfs_data = z.sort_values(['trip_id','stop_sequence'])
+    return gtfs_data
