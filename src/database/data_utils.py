@@ -13,6 +13,9 @@ import pandas as pd
 import pickle
 import shapely.geometry
 
+def normalize(ary, mean, std):
+    # Z = x-u / sigma
+    return (ary - mean) / std
 
 def recode_nums(ary):
     old_codes = np.sort(ary).astype(int)
