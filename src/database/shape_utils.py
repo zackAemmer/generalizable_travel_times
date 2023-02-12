@@ -25,7 +25,7 @@ def get_unique_line_geometries(shape_data):
     # Get line geometries for each segment
     # Each segment ID should have two rows; point 1 and point 2
     shape_segment_list_copy = shape_segment_list.copy()
-    shape_segment_list = geopandas.GeoDataFrame(shape_segment_list, geometry=geopandas.points_from_xy(shape_segment_list.shape_pt_lon, shape_segment_list.shape_pt_lat))
+    shape_segment_list = geopandas.GeoDataFrame(shape_segment_list, geometry=geopandas.points_from_xy(np.array(shape_segment_list.shape_pt_lon), np.array(shape_segment_list.shape_pt_lat)))
     shape_segment_list_copy = geopandas.GeoDataFrame(shape_segment_list_copy, geometry=geopandas.points_from_xy(shape_segment_list_copy.shape_pt_lon_shift, shape_segment_list_copy.shape_pt_lat_shift))
     segment_shapes = pd.concat([shape_segment_list, shape_segment_list_copy], axis=0).sort_values('segment_id')
     # Join each point-set across the two segment-rows into a line

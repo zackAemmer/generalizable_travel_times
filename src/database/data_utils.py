@@ -2,7 +2,7 @@
 Functions for processing and working with tracked bus data.
 """
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from math import radians, cos, sin, asin, sqrt
 import os
 from random import sample
@@ -12,6 +12,12 @@ import numpy as np
 import pandas as pd
 import pickle
 import shapely.geometry
+
+
+FEATURE_NAMES = ['trip_id','file','locationtime','lat','lon','vehicle_id']
+FEATURE_TYPES = ['object','object','int','float','float','object']
+FEATURE_LOOKUP = dict(zip(FEATURE_NAMES, FEATURE_TYPES))
+
 
 def normalize(ary, mean, std):
     # Z = x-u / sigma
@@ -28,6 +34,7 @@ def calculate_gps_dist(lons1, lats1, lons2, lats2):
     return spherical_dist(end_points, start_points)
 
 def spherical_dist(pos1, pos2, r=6371000):
+    # r is in meters
     pos1 = pos1 * np.pi / 180
     pos2 = pos2 * np.pi / 180
     cos_lat1 = np.cos(pos1[..., 0])
@@ -35,6 +42,16 @@ def spherical_dist(pos1, pos2, r=6371000):
     cos_lat_d = np.cos(pos1[..., 0] - pos2[..., 0])
     cos_lon_d = np.cos(pos1[..., 1] - pos2[..., 1])
     return r * np.arccos(cos_lat_d - cos_lat1 * cos_lat2 * (1 - cos_lon_d))
+
+def calculate_trip_speeds(data):
+    x = data[['trip_id','lat','lon','locationtime']]
+    y = data[['trip_id','lat','lon','locationtime']].shift()
+    y.columns = [colname+"_shift" for colname in y.columns]
+    z = pd.concat([x,y], axis=1)
+    z['dist_diff'] = calculate_gps_dist(z['lon'], z['lat'], z['lon_shift'], z['lat_shift'])
+    z['time_diff'] = z['locationtime'] - z['locationtime_shift']
+    z['speed_m_s'] = z['dist_diff'] / z['time_diff']
+    return z['speed_m_s'].values.flatten()
 
 def get_validation_dates(validation_path):
     """
@@ -61,14 +78,13 @@ def get_date_list(start, n_days):
     date_list = [base + timedelta(days=x) for x in range(n_days)]
     return [f"{date.strftime('%Y_%m_%d')}.pkl" for date in date_list]
 
-def combine_specific_folder_data(folder, file_list, given_names, feature_lookup):
+def combine_pkl_data(folder, file_list, given_names):
     """
-    Combine all the daily .pkl files containing feed data into a single dataframe.
+    Load raw feed data stored in a .pkl file to a dataframe. Unify column names and dtypes.
     folder: the folder to search in
     file_list: the file names to read and combine
     given_names: list of the names of the features in the raw data
-    feature_lookup: dict mapping feature names : data types
-    Returns: a dataframe of all data concatenated together, a column 'file' is added, also a list of all dates with no data.
+    Returns: a dataframe of all data concatenated together, a column 'file' is added, also a list of all files with no data.
     """
     data_list = []
     no_data_list = []
@@ -79,42 +95,14 @@ def combine_specific_folder_data(folder, file_list, given_names, feature_lookup)
                 data['file'] = file
                 # Get unified column names, data types
                 data = data[given_names]
-                data.columns = feature_lookup.keys()
-                data = data.astype(feature_lookup)
+                data.columns = FEATURE_LOOKUP.keys()
+                data = data.astype(FEATURE_LOOKUP)
                 data_list.append(data)
         except FileNotFoundError:
             no_data_list.append(file)
     data = pd.concat(data_list, axis=0)
     data = data.sort_values(['file','trip_id','locationtime'], ascending=True)
     return data, no_data_list
-
-def combine_all_folder_data(folder, given_names, feature_lookup, n_sample=None):
-    """
-    Combine all the daily .pkl files containing feed data into a single dataframe.
-    folder: the folder full of .pkl files to combine
-    given_names: list of the names of the features in the raw data
-    feature_lookup: dict mapping feature names : data types
-    n_sample: the number of files to sample from the folder (all if false)
-    Returns: a dataframe of all data concatenated together, a column 'file' is added
-    """
-    data_list = []
-    if n_sample is not None:
-        files = sample(os.listdir(folder), n_sample)
-    else:
-        files = os.listdir(folder)
-    for file in files:
-        if file != ".DS_Store":
-            with open(folder+'/'+file, 'rb') as f:
-                data = pickle.load(f)
-                # Get unified column names, data types
-                data = data[given_names]
-                data.columns = feature_lookup.keys()
-                data = data.astype(feature_lookup)
-                data['file'] = file
-                data_list.append(data)
-    data = pd.concat(data_list, axis=0)
-    data = data.sort_values(['file','trip_id','locationtime'],ascending=True).dropna()
-    return data
 
 def calculate_trace_df(data, timezone):
     """
@@ -287,3 +275,50 @@ def gtfs_to_graph(self):
     edge_attr = edges.values[:,2].reshape(edges.shape[0],1)
     x = np.random.random(node_ids.shape[0]).reshape(node_ids.shape[0],1)
     return {"x":x, "edge_index":edge_index, "edge_attr":edge_attr, "node_recode_dict":node_recode_dict}
+
+def get_date_from_filename(filename):
+    file_parts = filename.split("_")
+    date_obj = datetime(int(file_parts[0]), int(file_parts[1]), int(file_parts[2].split(".")[0]))
+    return date_obj
+
+def calc_data_metrics(data, timezone):
+    # Speed
+    data['speed_m_s'] = calculate_trip_speeds(data)
+    data = data.dropna()
+    data = data[data['speed_m_s']>0.0]
+    data = data[data['speed_m_s']<35.0]
+    # Simple metrics
+    points = len(data)
+    trajs = len(data.drop_duplicates(['trip_id']))
+    unique_trips = len(pd.unique(data['trip_id']))
+    unique_vehs = len(pd.unique(data['vehicle_id']))
+    # Obs and Speed by time of day
+    data['datetime'] = pd.to_datetime(data['locationtime'], unit='s', utc=True).map(lambda x: x.tz_convert(timezone))
+    data['timeID'] = data['datetime'].dt.hour
+    data['timeID'] = pd.Categorical(data['timeID'], categories=np.arange(24))
+    hourly_agg = data[['timeID','speed_m_s']].groupby('timeID')
+    mean_speeds = hourly_agg.mean(numeric_only=True)['speed_m_s'].values.flatten()
+    sd_speeds = hourly_agg.std(numeric_only=True)['speed_m_s'].values.flatten()
+    n_obs = hourly_agg.count()['speed_m_s'].values.flatten()
+    # Group metrics to return in dict
+    summary = {
+        "n_points": points,
+        "n_trajs": trajs,
+        "nunq_trips": unique_trips,
+        "nunq_vehs": unique_vehs,
+        "hourly_points": n_obs,
+        "hourly_mean_speeds": mean_speeds,
+        "hourly_sd_speeds": sd_speeds
+    }
+    return summary
+
+def full_dataset_summary(folder, given_names, timezone):
+    file_list = os.listdir(folder)
+    dates = []
+    data_summaries = []
+    for file in file_list:
+        if file != ".DS_Store":
+            data, _ = combine_pkl_data(folder, [file], given_names)
+            dates.append(get_date_from_filename(file))
+            data_summaries.append(calc_data_metrics(data, timezone))
+    return dates, data_summaries
