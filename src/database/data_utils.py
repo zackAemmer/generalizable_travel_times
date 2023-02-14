@@ -1,5 +1,5 @@
 """
-Functions for processing and working with tracked bus data.
+Functions for processing tracked bus and timetable data.
 """
 
 from datetime import date, datetime, timedelta
@@ -14,27 +14,47 @@ import pickle
 import shapely.geometry
 
 
+# Set of unified feature names and dtypes for variables in the raw data
 FEATURE_NAMES = ['trip_id','file','locationtime','lat','lon','vehicle_id']
 FEATURE_TYPES = ['object','object','int','float','float','object']
 FEATURE_LOOKUP = dict(zip(FEATURE_NAMES, FEATURE_TYPES))
 
 
 def normalize(ary, mean, std):
-    # Z = x-u / sigma
+    """
+    Z = (x-u) / sigma
+    """
     return (ary - mean) / std
 
 def recode_nums(ary):
+    """
+    Get new numeric codes starting from 0 for an array with random numbers.
+    ary: array to recode
+    Returns: dictionary that maps old numbers to new numbers starting from 0
+    """
     old_codes = np.sort(ary).astype(int)
     new_codes = np.arange(0,len(old_codes))
     return dict(zip(old_codes, new_codes))
 
 def calculate_gps_dist(lons1, lats1, lons2, lats2):
+    """
+    Calculate the Haversine distance between a series of points.
+    lons1/lats1: arrays of coordinates for the end points
+    lons2/lats2: arrays of coordinates for the start points
+    Returns: array of distances in meters.
+    """
     end_points = np.array((lons1, lats1)).T
     start_points = np.array((lons2, lats2)).T
     return spherical_dist(end_points, start_points)
 
 def spherical_dist(pos1, pos2, r=6371000):
-    # r is in meters
+    """
+    Calculate spherical distance between two coordinates.
+    pos1/pos2: 2d array with lon and lat for start/end points
+    r: radius of earth in desired units
+    Returns: array of distances.
+    """
+    # r is in meters (6371000)
     pos1 = pos1 * np.pi / 180
     pos2 = pos2 * np.pi / 180
     cos_lat1 = np.cos(pos1[..., 0])
@@ -44,6 +64,12 @@ def spherical_dist(pos1, pos2, r=6371000):
     return r * np.arccos(cos_lat_d - cos_lat1 * cos_lat2 * (1 - cos_lon_d))
 
 def calculate_trip_speeds(data):
+    """
+    Calculate speeds between consecutive trip locations.
+    data: pandas dataframe of bus data with unified columns
+    Returns: array of speeds, dist_diff, time_diff between consecutive points.
+    Nan for first point of a trip.
+    """
     x = data[['trip_id','lat','lon','locationtime']]
     y = data[['trip_id','lat','lon','locationtime']].shift()
     y.columns = [colname+"_shift" for colname in y.columns]
@@ -51,7 +77,7 @@ def calculate_trip_speeds(data):
     z['dist_diff'] = calculate_gps_dist(z['lon'], z['lat'], z['lon_shift'], z['lat_shift'])
     z['time_diff'] = z['locationtime'] - z['locationtime_shift']
     z['speed_m_s'] = z['dist_diff'] / z['time_diff']
-    return z['speed_m_s'].values.flatten()
+    return z['speed_m_s'].values.flatten(), z['dist_diff'].values.flatten(), z['time_diff'].values.flatten()
 
 def get_validation_dates(validation_path):
     """
@@ -81,6 +107,7 @@ def get_date_list(start, n_days):
 def combine_pkl_data(folder, file_list, given_names):
     """
     Load raw feed data stored in a .pkl file to a dataframe. Unify column names and dtypes.
+    This should ALWAYS be used to load the raw bus data from .pkl files, because it unifies the column names and types.
     folder: the folder to search in
     file_list: the file names to read and combine
     given_names: list of the names of the features in the raw data
@@ -111,56 +138,67 @@ def calculate_trace_df(data, timezone):
     timezone: string for timezone the data were collected in
     Returns: combination of original point values, and new _diff values
     """
-    # Calculate differences between consecutive locations; drops first point in every trajectory
-    shifted = data[['file','trip_id','locationtime','lat','lon']].groupby(['file','trip_id']).shift()
-    shifted.columns = [colname+'_prev' for colname in shifted.columns]
-    traces = pd.concat([data, shifted], axis=1).dropna()
-    # Shifting makes everything a float; revert back where necessary
-    traces['locationtime_prev'] = traces['locationtime_prev'].astype(int)
-    # Calculate GPS distance
-    end_points = np.array((traces.lon, traces.lat)).T
-    start_points = np.array((traces.lon_prev, traces.lat_prev)).T
-    traces['dist_calc_m'] = spherical_dist(end_points, start_points)
-    traces['dist_calc_km'] = traces['dist_calc_m'] / 1000.0
-    # Calculate and remove speeds that are unreasonable
-    traces['time_calc_s'] = traces['locationtime'] - traces['locationtime_prev']
-    traces['speed_m_s'] = traces['dist_calc_m'] / traces['time_calc_s']
-    traces = traces.loc[traces['speed_m_s']>0]
-    traces = traces.loc[traces['speed_m_s']<35]
-    # Only keep trajectories with at least 10 points
-    traces = traces.groupby(['file','trip_id']).filter(lambda x: len(x) > 10)
+    # Gets speeds between consecutive points, drop first points, filter
+    data['speed_m_s'], data['dist_calc_m'], data['time_calc_s'] = calculate_trip_speeds(data)
+    data['dist_calc_km'] = data['dist_calc_m'] / 1000.0
+    data = data.dropna()
+    data = data[data['speed_m_s']>0.0]
+    data = data[data['speed_m_s']<35.0]
+    # Get unique trajectories in pd groupby, only keep trajectories with at least 10 points
+    data = data.groupby(['file','trip_id']).filter(lambda x: len(x) > 10)
+    unique_traj = data.groupby(['file','trip_id'])
     # Get cumulative values from trip start
-    traces['time_cumulative_s'] = traces.locationtime - traces.groupby(['file','trip_id']).locationtime.transform('min')
-    traces['dist_cumulative_km'] = traces.groupby(['file','trip_id'])['dist_calc_km'].cumsum()
-    traces['dist_cumulative_km'] = traces.dist_cumulative_km - traces.groupby(['file','trip_id']).dist_cumulative_km.transform('min')
+    data['time_cumulative_s'] = data.locationtime - unique_traj.locationtime.transform('min')
+    data['dist_cumulative_km'] = unique_traj['dist_calc_km'].cumsum()
+    data['dist_cumulative_km'] = data.dist_cumulative_km - unique_traj.dist_cumulative_km.transform('min')
     # Time values for deeptte
-    traces['datetime'] = pd.to_datetime(traces['locationtime'], unit='s', utc=True).map(lambda x: x.tz_convert(timezone))
-    traces['dateID'] = (traces['datetime'].dt.day)
-    traces['weekID'] = (traces['datetime'].dt.dayofweek)
-    traces['timeID'] = (traces['datetime'].dt.hour * 60) + (traces['datetime'].dt.minute)
-    return traces
+    data['datetime'] = pd.to_datetime(data['locationtime'], unit='s', utc=True).map(lambda x: x.tz_convert(timezone))
+    data['dateID'] = (data['datetime'].dt.day)
+    data['weekID'] = (data['datetime'].dt.dayofweek)
+    data['timeID'] = (data['datetime'].dt.hour * 60) + (data['datetime'].dt.minute)
+    return data
 
-def clean_trace_df_w_timetables(trace_df, gtfs_folder):
+def clean_trace_df_w_timetables(data, gtfs_folder):
+    """
+    Validate a set of tracked bus locations against GTFS.
+    data: pandas dataframe with unified bus data
+    gtfs_folder: location to search for gtfs files
+    Returns: dataframe with only trips that are in GTFS, and are reasonably close to scheduled stop ids.
+    """
     # Read in GTFS files
     gtfs_data = merge_gtfs_files(gtfs_folder)
     # Remove any trips that are not in the GTFS
-    trace_df = trace_df[trace_df['trip_id'].isin(gtfs_data.trip_id)]
+    data = data[data['trip_id'].isin(gtfs_data.trip_id)]
     # Match the first data point of each trajectory to first stop in its trip
-    first_points_and_stops = pd.merge(trace_df.drop_duplicates(['file','trip_id']), gtfs_data.drop_duplicates(['trip_id']), on='trip_id')
+    first_points_and_stops = pd.merge(data.drop_duplicates(['file','trip_id']), gtfs_data.drop_duplicates(['trip_id']), on='trip_id')
     end_points = np.array((first_points_and_stops.lon, first_points_and_stops.lat)).T
     start_points = np.array((first_points_and_stops.stop_lon, first_points_and_stops.stop_lat)).T
     first_points_and_stops['stop_distances_m'] = spherical_dist(end_points, start_points)
     # Remove the 95th percentile of distances and up
     first_points_and_stops = first_points_and_stops[first_points_and_stops['stop_distances_m'] < np.quantile(first_points_and_stops['stop_distances_m'], .95)]
     first_points_and_stops = first_points_and_stops[['file','trip_id']].drop_duplicates()
-    trace_df = pd.merge(trace_df, first_points_and_stops, on=['file','trip_id'])    
-    return trace_df
+    data = pd.merge(data, first_points_and_stops, on=['file','trip_id'])    
+    return data
+
+def remap_vehicle_ids(df_list):
+    """
+    Remap each vehicle ID in all dfs to start from 0, maintaining order.
+    df_list: list of pandas dataframes with unified bus data
+    Returns: list of pandas dataframes with new column for vehicle_id_recode.
+    """
+    all_vehicle_ids = pd.concat([x['vehicle_id'] for x in df_list]).values.flatten()
+    # Recode vehicle ids to start from 0
+    mapping = {v:k for k,v in enumerate(set(all_vehicle_ids))}
+    for df in df_list:
+        recode = [mapping[y] for y in df['vehicle_id'].values.flatten()]
+        df['vehicle_id_recode'] = recode
+    return (df_list, len(pd.unique(all_vehicle_ids)))
 
 def map_to_deeptte(trace_data):
     """
     Reshape pandas dataframe to the json format needed to use deeptte.
     trace_data: dataframe with bus trajectories
-    Returns: path to json file where deeptte trajectories are saved
+    Returns: path to json file where deeptte trajectories are saved.
     """
     # group by the desired column
     groups = trace_data.groupby(['file', 'trip_id'])
@@ -181,6 +219,159 @@ def map_to_deeptte(trace_data):
             'dist_gap': group['dist_cumulative_km'].tolist()
         }
     return result
+
+def get_summary_config(trace_data):
+    """
+    Get a dict of means and sds which are used to normalize data by DeepTTE.
+    trace_data: pandas dataframe with unified columns and calculated distances
+    Returns: dict of mean and std values, as well as train/test filenames.
+    """
+    # config.json
+    summary_dict = {
+        'dist_gap_mean': np.mean(trace_data['dist_calc_km']),
+        'dist_gap_std': np.std(trace_data['dist_calc_km']),
+        'time_gap_mean': np.mean(trace_data['time_calc_s']),
+        'time_gap_std': np.std(trace_data['time_calc_s']),
+        'lngs_std': np.std(trace_data['lon']),
+        'lngs_mean': np.mean(trace_data['lon']),
+        'lats_mean': np.mean(trace_data['lat']),
+        'dist_std': np.std(trace_data.groupby(['file','trip_id']).max()[['dist_cumulative_km']].values.flatten()),
+        "dist_mean": np.mean(trace_data.groupby(['file','trip_id']).max()[['dist_cumulative_km']].values.flatten()),
+        "lats_std": np.std(trace_data['lat']),
+        "time_mean": np.mean(trace_data.groupby(['file','trip_id']).max()[['time_cumulative_s']].values.flatten()),
+        "time_std": np.std(trace_data.groupby(['file','trip_id']).max()[['time_cumulative_s']].values.flatten()),
+        "train_set": ["train_00", "train_01", "train_02", "train_03"],
+        "eval_set": ["train_04"],
+        "test_set": ["test"]
+    }
+    return summary_dict
+
+def extract_operator(old_folder, new_folder, source_col, op_name):
+    """
+    Make a copy of raw bus data with only a single operator.
+    old_folder: location of data which contains the desired operator + others
+    new_folder: where to save the new filtered files
+    source_col: column name to filter on
+    op_name: column value to keep in new files
+    """
+    folder = '../data/nwy_all/'
+    new_folder = '../data/atb_all/'
+    files = os.listdir(folder)
+    for file in files:
+        if file != ".DS_Store":
+            with open(folder+'/'+file, 'rb') as f:
+                data = pickle.load(f)
+                data = data[data[source_col]==op_name]
+            with open(f"{new_folder}/{file}", 'wb') as f:
+                pickle.dump(data, f)
+
+def merge_gtfs_files(gtfs_folder):
+    """
+    Join a set of GTFS files into a single dataframe. Each row is a trip + arrival time.
+    gtfs_folder: location to search for GTFS files
+    Returns: pandas dataframe with merged GTFS data.
+    """
+    z = pd.read_csv(gtfs_folder+"trips.txt", low_memory=False)
+    st = pd.read_csv(gtfs_folder+"stop_times.txt", low_memory=False)
+    sl = pd.read_csv(gtfs_folder+"stops.txt", low_memory=False)
+    z = pd.merge(z,st,on="trip_id")
+    z = pd.merge(z,sl,on="stop_id")
+    gtfs_data = z.sort_values(['trip_id','stop_sequence'])
+    return gtfs_data
+
+def gtfs_to_graph():
+    """
+    Reshape a set of GTFS files into a graph network. Nodes are stops and edges are mean travel times.
+    Intended to use with geometric torch.
+    Returns: Dictionary with node and edge lists/values.
+    """
+    # Read in GTFS data, get travel times
+    gtfs_data = merge_gtfs_files("../data/kcm_gtfs/2022_09_19/")[['trip_id','stop_id','arrival_time']]
+    gtfs_data['arrival_s'] = [int(x[0])*60*60 + int(x[1])*60 + int(x[2]) for x in gtfs_data['arrival_time'].str.split(":")]
+    gtfs_data_shifted = gtfs_data.groupby(['trip_id']).shift()
+    gtfs_data_shifted.columns = [x+"_shift" for x in gtfs_data_shifted.columns]
+    gtfs_data = pd.concat([gtfs_data, gtfs_data_shifted], axis=1).dropna()
+    gtfs_data['travel_time_s'] = gtfs_data['arrival_s'] - gtfs_data['arrival_s_shift']
+    gtfs_data = gtfs_data.sort_values(['trip_id','stop_id','arrival_time'])
+    # Recode nodes to start from 0
+    node_ids = np.unique(pd.concat([gtfs_data['stop_id'], gtfs_data['stop_id_shift']], axis=0))
+    node_recode_dict = recode_nums(node_ids)
+    # Get edge connections, and recode to match new node IDs
+    edges = gtfs_data[['stop_id_shift','stop_id','travel_time_s']].astype(int)
+    edges = edges.groupby(['stop_id_shift','stop_id']).mean().reset_index()
+    edges.columns = ['start_node','end_node','weight']
+    edges_data = edges.values[:,:2].T
+    edges_data = np.vectorize(node_recode_dict.get)(edges_data)
+    # Create graph
+    edge_index = edges_data
+    edge_attr = edges.values[:,2].reshape(edges.shape[0],1)
+    x = np.random.random(node_ids.shape[0]).reshape(node_ids.shape[0],1)
+    return {"x":x, "edge_index":edge_index, "edge_attr":edge_attr, "node_recode_dict":node_recode_dict}
+
+def get_date_from_filename(filename):
+    """
+    Get the date from a .pkl raw bus data filename.
+    filename: string in format "YYYY_MM_DD.pkl"
+    Returns: Datetime object.
+    """
+    file_parts = filename.split("_")
+    date_obj = datetime(int(file_parts[0]), int(file_parts[1]), int(file_parts[2].split(".")[0]))
+    return date_obj
+
+def calc_data_metrics(data, timezone):
+    """
+    Summarize some metrics for a set of bus data on a given day.
+    data: pandas dataframe with unified bus data
+    timezone: string similar to "America/Los_Angeles"
+    Returns: Dictionary with keys corresponding to metrics. Some are grouped by hour of day.
+    """
+    # Speed
+    data['speed_m_s'] = calculate_trip_speeds(data)
+    data = data.dropna()
+    data = data[data['speed_m_s']>0.0]
+    data = data[data['speed_m_s']<35.0]
+    # Simple metrics
+    points = len(data)
+    trajs = len(data.drop_duplicates(['trip_id']))
+    unique_trips = len(pd.unique(data['trip_id']))
+    unique_vehs = len(pd.unique(data['vehicle_id']))
+    # Obs and Speed by time of day
+    data['datetime'] = pd.to_datetime(data['locationtime'], unit='s', utc=True).map(lambda x: x.tz_convert(timezone))
+    data['timeID'] = data['datetime'].dt.hour
+    data['timeID'] = pd.Categorical(data['timeID'], categories=np.arange(24))
+    hourly_agg = data[['timeID','speed_m_s']].groupby('timeID')
+    mean_speeds = hourly_agg.mean(numeric_only=True)['speed_m_s'].values.flatten()
+    sd_speeds = hourly_agg.std(numeric_only=True)['speed_m_s'].values.flatten()
+    n_obs = hourly_agg.count()['speed_m_s'].values.flatten()
+    # Group metrics to return in dict
+    summary = {
+        "n_points": points,
+        "n_trajs": trajs,
+        "nunq_trips": unique_trips,
+        "nunq_vehs": unique_vehs,
+        "hourly_points": n_obs,
+        "hourly_mean_speeds": mean_speeds,
+        "hourly_sd_speeds": sd_speeds
+    }
+    return summary
+
+def full_dataset_summary(folder, given_names, timezone):
+    """
+    Calculate summaries for every raw bus data file in a folder.
+    folder: where to look for .pkl files
+    given_names: feature names (in order) used by the raw feed
+    timezone: string similar to "America/Los_Angeles"
+    Returns: list of dates that data was found for, and list of dicts with summary for each date.
+    """
+    file_list = os.listdir(folder)
+    dates = []
+    data_summaries = []
+    for file in file_list:
+        if file != ".DS_Store":
+            data, _ = combine_pkl_data(folder, [file], given_names)
+            dates.append(get_date_from_filename(file))
+            data_summaries.append(calc_data_metrics(data, timezone))
+    return dates, data_summaries
 
 def resample_deeptte_gps(deeptte_data, n_samples):
     """
@@ -230,95 +421,3 @@ def format_deeptte_to_features(deeptte_data, resampled_deeptte_data):
     resampled_features = np.array([x for x in resampled_features])
     df = np.hstack((df, resampled_features))
     return df, times
-
-def extract_operator():    
-    folder = '../data/nwy_all/'
-    new_folder = '../data/atb_all/'
-    files = os.listdir(folder)
-    for file in files:
-        if file != ".DS_Store":
-            with open(folder+'/'+file, 'rb') as f:
-                data = pickle.load(f)
-                data = data[data['datasource']=='ATB']
-            with open(f"{new_folder}/{file}", 'wb') as f:
-                pickle.dump(data, f)
-
-def merge_gtfs_files(gtfs_folder):
-    z = pd.read_csv(gtfs_folder+"trips.txt", low_memory=False)
-    st = pd.read_csv(gtfs_folder+"stop_times.txt", low_memory=False)
-    sl = pd.read_csv(gtfs_folder+"stops.txt", low_memory=False)
-    z = pd.merge(z,st,on="trip_id")
-    z = pd.merge(z,sl,on="stop_id")
-    gtfs_data = z.sort_values(['trip_id','stop_sequence'])
-    return gtfs_data
-
-def gtfs_to_graph(self):
-    # Read in GTFS data, get travel times
-    gtfs_data = merge_gtfs_files("../data/kcm_gtfs/2022_09_19/")[['trip_id','stop_id','arrival_time']]
-    gtfs_data['arrival_s'] = [int(x[0])*60*60 + int(x[1])*60 + int(x[2]) for x in gtfs_data['arrival_time'].str.split(":")]
-    gtfs_data_shifted = gtfs_data.groupby(['trip_id']).shift()
-    gtfs_data_shifted.columns = [x+"_shift" for x in gtfs_data_shifted.columns]
-    gtfs_data = pd.concat([gtfs_data, gtfs_data_shifted], axis=1).dropna()
-    gtfs_data['travel_time_s'] = gtfs_data['arrival_s'] - gtfs_data['arrival_s_shift']
-    gtfs_data = gtfs_data.sort_values(['trip_id','stop_id','arrival_time'])
-    # Recode nodes to start from 0
-    node_ids = np.unique(pd.concat([gtfs_data['stop_id'], gtfs_data['stop_id_shift']], axis=0))
-    node_recode_dict = recode_nums(node_ids)
-    # Get edge connections, and recode to match new node IDs
-    edges = gtfs_data[['stop_id_shift','stop_id','travel_time_s']].astype(int)
-    edges = edges.groupby(['stop_id_shift','stop_id']).mean().reset_index()
-    edges.columns = ['start_node','end_node','weight']
-    edges_data = edges.values[:,:2].T
-    edges_data = np.vectorize(node_recode_dict.get)(edges_data)
-    # Create graph
-    edge_index = edges_data
-    edge_attr = edges.values[:,2].reshape(edges.shape[0],1)
-    x = np.random.random(node_ids.shape[0]).reshape(node_ids.shape[0],1)
-    return {"x":x, "edge_index":edge_index, "edge_attr":edge_attr, "node_recode_dict":node_recode_dict}
-
-def get_date_from_filename(filename):
-    file_parts = filename.split("_")
-    date_obj = datetime(int(file_parts[0]), int(file_parts[1]), int(file_parts[2].split(".")[0]))
-    return date_obj
-
-def calc_data_metrics(data, timezone):
-    # Speed
-    data['speed_m_s'] = calculate_trip_speeds(data)
-    data = data.dropna()
-    data = data[data['speed_m_s']>0.0]
-    data = data[data['speed_m_s']<35.0]
-    # Simple metrics
-    points = len(data)
-    trajs = len(data.drop_duplicates(['trip_id']))
-    unique_trips = len(pd.unique(data['trip_id']))
-    unique_vehs = len(pd.unique(data['vehicle_id']))
-    # Obs and Speed by time of day
-    data['datetime'] = pd.to_datetime(data['locationtime'], unit='s', utc=True).map(lambda x: x.tz_convert(timezone))
-    data['timeID'] = data['datetime'].dt.hour
-    data['timeID'] = pd.Categorical(data['timeID'], categories=np.arange(24))
-    hourly_agg = data[['timeID','speed_m_s']].groupby('timeID')
-    mean_speeds = hourly_agg.mean(numeric_only=True)['speed_m_s'].values.flatten()
-    sd_speeds = hourly_agg.std(numeric_only=True)['speed_m_s'].values.flatten()
-    n_obs = hourly_agg.count()['speed_m_s'].values.flatten()
-    # Group metrics to return in dict
-    summary = {
-        "n_points": points,
-        "n_trajs": trajs,
-        "nunq_trips": unique_trips,
-        "nunq_vehs": unique_vehs,
-        "hourly_points": n_obs,
-        "hourly_mean_speeds": mean_speeds,
-        "hourly_sd_speeds": sd_speeds
-    }
-    return summary
-
-def full_dataset_summary(folder, given_names, timezone):
-    file_list = os.listdir(folder)
-    dates = []
-    data_summaries = []
-    for file in file_list:
-        if file != ".DS_Store":
-            data, _ = combine_pkl_data(folder, [file], given_names)
-            dates.append(get_date_from_filename(file))
-            data_summaries.append(calc_data_metrics(data, timezone))
-    return dates, data_summaries

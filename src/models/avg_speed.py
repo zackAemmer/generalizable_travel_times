@@ -4,6 +4,7 @@ import pandas as pd
 
 class AvgHourlySpeedModel:
     def __init__(self):
+        self.speed_lookup = {}
         return None
 
     def fit(self, traces):
@@ -24,6 +25,7 @@ class AvgHourlySpeedModel:
         return preds
 
     def get_speed_if_available(self, hour):
+        # If no data was available for the requested hour, return the mean of all available hours
         if hour in self.speed_lookup.keys():
             return self.speed_lookup['speed'][hour]
         else:

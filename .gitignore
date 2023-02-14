@@ -2,10 +2,13 @@
 config.py
 secret.py
 .DS_Store
+current_scraping_files.zip
 /docs/*
 /data/*
 /plots/*
 /results/*
+/aws/*
+/src/scraped_data/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

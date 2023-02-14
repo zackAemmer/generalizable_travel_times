@@ -1,0 +1,1 @@
+scp -i ../aws/gtfs_scraper.pem current_scraping_files.zip ec2-user@ec2-35-87-60-49.us-west-2.compute.amazonaws.com:
