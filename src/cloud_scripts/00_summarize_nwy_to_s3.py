@@ -22,9 +22,9 @@ if __name__ == "__main__":
     scrape_folder = "./scraped_data/nwy/"
     scrape_files = os.listdir(scrape_folder)
     all_data = []
-    yesterday_date_str, current_epoch = get_time_info(-26)
+    date_str, current_epoch = get_time_info(1)
     for filename in scrape_files:
-        if filename[-4:]==".pkl" and filename[:10]==yesterday_date_str[:10]:
+        if filename[-4:]==".pkl" and filename[:10]!=date_str[:10]:
             with open(scrape_folder+filename, 'rb') as f:
                 data = pickle.load(f)
             all_data.append(data)
@@ -43,7 +43,7 @@ if __name__ == "__main__":
         cli.put_object(
             Body=pickle.dumps(all_data),
             Bucket="gtfs-collection-nwy",
-            Key=yesterday_date_str[:10]+".pkl"
+            Key=date_str[:10]+".pkl"
         )
     except:
-        print(f"Either no files found for {yesterday_date_str}, or failure to access S3")
+        print(f"Either no files found for {date_str}, or failure to access S3")

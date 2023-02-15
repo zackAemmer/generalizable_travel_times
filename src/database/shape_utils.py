@@ -8,6 +8,7 @@ import os
 from random import sample
 
 import geopandas
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pickle
@@ -74,3 +75,36 @@ def map_to_network(traces, segments, n_sample):
     # There are duplicates when distance to segments is tied; just take first
     traces_n = geopandas.sjoin_nearest(traces_n, segments, distance_col="join_dist").drop_duplicates(['tripid','locationtime'])
     return traces_n
+
+def plot_gtfsrt_trip(ax, trace_df):
+    """
+    Plot a single real-time bus trajectory on a map.
+    ax: where to plot
+    trace_df: data from trip to plot
+    Returns: None.
+    """
+    to_plot = geopandas.GeoDataFrame(trace_df, geometry=geopandas.points_from_xy(trace_df.lon, trace_df.lat), crs="EPSG:4326")
+    to_plot_stop = trace_df.iloc[-1:,:]
+    to_plot_stop = geopandas.GeoDataFrame(to_plot_stop, geometry=geopandas.points_from_xy(to_plot_stop.stop_lon, to_plot_stop.stop_lat), crs="EPSG:4326")
+    # Plot all points
+    to_plot.plot(ax=ax, marker='.', color='purple', markersize=10)
+    # Plot first/last points
+    to_plot.iloc[0:1,:].plot(ax=ax, marker='*', color='green', markersize=40)
+    to_plot.iloc[-1:,:].plot(ax=ax, marker='*', color='red', markersize=40)
+    # Also plot closest stop to final point
+    to_plot_stop.plot(ax=ax, marker='x', color='blue', markersize=20)
+    return None
+
+def plot_gtfs_trip(ax, trip_id, gtfs_data):
+    """
+    Plot scheduled stops for a single bus trip on a map.
+    ax: where to plot
+    trip_id: which trip in GTFS to plot
+    gtfs_data: merged GTFS data
+    Returns: None.
+    """
+    to_plot = gtfs_data[gtfs_data['trip_id']==trip_id]
+    to_plot = [shapely.Point(x,y) for x,y in zip(to_plot.stop_lon, to_plot.stop_lat)]
+    to_plot = geopandas.GeoDataFrame(crs='epsg:4326', geometry=to_plot)
+    to_plot.plot(ax=ax, marker='x', color='black', markersize=10)
+    return None

@@ -12,25 +12,6 @@ class TimeTableModel:
         self.timezone = timezone
         self.gtfs_data = data_utils.merge_gtfs_files(self.gtfs_folder)
 
-    def plot_gtfs_trip(self, trip_id, ax):
-        z = self.gtfs_data
-        z = z[z['trip_id'] == trip_id]
-        stop_geometry = [shapely.Point(x,y) for x,y in zip(z.stop_lon, z.stop_lat)]
-        stop_geometry = geopandas.GeoDataFrame(crs='epsg:4326', geometry=stop_geometry)
-        z.plot(ax=ax)
-        stop_geometry.plot(ax=ax)
-        return None
-
-    def plot_trace_and_nextstop(self, traces, trip_id, file_id, ax):
-        z = traces[traces['file']==file_id]
-        z = z[z['tripid']==trip_id]
-        z = geopandas.GeoDataFrame(z)
-        stop_geometry = [shapely.Point(x,y) for x,y in zip(z.stop_lon, z.stop_lat)]
-        stop_geometry = geopandas.GeoDataFrame(crs='epsg:4326', geometry=stop_geometry)
-        z.plot(ax=ax)
-        stop_geometry.plot(ax=ax, marker="x")
-        return z
-
     def predict_using_schedule_only(self, traces):
         # Calculate baseline for test data from GTFS timetables
         # If the trip is not in the time tables, we cannot make a prediction
