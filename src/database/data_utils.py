@@ -23,9 +23,9 @@ def load_pkl(path):
         data = pickle.load(f)
     return data
 
-def write_pkl(path, data):
+def write_pkl(data, path):
     with open(path, 'wb') as f:
-        pickle.dump(f)
+        pickle.dump(data, f)
     return None
 
 def normalize(ary, mean, std):
@@ -218,7 +218,11 @@ def get_scheduled_arrival(trip_ids, lons, lats, gtfs_data):
     """
     # Use pd to cross join and calc distances
     # Must maintain original order to join back to formatted data so reset index
-    data = pd.DataFrame({"trip_id": trip_ids, "lons": lons, "lats": lats}).reset_index()
+    data = pd.DataFrame({
+        "trip_id": pd.Series(trip_ids, dtype='str'),
+        "lons": pd.Series(lons, dtype='float'),
+        "lats": pd.Series(lats, dtype='float')
+    }).reset_index()
     data = pd.merge(data, gtfs_data, on="trip_id")
     dists = calculate_gps_dist(
         data.stop_lon,
@@ -230,7 +234,11 @@ def get_scheduled_arrival(trip_ids, lons, lats, gtfs_data):
     data = data.sort_values(['index','dist'])
     # Return distance to closest stop, and arrival time at that stop
     data = data.groupby('index').first()[['dist','arrival_s','stop_lon','stop_lat']]
-    return data['dist'].values.flatten() / 1000.0, data['arrival_s'].values.flatten(), data['stop_lon'].values.flatten(), data['stop_lat'].values.flatten()
+    dists = data['dist'].values.flatten() / 1000.0
+    arrival_s = data['arrival_s'].values.flatten()
+    stop_lons = data['stop_lon'].values.flatten()
+    stop_lats = data['stop_lat'].values.flatten()
+    return dists, arrival_s, stop_lons, stop_lats
 
 def remap_vehicle_ids(df_list):
     """
@@ -331,12 +339,10 @@ def extract_operator(old_folder, new_folder, source_col, op_name):
     source_col: column name to filter on
     op_name: column value to keep in new files
     """
-    folder = '../data/nwy_all/'
-    new_folder = '../data/atb_all/'
-    files = os.listdir(folder)
+    files = os.listdir(old_folder)
     for file in files:
         if file != ".DS_Store":
-            with open(folder+'/'+file, 'rb') as f:
+            with open(old_folder+'/'+file, 'rb') as f:
                 data = pickle.load(f)
                 data = data[data[source_col]==op_name]
             with open(f"{new_folder}/{file}", 'wb') as f:
@@ -353,8 +359,18 @@ def merge_gtfs_files(gtfs_folder):
     sl = pd.read_csv(gtfs_folder+"stops.txt", low_memory=False)
     z = pd.merge(z,st,on="trip_id")
     z = pd.merge(z,sl,on="stop_id")
+    # Pandas reads the KCM trip ID as an integer, but it needs to match .0 formatted string IDs later
+    # Can specify exact dtypes later, but also need to get trip_id in the formatted data to match
+    if z['trip_id'].dtype==int:
+        z['trip_id'] = z['trip_id'].astype(float)
     gtfs_data = z.sort_values(['trip_id','stop_sequence'])
-    gtfs_data = gtfs_data[['trip_id','stop_id','stop_lat','stop_lon','arrival_time']].copy()
+    gtfs_data = pd.DataFrame({
+        'trip_id': pd.Series(gtfs_data['trip_id'], dtype='str'),
+        'stop_id': pd.Series(gtfs_data['stop_id'], dtype='str'),
+        'stop_lat': pd.Series(gtfs_data['stop_lat'], dtype='float'),
+        'stop_lon': pd.Series(gtfs_data['stop_lon'], dtype='float'),
+        'arrival_time': pd.Series(gtfs_data['arrival_time'], dtype='str'),
+    })
     gtfs_data['arrival_s'] = [int(x[0])*60*60 + int(x[1])*60 + int(x[2]) for x in gtfs_data['arrival_time'].str.split(":")]
     return gtfs_data
 
