@@ -45,9 +45,19 @@ def make_dataset(data, config, device):
     noise = torch.from_numpy(np.random.uniform(0.0, 1.0, len(data)).astype('float32')).unsqueeze(1)
 
     # Testing different feature combinations
-    # X = torch.cat((start_lng, start_lat, end_lng, end_lat, stop_dist_km, scheduled_time_s, speed_m_s, timeID, weekID), dim=1)
-    # X = torch.cat((start_lng, start_lat, end_lng, end_lat, timeID, weekID), dim=1)
-    X = torch.cat((scheduled_time_s, dist, timeID, weekID, driverID), dim=1)
+    X = torch.cat((
+        scheduled_time_s,
+        start_lng,
+        start_lat,
+        end_lng,
+        end_lat,
+        stop_dist_km,
+        speed_m_s,
+        dist,
+        timeID,
+        weekID,
+        driverID
+    ), dim=1)
 
     # Labels
     y = torch.from_numpy(data_utils.normalize(np.array([x['time_gap'][-1] for x in data]).astype('float32'), config['time_mean'], config['time_std'])).unsqueeze(1)

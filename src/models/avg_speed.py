@@ -32,6 +32,6 @@ class AvgHourlySpeedModel:
         else:
             return np.mean(list(self.speed_lookup['speed'].values()))
 
-    def save_to(self, folder, name):
-        data_utils.write_pkl(self, folder + name + ".pkl")
+    def save_to(self, path):
+        data_utils.write_pkl(self, path)
         return None

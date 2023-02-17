@@ -24,7 +24,7 @@ class BasicFeedForward(nn.Module):
             nn.ReLU(),
             nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE),
             nn.ReLU(),
-            nn.Dropout(p=0.50),
+            nn.Dropout(p=0.25),
             nn.Linear(HIDDEN_SIZE, 1),
         )
 

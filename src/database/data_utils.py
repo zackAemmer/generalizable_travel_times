@@ -3,6 +3,8 @@ Functions for processing tracked bus and timetable data.
 """
 
 from datetime import date, datetime, timedelta
+import itertools
+import json
 from math import radians, cos, sin, asin, sqrt
 import os
 from random import sample
@@ -12,10 +14,15 @@ import pandas as pd
 import pickle
 
 
-# Set of unified feature names and dtypes for variables in the raw data
+# Set of unified feature names and dtypes for variables in the GTFS-RT data
 FEATURE_NAMES = ['trip_id','file','locationtime','lat','lon','vehicle_id']
 FEATURE_TYPES = ['object','object','int','float','float','object']
 FEATURE_LOOKUP = dict(zip(FEATURE_NAMES, FEATURE_TYPES))
+
+# Set of unified feature names and dtypes for variables in the GTFS data
+GTFS_NAMES = ['trip_id','stop_id','stop_lat','stop_lon','arrival_time']
+GTFS_TYPES = [str,str,float,float,str]
+GTFS_LOOKUP = dict(zip(GTFS_NAMES, GTFS_TYPES))
 
 
 def load_pkl(path):
@@ -118,10 +125,29 @@ def get_date_list(start, n_days):
     date_list = [base + timedelta(days=x) for x in range(n_days)]
     return [f"{date.strftime('%Y_%m_%d')}.pkl" for date in date_list]
 
+def load_train_test_data(data_folder, n_folds):
+    """
+    Load files with training/testing samples that have been formatted into json.
+    Files are train_00 - train_05, and test
+    data_folder: location that contains the train/test files
+    Returns: list of trainning json samples, and list of test samples.
+    """
+    train_data_chunks = []
+    for i in range(0, n_folds):
+        train_data = []
+        contents = open(data_folder + "train_0" + str(i), "r").read()
+        train_data.append([json.loads(str(item)) for item in contents.strip().split('\n')])
+        train_data = list(itertools.chain.from_iterable(train_data))
+        train_data_chunks.append(train_data)
+    # Read in test data
+    contents = open(data_folder + "test", "r").read()
+    test_data = [json.loads(str(item)) for item in contents.strip().split('\n')]
+    return train_data_chunks, test_data
+
 def combine_pkl_data(folder, file_list, given_names):
     """
     Load raw feed data stored in a .pkl file to a dataframe. Unify column names and dtypes.
-    This should ALWAYS be used to load the raw bus data from .pkl files, because it unifies the column names and types.
+    This should ALWAYS be used to load the raw bus data from .pkl files, because it unifies the column names and types from different networks.
     folder: the folder to search in
     file_list: the file names to read and combine
     given_names: list of the names of the features in the raw data
@@ -131,17 +157,22 @@ def combine_pkl_data(folder, file_list, given_names):
     no_data_list = []
     for file in file_list:
         try:
-            with open(folder+'/'+file, 'rb') as f:
-                data = pickle.load(f)
-                data['file'] = file
-                # Get unified column names, data types
-                data = data[given_names]
-                data.columns = FEATURE_LOOKUP.keys()
-                data = data.astype(FEATURE_LOOKUP)
-                data_list.append(data)
+            data = load_pkl(folder + "/" + file)
+            data['file'] = file
+            # Get unified column names, data types
+            data = data[given_names]            
+            data.columns = FEATURE_LOOKUP.keys()
+            data = data.astype(FEATURE_LOOKUP)
+            data_list.append(data)
         except FileNotFoundError:
             no_data_list.append(file)
     data = pd.concat(data_list, axis=0)
+    # Fix IDs that were read as 0s by numpy during data download
+    try:
+        data['trip_id'] = [str(int(x)) for x in data['trip_id'].values]
+    except:
+        x = 1
+        print("This should not print unless processing AtB data")
     data = data.sort_values(['file','trip_id','locationtime'], ascending=True)
     return data, no_data_list
 
@@ -182,7 +213,7 @@ def clean_trace_df_w_timetables(data, gtfs_data):
     Returns: dataframe with only trips that are in GTFS, and are reasonably close to scheduled stop ids.
     """
     # Remove any trips that are not in the GTFS
-    data = data[data['trip_id'].isin(gtfs_data.trip_id)]
+    data = data[data['trip_id'].astype(str).isin(gtfs_data.trip_id)]
     # Match the last data point of each trajectory to first stop in its trip
     first_points = data.groupby(['file','trip_id']).first().reset_index()[['file','trip_id','timeID_s']]
     first_points.columns = ['file','trip_id','trip_start_timeID_s']
@@ -293,7 +324,7 @@ def map_to_deeptte(trace_data):
         }
     return result
 
-def get_summary_config(trace_data):
+def get_summary_config(trace_data, n_unique_veh, gtfs_folder, n_folds):
     """
     Get a dict of means and sds which are used to normalize data by DeepTTE.
     trace_data: pandas dataframe with unified columns and calculated distances
@@ -325,6 +356,10 @@ def get_summary_config(trace_data):
         "stop_lng_std": np.std(trace_data['stop_lon']),
         "stop_lat_mean": np.mean(trace_data['stop_lat']),
         "stop_lat_std": np.std(trace_data['stop_lat']),
+        # Not variables
+        "n_unique_veh": n_unique_veh,
+        "gtfs_folder": gtfs_folder,
+        "n_folds": n_folds,
         "train_set": ["train_00", "train_01", "train_02", "train_03"],
         "eval_set": ["train_04"],
         "test_set": ["test"]
@@ -354,23 +389,13 @@ def merge_gtfs_files(gtfs_folder):
     gtfs_folder: location to search for GTFS files
     Returns: pandas dataframe with merged GTFS data.
     """
-    z = pd.read_csv(gtfs_folder+"trips.txt", low_memory=False)
-    st = pd.read_csv(gtfs_folder+"stop_times.txt", low_memory=False)
-    sl = pd.read_csv(gtfs_folder+"stops.txt", low_memory=False)
+    z = pd.read_csv(gtfs_folder+"trips.txt", low_memory=False, dtype=GTFS_LOOKUP)
+    st = pd.read_csv(gtfs_folder+"stop_times.txt", low_memory=False, dtype=GTFS_LOOKUP)
+    sl = pd.read_csv(gtfs_folder+"stops.txt", low_memory=False, dtype=GTFS_LOOKUP)
     z = pd.merge(z,st,on="trip_id")
     z = pd.merge(z,sl,on="stop_id")
-    # Pandas reads the KCM trip ID as an integer, but it needs to match .0 formatted string IDs later
-    # Can specify exact dtypes later, but also need to get trip_id in the formatted data to match
-    if z['trip_id'].dtype==int:
-        z['trip_id'] = z['trip_id'].astype(float)
+
     gtfs_data = z.sort_values(['trip_id','stop_sequence'])
-    gtfs_data = pd.DataFrame({
-        'trip_id': pd.Series(gtfs_data['trip_id'], dtype='str'),
-        'stop_id': pd.Series(gtfs_data['stop_id'], dtype='str'),
-        'stop_lat': pd.Series(gtfs_data['stop_lat'], dtype='float'),
-        'stop_lon': pd.Series(gtfs_data['stop_lon'], dtype='float'),
-        'arrival_time': pd.Series(gtfs_data['arrival_time'], dtype='str'),
-    })
     gtfs_data['arrival_s'] = [int(x[0])*60*60 + int(x[1])*60 + int(x[2]) for x in gtfs_data['arrival_time'].str.split(":")]
     return gtfs_data
 
@@ -487,32 +512,3 @@ def format_deeptte_to_features(deeptte_data, resampled_deeptte_data):
     resampled_features = np.array([x for x in resampled_features])
     df = np.hstack((df, resampled_features))
     return df, times
-
-# def gtfs_to_graph():
-#     """
-#     Reshape a set of GTFS files into a graph network. Nodes are stops and edges are mean travel times.
-#     Intended to use with geometric torch.
-#     Returns: Dictionary with node and edge lists/values.
-#     """
-#     # Read in GTFS data, get travel times
-#     gtfs_data = merge_gtfs_files("../data/kcm_gtfs/2022_09_19/")[['trip_id','stop_id','arrival_time']]
-#     gtfs_data['arrival_s'] = [int(x[0])*60*60 + int(x[1])*60 + int(x[2]) for x in gtfs_data['arrival_time'].str.split(":")]
-#     gtfs_data_shifted = gtfs_data.groupby(['trip_id']).shift()
-#     gtfs_data_shifted.columns = [x+"_shift" for x in gtfs_data_shifted.columns]
-#     gtfs_data = pd.concat([gtfs_data, gtfs_data_shifted], axis=1).dropna()
-#     gtfs_data['travel_time_s'] = gtfs_data['arrival_s'] - gtfs_data['arrival_s_shift']
-#     gtfs_data = gtfs_data.sort_values(['trip_id','stop_id','arrival_time'])
-#     # Recode nodes to start from 0
-#     node_ids = np.unique(pd.concat([gtfs_data['stop_id'], gtfs_data['stop_id_shift']], axis=0))
-#     node_recode_dict = recode_nums(node_ids)
-#     # Get edge connections, and recode to match new node IDs
-#     edges = gtfs_data[['stop_id_shift','stop_id','travel_time_s']].astype(int)
-#     edges = edges.groupby(['stop_id_shift','stop_id']).mean().reset_index()
-#     edges.columns = ['start_node','end_node','weight']
-#     edges_data = edges.values[:,:2].T
-#     edges_data = np.vectorize(node_recode_dict.get)(edges_data)
-#     # Create graph
-#     edge_index = edges_data
-#     edge_attr = edges.values[:,2].reshape(edges.shape[0],1)
-#     x = np.random.random(node_ids.shape[0]).reshape(node_ids.shape[0],1)
-#     return {"x":x, "edge_index":edge_index, "edge_attr":edge_attr, "node_recode_dict":node_recode_dict}
