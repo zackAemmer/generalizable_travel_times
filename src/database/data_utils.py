@@ -512,3 +512,28 @@ def format_deeptte_to_features(deeptte_data, resampled_deeptte_data):
     resampled_features = np.array([x for x in resampled_features])
     df = np.hstack((df, resampled_features))
     return df, times
+
+def extract_results(city, model_results):
+    cities = []
+    models = []
+    mapes = []
+    rmses = []
+    maes = []
+    fold_nums = []
+    for fold_num in range(0,len(model_results)):
+        for value in range(0,len(model_results[0])):
+            cities.append(city)
+            fold_nums.append(fold_num)
+            models.append(model_results[fold_num][value][0])
+            mapes.append(model_results[fold_num][value][1])
+            rmses.append(model_results[fold_num][value][2])
+            maes.append(model_results[fold_num][value][3])
+    result_df = pd.DataFrame({
+        "Model": models,
+        "City": cities,
+        "Fold": fold_nums,
+        "MAPE": mapes,
+        "RMSE": rmses,
+        "MAE": maes
+    })
+    return result_df
