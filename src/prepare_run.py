@@ -126,7 +126,7 @@ if __name__=="__main__":
         given_names=['tripid','file','locationtime','lat','lon','vehicleid'],
         train_dates=data_utils.get_date_list("2022_01_01", 31),
         test_dates=data_utils.get_date_list("2022_02_01", 7),
-        n_folds=10
+        n_folds=3
     )
     # For now, we can use Norway dates that are post-2022_11_02
     # Need to get mapping of old IDs to new IDs in order to use schedule data from prior to that date
@@ -140,5 +140,5 @@ if __name__=="__main__":
         given_names=['datedvehiclejourney','file','locationtime','lat','lon','vehicle'],
         train_dates=data_utils.get_date_list("2022_11_01", 23),
         test_dates=data_utils.get_date_list("2022_11_24", 12),
-        n_folds=10
+        n_folds=3
     )

@@ -360,9 +360,8 @@ def get_summary_config(trace_data, n_unique_veh, gtfs_folder, n_folds):
         "n_unique_veh": n_unique_veh,
         "gtfs_folder": gtfs_folder,
         "n_folds": n_folds,
-        "train_set": ["train_00", "train_01", "train_02", "train_03"],
-        "eval_set": ["train_04"],
-        "test_set": ["test"]
+        "train_set": ["train_0"+str(x) for x in range(0,n_folds)],
+        "eval_set": ["test"]
     }
     return summary_dict
 
