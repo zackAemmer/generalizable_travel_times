@@ -185,10 +185,14 @@ def calculate_trace_df(data, timezone):
     """
     # Gets speeds between consecutive points, drop first points, filter
     data['speed_m_s'], data['dist_calc_m'], data['time_calc_s'] = calculate_trip_speeds(data)
-    data['dist_calc_km'] = data['dist_calc_m'] / 1000.0
-    data = data.dropna()
+    data = data[data['dist_calc_m']>0.0]
+    data = data[data['dist_calc_m']<5000.0]
+    data = data[data['time_calc_s']>0.0]
+    data = data[data['time_calc_s']<120.0]
     data = data[data['speed_m_s']>0.0]
     data = data[data['speed_m_s']<35.0]
+    data['dist_calc_km'] = data['dist_calc_m'] / 1000.0
+    data = data.dropna()
     # Get unique trajectories in pd groupby, only keep trajectories with at least 10 points
     data = data.groupby(['file','trip_id']).filter(lambda x: len(x) > 10)
     unique_traj = data.groupby(['file','trip_id'])
@@ -292,7 +296,7 @@ def map_to_deeptte(trace_data):
     Returns: path to json file where deeptte trajectories are saved.
     """
     # group by the desired column
-    groups = trace_data.groupby(['file','trip_id'])
+    groups = trace_data.groupby('shingle_id')
     # create an empty dictionary to store the JSON data
     result = {}
     for name, group in groups:
@@ -536,3 +540,29 @@ def extract_results(city, model_results):
         "MAE": maes
     })
     return result_df
+
+def shingle(trace_df, min_len, max_len):
+    """
+    Split a df into even chunks randomly between min and max length.
+    Each split comes from a group representing a trajector in the dataframe.
+    trace_df: unified dataframe
+    min_len: minimum number of chunks to split a trajectory into.
+    max_lan: maximum number of chunks to split a trajectory into.
+    Returns: A copy of trace_df with a new index, traces with <2 points removed.
+    """
+    shingle_groups = trace_df.groupby(['file','trip_id']).count()['lat'].values
+    idx = 0
+    new_idx = []
+    for num_pts in shingle_groups:
+        dummy = np.array([0 for i in range(0,num_pts)])
+        dummy = np.array_split(dummy, np.random.randint(min_len, max_len))
+        dummy = [len(x) for x in dummy]
+        for x in dummy:
+            [new_idx.append(idx) for y in range(0,x)]
+            idx += 1
+    z = trace_df.copy()
+    z['shingle_id'] = new_idx
+    throwouts = z.groupby(['shingle_id']).count()['lat'].reset_index()
+    throwouts = throwouts[throwouts['lat']<3]['shingle_id'].values
+    z = z[~z['shingle_id'].isin(throwouts)]
+    return z

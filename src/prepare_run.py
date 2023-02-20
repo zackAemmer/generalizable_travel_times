@@ -56,7 +56,7 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
 
     # Load the GTFS
     print(f"Loading and merging GTFS files from '{gtfs_folder}'...")
-    kcm_gtfs = data_utils.merge_gtfs_files(gtfs_folder)
+    gtfs_data = data_utils.merge_gtfs_files(gtfs_folder)
 
     # Calculate distance between points in each trajectory, do some filtering on speed, n_points
     print(f"Calculating trace trajectories, filtering on speed and number of trajectory points...")
@@ -67,14 +67,21 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
 
     # Match trajectories to timetables and do filtering on stop distance, availability
     print(f"Matching traces to GTFS timetables, filtering on nearest scheduled stop distance, schedule availability...")
-    train_traces = data_utils.clean_trace_df_w_timetables(train_traces, kcm_gtfs)
-    test_traces = data_utils.clean_trace_df_w_timetables(test_traces, kcm_gtfs)
+    train_traces = data_utils.clean_trace_df_w_timetables(train_traces, gtfs_data)
+    test_traces = data_utils.clean_trace_df_w_timetables(test_traces, gtfs_data)
     print(f"Cumulative {np.round(len(train_traces) / len(train_data) * 100, 1)}% of train data retained. Saving {len(train_traces)} samples.")
     print(f"Cumulative {np.round(len(test_traces) / len(test_data) * 100, 1)}% of test data retained. Saving {len(test_traces)} samples.")
 
     # Get unique vehicle ids
     (train_traces, test_traces), n_unique_veh = data_utils.remap_vehicle_ids([train_traces, test_traces])
     print(f"Found {n_unique_veh} unique vehicle IDs in this data.")
+
+    # Shingle each trajectory into a subset of smaller chunks, drop chunks with 1 point
+    print(f"Shingling traces into smaller chunks...")
+    train_traces = data_utils.shingle(train_traces, 2, 8)
+    test_traces = data_utils.shingle(test_traces, 2, 8)
+    print(f"Cumulative {np.round(len(train_traces) / len(train_data) * 100, 1)}% of train data retained. Saving {len(train_traces)} samples.")
+    print(f"Cumulative {np.round(len(test_traces) / len(test_data) * 100, 1)}% of test data retained. Saving {len(test_traces)} samples.")
 
     ### Save processed data from raw bus data files
     print("="*30)
@@ -126,7 +133,7 @@ if __name__=="__main__":
         given_names=['tripid','file','locationtime','lat','lon','vehicleid'],
         train_dates=data_utils.get_date_list("2022_01_01", 31),
         test_dates=data_utils.get_date_list("2022_02_01", 7),
-        n_folds=3
+        n_folds=10
     )
     # For now, we can use Norway dates that are post-2022_11_02
     # Need to get mapping of old IDs to new IDs in order to use schedule data from prior to that date
@@ -140,5 +147,5 @@ if __name__=="__main__":
         given_names=['datedvehiclejourney','file','locationtime','lat','lon','vehicle'],
         train_dates=data_utils.get_date_list("2022_11_01", 23),
         test_dates=data_utils.get_date_list("2022_11_24", 12),
-        n_folds=3
+        n_folds=10
     )
