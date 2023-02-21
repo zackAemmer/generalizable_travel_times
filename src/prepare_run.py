@@ -78,8 +78,8 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
 
     # Shingle each trajectory into a subset of smaller chunks, drop chunks with 1 point
     print(f"Shingling traces into smaller chunks...")
-    train_traces = data_utils.shingle(train_traces, 2, 8)
-    test_traces = data_utils.shingle(test_traces, 2, 8)
+    train_traces = data_utils.shingle(train_traces, 2, 5)
+    test_traces = data_utils.shingle(test_traces, 2, 5)
     print(f"Cumulative {np.round(len(train_traces) / len(train_data) * 100, 1)}% of train data retained. Saving {len(train_traces)} samples.")
     print(f"Cumulative {np.round(len(test_traces) / len(test_data) * 100, 1)}% of test data retained. Saving {len(test_traces)} samples.")
 

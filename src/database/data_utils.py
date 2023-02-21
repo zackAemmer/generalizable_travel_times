@@ -420,10 +420,15 @@ def calc_data_metrics(data, timezone):
     Returns: Dictionary with keys corresponding to metrics. Some are grouped by hour of day.
     """
     # Speed
-    data['speed_m_s'] = calculate_trip_speeds(data)
-    data = data.dropna()
+    data['speed_m_s'], data['dist_calc_m'], data['time_calc_s'] = calculate_trip_speeds(data)
+    data = data[data['dist_calc_m']>0.0]
+    data = data[data['dist_calc_m']<5000.0]
+    data = data[data['time_calc_s']>0.0]
+    data = data[data['time_calc_s']<120.0]
     data = data[data['speed_m_s']>0.0]
     data = data[data['speed_m_s']<35.0]
+    data['dist_calc_km'] = data['dist_calc_m'] / 1000.0
+    data = data.dropna()
     # Simple metrics
     points = len(data)
     trajs = len(data.drop_duplicates(['trip_id']))
@@ -517,20 +522,22 @@ def format_deeptte_to_features(deeptte_data, resampled_deeptte_data):
     return df, times
 
 def extract_results(city, model_results):
+    # Extract fold losses for all models
+    fold_results = [x['All Losses'] for x in model_results]
     cities = []
     models = []
     mapes = []
     rmses = []
     maes = []
     fold_nums = []
-    for fold_num in range(0,len(model_results)):
-        for value in range(0,len(model_results[0])):
+    for fold_num in range(0,len(fold_results)):
+        for value in range(0,len(fold_results[0])):
             cities.append(city)
             fold_nums.append(fold_num)
-            models.append(model_results[fold_num][value][0])
-            mapes.append(model_results[fold_num][value][1])
-            rmses.append(model_results[fold_num][value][2])
-            maes.append(model_results[fold_num][value][3])
+            models.append(fold_results[fold_num][value][0])
+            mapes.append(fold_results[fold_num][value][1])
+            rmses.append(fold_results[fold_num][value][2])
+            maes.append(fold_results[fold_num][value][3])
     result_df = pd.DataFrame({
         "Model": models,
         "City": cities,
@@ -539,7 +546,29 @@ def extract_results(city, model_results):
         "RMSE": rmses,
         "MAE": maes
     })
-    return result_df
+    # Extract FF loss curves
+    loss_df = []
+    fold_train_losses = [x['FF Train Losses'] for x in model_results]
+    fold_test_losses = [x['FF Valid Losses'] for x in model_results]
+    for fold_num in range(0,len(fold_train_losses)):
+        df_train = pd.DataFrame({
+            "City": city,
+            "Fold": fold_num,
+            "Loss Set": "Train",
+            "Epoch": np.arange(len(fold_train_losses[0])),
+            "Loss": fold_train_losses[fold_num]
+        })
+        df_test = pd.DataFrame({
+            "City": city,
+            "Fold": fold_num,
+            "Loss Set": "Test",
+            "Epoch": np.arange(len(fold_train_losses[0])),
+            "Loss": fold_test_losses[fold_num]
+        })
+        loss_df.append(df_train)
+        loss_df.append(df_test)
+    loss_df = pd.concat(loss_df)
+    return result_df, loss_df
 
 def shingle(trace_df, min_len, max_len):
     """

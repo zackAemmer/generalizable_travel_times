@@ -107,7 +107,7 @@ def run_models(run_folder, network_folder):
             embed_dict,
             HIDDEN_SIZE
         ).to(device)
-        ff_model.fit_to_data(train_dataloader, test_dataloader, LEARN_RATE, EPOCHS)
+        ff_train_losses, ff_test_losses = ff_model.fit_to_data(train_dataloader, test_dataloader, LEARN_RATE, EPOCHS)
         torch.save(ff_model.state_dict(), run_folder + network_folder + f"models/ff_model_{fold_num}.pt")
         ff_model.eval()
         ff_labels, ff_preds = ff_model.predict(valid_dataloader, config)
@@ -117,14 +117,19 @@ def run_models(run_folder, network_folder):
         models = ["AVG","SCH","FF"]
         preds = [avg_preds, sch_preds, ff_preds]
         labels = np.array([x['time_gap'][-1] for x in valid_data])
-        fold_results = []
+        fold_results = {
+            "Fold": fold_num,
+            "All Losses": [],
+            "FF Train Losses": ff_train_losses,
+            "FF Valid Losses": ff_test_losses
+        }
         for model_name, preds in zip(models, preds):
             _ = [model_name]
             _.append(np.round(metrics.mean_absolute_percentage_error(labels, preds), 2))
             _.append(np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2))
             _.append(np.round(metrics.mean_absolute_error(labels, preds), 2))
-            fold_results.append(_)
-        print(tabulate(fold_results, headers=["Model", "MAPE", "RMSE", "MAE"]))
+            fold_results['All Losses'].append(_)
+        print(tabulate(fold_results['All Losses'], headers=["Model", "MAPE", "RMSE", "MAE"]))
         run_results.append(fold_results)
 
     # Save results
