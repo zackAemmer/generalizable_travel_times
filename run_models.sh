@@ -2,6 +2,7 @@
 
 # Move to project folder
 cd ~/Desktop/valle
+# cd ~/Skrivebord/valle
 
 # Run setup
 python ./src/prepare_run.py
