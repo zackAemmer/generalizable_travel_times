@@ -7,12 +7,12 @@ cd ~/Skrivebord/valle
 
 ## KCM
 # Copy files to Deeptte
-cp -a ./results/3_mo_cross_val/kcm/deeptte_formatted/ ../DeepTTE_Annotated/data
-cp ../DeepTTE_Annotated/data/config.json ../DeepTTE_Annotated/config.json
+cp -a ./results/3_mo_cross_val/kcm/deeptte_formatted/ ../DeepTTE/data
+cp ../DeepTTE/data/config.json ../DeepTTE/config.json
 
 # Run Deeptte
-# cd ~/Desktop/DeepTTE_Annotated
-cd ~/Skrivebord/DeepTTE_Annotated
+# cd ~/Desktop/DeepTTE
+cd ~/Skrivebord/DeepTTE
 rm -rf ./result && mkdir ./result
 rm -rf ./saved_weights && mkdir ./saved_weights
 rm -rf ./logs && mkdir ./logs
@@ -21,18 +21,18 @@ python main.py --task train --batch_size 10 --epochs 50 --result_file ./result/d
 # Copy Deeptte results back to results folder
 # cd ~/Desktop/valle
 cd ~/Skrivebord/valle
-cp -a ../DeepTTE_Annotated/result ./results/3_mo_cross_val/kcm/deeptte_results/
-cp -a ../DeepTTE_Annotated/saved_weights ./results/3_mo_cross_val/kcm/deeptte_results/
+cp -a ../DeepTTE/result ./results/3_mo_cross_val/kcm/deeptte_results/
+cp -a ../DeepTTE/saved_weights ./results/3_mo_cross_val/kcm/deeptte_results/
 
 
 ## ATB
 # Copy files to Deeptte
-cp -a ./results/3_mo_cross_val/atb/deeptte_formatted/ ../DeepTTE_Annotated/data
-cp ../DeepTTE_Annotated/data/config.json ../DeepTTE_Annotated/config.json
+cp -a ./results/3_mo_cross_val/atb/deeptte_formatted/ ../DeepTTE/data
+cp ../DeepTTE/data/config.json ../DeepTTE_Annotated/config.json
 
 # Run Deeptte
-# cd ~/Desktop/DeepTTE_Annotated
-cd ~/Skrivebord/DeepTTE_Annotated
+# cd ~/Desktop/DeepTTE
+cd ~/Skrivebord/DeepTTE
 rm -rf ./result && mkdir ./result
 rm -rf ./saved_weights && mkdir ./saved_weights
 rm -rf ./logs && mkdir ./logs
@@ -41,5 +41,5 @@ python main.py --task train --batch_size 10 --epochs 50 --result_file ./result/d
 # Copy Deeptte results back to results folder
 cd ~/Desktop/valle
 cd ~/Skrivebord/valle
-cp -a ../DeepTTE_Annotated/result ./results/3_mo_cross_val/atb/deeptte_results/
-cp -a ../DeepTTE_Annotated/saved_weights ./results/3_mo_cross_val/atb/deeptte_results/
+cp -a ../DeepTTE/result ./results/3_mo_cross_val/atb/deeptte_results/
+cp -a ../DeepTTE/saved_weights ./results/3_mo_cross_val/atb/deeptte_results/
