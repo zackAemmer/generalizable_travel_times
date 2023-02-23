@@ -1,4 +1,6 @@
 # Additional files
+run_deeptte.sh
+run_models.sh
 config.py
 secret.py
 .DS_Store
