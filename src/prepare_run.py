@@ -132,8 +132,8 @@ if __name__=="__main__":
         timezone="America/Los_Angeles",
         given_names=['tripid','file','locationtime','lat','lon','vehicleid'],
         train_dates=data_utils.get_date_list("2021_01_12", 2),
-        test_dates=data_utils.get_date_list("2021_01_19", 2),
-        n_folds=10
+        test_dates=data_utils.get_date_list("2021_01_19", 1),
+        n_folds=5
     )
     # For now, we can use Norway dates that are post-2022_11_02
     # Need to get mapping of old IDs to new IDs in order to use schedule data from prior to that date
@@ -147,5 +147,5 @@ if __name__=="__main__":
         given_names=['datedvehiclejourney','file','locationtime','lat','lon','vehicle'],
         train_dates=data_utils.get_date_list("2022_11_01", 23),
         test_dates=data_utils.get_date_list("2022_11_24", 12),
-        n_folds=10
+        n_folds=5
     )
