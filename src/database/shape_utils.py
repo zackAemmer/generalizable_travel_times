@@ -14,6 +14,10 @@ import pandas as pd
 import pickle
 import shapely.geometry
 
+import shapely
+import warnings
+from shapely.errors import ShapelyDeprecationWarning
+warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 def get_unique_line_geometries(shape_data):
     """
@@ -87,7 +91,7 @@ def plot_gtfsrt_trip(ax, trace_df):
     to_plot_stop = trace_df.iloc[-1:,:]
     to_plot_stop = geopandas.GeoDataFrame(to_plot_stop, geometry=geopandas.points_from_xy(to_plot_stop.stop_lon, to_plot_stop.stop_lat), crs="EPSG:4326")
     # Plot all points
-    to_plot.plot(ax=ax, marker='.', color='purple', markersize=10)
+    to_plot.plot(ax=ax, marker='.', color='purple', markersize=20)
     # Plot first/last points
     to_plot.iloc[0:1,:].plot(ax=ax, marker='*', color='green', markersize=40)
     to_plot.iloc[-1:,:].plot(ax=ax, marker='*', color='red', markersize=40)
@@ -104,7 +108,36 @@ def plot_gtfs_trip(ax, trip_id, gtfs_data):
     Returns: None.
     """
     to_plot = gtfs_data[gtfs_data['trip_id']==trip_id]
-    to_plot = [shapely.Point(x,y) for x,y in zip(to_plot.stop_lon, to_plot.stop_lat)]
-    to_plot = geopandas.GeoDataFrame(crs='epsg:4326', geometry=to_plot)
-    to_plot.plot(ax=ax, marker='x', color='black', markersize=10)
+    to_plot = geopandas.GeoDataFrame(to_plot, geometry=geopandas.points_from_xy(to_plot.stop_lon, to_plot.stop_lat), crs="EPSG:4326")
+    to_plot.plot(ax=ax, marker='x', color='lightgreen', markersize=10)
     return None
+
+# def plot_validation_trip():
+#     # Get traces from a single validation trip
+#     validation_trip = "8124-33-2022-10-17_20-52-26"
+#     validation_traces = validation_data_lookup[validation_trip][2]
+#     validation_traces = geopandas.GeoDataFrame(validation_traces, geometry=geopandas.points_from_xy(validation_traces.longitude, validation_traces.latitude), crs="EPSG:4326")
+#     # Use less digits in the epoch time
+#     validation_traces['time'] = [int(str(x)[:10]) for x in validation_traces['time']]
+
+#     # Get corresponding GTFS-RT trip traces (if recorded)
+#     trip_details = validation_trip.split("-")
+#     vehicle_id = trip_details[0]
+#     original_traces = traces[traces['vehicleid']==float(vehicle_id)]
+#     original_traces = original_traces[original_traces['locationtime']>=min(validation_traces['time'])]
+#     original_traces = original_traces[original_traces['locationtime']<=max(validation_traces['time'])]
+#     original_traces = geopandas.GeoDataFrame(original_traces, geometry=geopandas.points_from_xy(original_traces.lon, original_traces.lat), crs="EPSG:4326")
+
+#     # Map trip to shape id
+#     gtfs_trips = pd.read_csv("../data/kcm_gtfs/trips.txt")
+#     gtfs_trips.head()
+
+#     # If the original traces were found in the GTFS-RT, plot them
+#     fig, ax = plt.subplots(1,1)
+#     if (len(original_traces)) == 0:
+#         print("Validation trip was not captured in the GTFS-RT.")
+#     else:
+#         validation_traces.plot(ax=ax, marker='.', color='green', markersize=5)
+#         original_traces.plot(ax=ax, marker='*', color='purple', markersize=20)
+#         cx.add_basemap(ax, crs=original_traces.crs, source=cx.providers.CartoDB.Voyager)
+#         plt.savefig("../plots/original_validation.png", dpi=1800, bbox_inches='tight')

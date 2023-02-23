@@ -5,13 +5,14 @@ Functions for processing tracked bus and timetable data.
 from datetime import date, datetime, timedelta
 import itertools
 import json
-from math import radians, cos, sin, asin, sqrt
+from math import degrees, radians, atan2, cos, sin, asin, sqrt
 import os
 from random import sample
 
 import numpy as np
 import pandas as pd
 import pickle
+from zipfile import ZipFile
 
 
 # Set of unified feature names and dtypes for variables in the GTFS-RT data
@@ -57,16 +58,34 @@ def recode_nums(ary):
     new_codes = np.arange(0,len(old_codes))
     return dict(zip(old_codes, new_codes))
 
-def calculate_gps_dist(lons1, lats1, lons2, lats2):
+def calculate_bearing(pos1, pos2):
     """
-    Calculate the Haversine distance between a series of points.
+    Calculate the bearing between two GPS coordinates.
     lons1/lats1: arrays of coordinates for the end points
     lons2/lats2: arrays of coordinates for the start points
     Returns: array of distances in meters.
     """
-    end_points = np.array((lons1, lats1)).T
-    start_points = np.array((lons2, lats2)).T
-    return spherical_dist(end_points, start_points)
+    # end_lon, end_lat = pos1
+    # start_lon, start_lat = pos2
+    bearings = []
+    for i in range(0, pos1.shape[0]):
+        end_lon, end_lat = pos1[i]
+        start_lon, start_lat = pos2[i]
+        # Convert to radians
+        start_lat, start_lon, end_lat, end_lon = map(radians, [start_lat, start_lon, end_lat, end_lon])
+        # Calculate differences
+        d_lon = end_lon - start_lon
+        # Calculate bearing
+        y = sin(d_lon) * cos(end_lat)
+        x = cos(start_lat) * sin(end_lat) - sin(start_lat) * cos(end_lat) * cos(d_lon)
+        bearing = atan2(y, x)
+        # Convert to degrees
+        bearing = degrees(bearing)
+        # Normalize to 0-360
+        if bearing < 0:
+            bearing += 360
+        bearings.append(np.round(bearing,1))
+    return bearings
 
 def spherical_dist(pos1, pos2, r=6371000):
     """
@@ -84,6 +103,17 @@ def spherical_dist(pos1, pos2, r=6371000):
     cos_lon_d = np.cos(pos1[..., 1] - pos2[..., 1])
     return r * np.arccos(cos_lat_d - cos_lat1 * cos_lat2 * (1 - cos_lon_d))
 
+def calculate_gps_dist(end_lat, end_lon, start_lat, start_lon):
+    """
+    Calculate the Haversine distance between a series of points.
+    lons1/lats1: arrays of coordinates for the end points
+    lons2/lats2: arrays of coordinates for the start points
+    Returns: array of distances in meters.
+    """
+    end_points = np.array((end_lon, end_lat)).T
+    start_points = np.array((start_lon, start_lat)).T
+    return spherical_dist(end_points, start_points), calculate_bearing(end_points, start_points)
+
 def calculate_trip_speeds(data):
     """
     Calculate speeds between consecutive trip locations.
@@ -95,10 +125,10 @@ def calculate_trip_speeds(data):
     y = data[['trip_id','lat','lon','locationtime']].shift()
     y.columns = [colname+"_shift" for colname in y.columns]
     z = pd.concat([x,y], axis=1)
-    z['dist_diff'] = calculate_gps_dist(z['lon'], z['lat'], z['lon_shift'], z['lat_shift'])
+    z['dist_diff'], z['bearing'] = calculate_gps_dist(z['lon'], z['lat'], z['lon_shift'], z['lat_shift'])
     z['time_diff'] = z['locationtime'] - z['locationtime_shift']
     z['speed_m_s'] = z['dist_diff'] / z['time_diff']
-    return z['speed_m_s'].values.flatten(), z['dist_diff'].values.flatten(), z['time_diff'].values.flatten()
+    return z['speed_m_s'].values.flatten(), z['dist_diff'].values.flatten(), z['time_diff'].values.flatten(), z['bearing'].values.flatten()
 
 def get_validation_dates(validation_path):
     """
@@ -184,7 +214,7 @@ def calculate_trace_df(data, timezone):
     Returns: combination of original point values, and new _diff values
     """
     # Gets speeds between consecutive points, drop first points, filter
-    data['speed_m_s'], data['dist_calc_m'], data['time_calc_s'] = calculate_trip_speeds(data)
+    data['speed_m_s'], data['dist_calc_m'], data['time_calc_s'], data['bearing'] = calculate_trip_speeds(data)
     data = data[data['dist_calc_m']>0.0]
     data = data[data['dist_calc_m']<5000.0]
     data = data[data['time_calc_s']>0.0]
@@ -218,27 +248,24 @@ def clean_trace_df_w_timetables(data, gtfs_data):
     """
     # Remove any trips that are not in the GTFS
     data = data[data['trip_id'].astype(str).isin(gtfs_data.trip_id)]
-    # Match the last data point of each trajectory to first stop in its trip
-    first_points = data.groupby(['file','trip_id']).first().reset_index()[['file','trip_id','timeID_s']]
-    first_points.columns = ['file','trip_id','trip_start_timeID_s']
-    last_points = data.groupby(['file','trip_id']).last().reset_index()[['file','trip_id','lon','lat']]
+    # Save start time of first points in trajectories, match last points to nearest traversed stops
+    first_points = data.groupby('shingle_id').first().reset_index()[['shingle_id','timeID_s']]
+    first_points.columns = ['shingle_id','trip_start_timeID_s']
+    last_points = data.groupby('shingle_id').last().reset_index()[['shingle_id','trip_id','lon','lat']]
     closest_stops = get_scheduled_arrival(
         last_points['trip_id'].values,
         last_points['lon'].values,
         last_points['lat'].values,
         gtfs_data
     )
-    last_points['stop_dist_km'], \
-    last_points['stop_arrival_s'], \
-    last_points['stop_lon'], \
-    last_points['stop_lat'] = closest_stops
-    last_points = last_points[['file','trip_id','stop_dist_km','stop_arrival_s','stop_lon','stop_lat']]
-    # Remove the 95th percentile of distances and up (note that joining this filters the original points)
-    last_points = last_points[last_points['stop_dist_km'] < np.quantile(last_points['stop_dist_km'], .95)]
+    last_points['stop_dist_km'], last_points['stop_arrival_s'], last_points['stop_lon'], last_points['stop_lat'] = closest_stops
+    last_points = last_points[['shingle_id','stop_dist_km','stop_arrival_s','stop_lon','stop_lat']]
+    # Remove cases where the closest stop was more than 1km away (note that joining this filters the original points)
+    last_points = last_points[last_points['stop_dist_km'] < 1.0]
     # Add stop distances and scheduled arrival times (for last tracked point of each trajectory)
-    data = pd.merge(data, last_points, on=['file','trip_id'])
+    data = pd.merge(data, last_points, on='shingle_id')
     # Get the timeID_s (for the first point of each trajectory)
-    data = pd.merge(data, first_points, on=['file','trip_id'])
+    data = pd.merge(data, first_points, on='shingle_id')
     # Calculate the scheduled travel time
     data['scheduled_time_s'] = data['stop_arrival_s'] - data['trip_start_timeID_s'] # Want time of first point, not last
     return data
@@ -265,7 +292,7 @@ def get_scheduled_arrival(trip_ids, lons, lats, gtfs_data):
         data.lons,
         data.lats
     )
-    data['dist'] = dists
+    data['dist'], data['bearing'] = dists
     data = data.sort_values(['index','dist'])
     # Return distance to closest stop, and arrival time at that stop
     data = data.groupby('index').first()[['dist','arrival_s','stop_lon','stop_lat']]
@@ -595,3 +622,22 @@ def shingle(trace_df, min_len, max_len):
     throwouts = throwouts[throwouts['lat']<3]['shingle_id'].values
     z = z[~z['shingle_id'].isin(throwouts)]
     return z
+
+# def extract_validation():
+#     # Extract zip files of all validation tracks in folder
+#     folder = "../data/kcm_validation_sensor/"
+#     for file in os.listdir(folder):
+#         if file != ".DS_Store" and file[-4] == ".":
+#             with ZipFile(folder+file, 'r') as zip:
+#                 zip.extractall(folder+file[:-4])
+
+#     # Combine all validation data into a dict, filenames are the keys
+#     folder = "../data/kcm_validation_sensor/"
+#     validation_data_lookup = {}
+#     for file in os.listdir(folder):
+#         if file != ".DS_Store" and file[-4:] != ".zip":
+#             df = [pd.read_csv(folder+file+"/"+validation_file) for validation_file in os.listdir(folder+file)]
+#             validation_data_lookup[file] = df
+
+#     # Show available keys
+#     validation_data_lookup.keys()

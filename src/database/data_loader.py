@@ -27,22 +27,22 @@ class DeepTTEDataset(Dataset):
 def make_dataset(data, config, device):
     # Get all features that can be made available to the model
     # Coordinates
-    start_lng = torch.from_numpy(data_utils.normalize(np.array([x['lngs'][0] for x in data]).astype('float32'), config['lngs_mean'], config['lngs_std'])).unsqueeze(1)
-    start_lat = torch.from_numpy(data_utils.normalize(np.array([x['lats'][0] for x in data]).astype('float32'), config['lats_mean'], config['lats_std'])).unsqueeze(1)
-    end_lng = torch.from_numpy(data_utils.normalize(np.array([x['lngs'][-1] for x in data]).astype('float32'), config['lngs_mean'], config['lngs_std'])).unsqueeze(1)
-    end_lat = torch.from_numpy(data_utils.normalize(np.array([x['lats'][-1] for x in data]).astype('float32'), config['lats_mean'], config['lats_std'])).unsqueeze(1)
+    start_lng = torch.from_numpy(data_utils.normalize(np.array([x['lngs'][0] for x in data]).astype('float32'), config['lngs_mean'], config['lngs_std'])).unsqueeze(1).to(device=device)
+    start_lat = torch.from_numpy(data_utils.normalize(np.array([x['lats'][0] for x in data]).astype('float32'), config['lats_mean'], config['lats_std'])).unsqueeze(1).to(device=device)
+    end_lng = torch.from_numpy(data_utils.normalize(np.array([x['lngs'][-1] for x in data]).astype('float32'), config['lngs_mean'], config['lngs_std'])).unsqueeze(1).to(device=device)
+    end_lat = torch.from_numpy(data_utils.normalize(np.array([x['lats'][-1] for x in data]).astype('float32'), config['lats_mean'], config['lats_std'])).unsqueeze(1).to(device=device)
     # Schedule
-    stop_dist_km = torch.from_numpy(data_utils.normalize(np.array([x['stop_dist_km'] for x in data]).astype('float32'), config['stop_dist_km_mean'], config['stop_dist_km_std'])).unsqueeze(1)
-    scheduled_time_s = torch.from_numpy(data_utils.normalize(np.array([x['scheduled_time_s'] for x in data]).astype('float32'), config['scheduled_time_s_mean'], config['scheduled_time_s_std'])).unsqueeze(1)
+    stop_dist_km = torch.from_numpy(data_utils.normalize(np.array([x['stop_dist_km'] for x in data]).astype('float32'), config['stop_dist_km_mean'], config['stop_dist_km_std'])).unsqueeze(1).to(device=device)
+    scheduled_time_s = torch.from_numpy(data_utils.normalize(np.array([x['scheduled_time_s'] for x in data]).astype('float32'), config['scheduled_time_s_mean'], config['scheduled_time_s_std'])).unsqueeze(1).to(device=device)
     # Previous
-    speed_m_s = torch.from_numpy(data_utils.normalize(np.array([x['speed_m_s'][0] for x in data]).astype('float32'), config['speed_m_s_mean'], config['speed_m_s_std'])).unsqueeze(1)
+    speed_m_s = torch.from_numpy(data_utils.normalize(np.array([x['speed_m_s'][0] for x in data]).astype('float32'), config['speed_m_s_mean'], config['speed_m_s_std'])).unsqueeze(1).to(device=device)
     # Network
-    timeID = torch.from_numpy(np.array([x['timeID'] for x in data]).astype('float32')).unsqueeze(1)
-    weekID = torch.from_numpy(np.array([x['weekID'] for x in data]).astype('float32')).unsqueeze(1)
+    timeID = torch.from_numpy(np.array([x['timeID'] for x in data]).astype('float32')).unsqueeze(1).to(device=device)
+    weekID = torch.from_numpy(np.array([x['weekID'] for x in data]).astype('float32')).unsqueeze(1).to(device=device)
     # Misc
-    driverID = torch.from_numpy(np.array([x['driverID'] for x in data]).astype('float32')).unsqueeze(1)
-    dist = torch.from_numpy(data_utils.normalize(np.array([x['dist_gap'][-1] for x in data]).astype('float32'), config['dist_mean'], config['dist_std'])).unsqueeze(1)
-    noise = torch.from_numpy(np.random.uniform(0.0, 1.0, len(data)).astype('float32')).unsqueeze(1)
+    driverID = torch.from_numpy(np.array([x['driverID'] for x in data]).astype('float32')).unsqueeze(1).to(device=device)
+    dist = torch.from_numpy(data_utils.normalize(np.array([x['dist_gap'][-1] for x in data]).astype('float32'), config['dist_mean'], config['dist_std'])).unsqueeze(1).to(device=device)
+    # noise = torch.from_numpy(np.random.uniform(0.0, 1.0, len(data)).astype('float32')).unsqueeze(1).to(device=device)
 
     # Testing different feature combinations
     X = torch.cat((
@@ -60,7 +60,7 @@ def make_dataset(data, config, device):
     ), dim=1)
 
     # Labels
-    y = torch.from_numpy(data_utils.normalize(np.array([x['time_gap'][-1] for x in data]).astype('float32'), config['time_mean'], config['time_std'])).unsqueeze(1)
+    y = torch.from_numpy(data_utils.normalize(np.array([x['time_gap'][-1] for x in data]).astype('float32'), config['time_mean'], config['time_std'])).unsqueeze(1).to(device=device)
 
     # Pack everything into dataset/dataloader for training loop
     dataset = DeepTTEDataset((X,y), device=device)

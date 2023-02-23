@@ -65,6 +65,13 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     print(f"Cumulative {np.round(len(train_traces) / len(train_data) * 100, 1)}% of train data retained.")
     print(f"Cumulative {np.round(len(test_traces) / len(test_data) * 100, 1)}% of test data retained.")
 
+    # Shingle each trajectory into a subset of smaller chunks, drop chunks with 1 point
+    print(f"Shingling traces into smaller chunks...")
+    train_traces = data_utils.shingle(train_traces, 2, 5)
+    test_traces = data_utils.shingle(test_traces, 2, 5)
+    print(f"Cumulative {np.round(len(train_traces) / len(train_data) * 100, 1)}% of train data retained. Saving {len(train_traces)} samples.")
+    print(f"Cumulative {np.round(len(test_traces) / len(test_data) * 100, 1)}% of test data retained. Saving {len(test_traces)} samples.")
+
     # Match trajectories to timetables and do filtering on stop distance, availability
     print(f"Matching traces to GTFS timetables, filtering on nearest scheduled stop distance, schedule availability...")
     train_traces = data_utils.clean_trace_df_w_timetables(train_traces, gtfs_data)
@@ -75,13 +82,6 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     # Get unique vehicle ids
     (train_traces, test_traces), n_unique_veh = data_utils.remap_vehicle_ids([train_traces, test_traces])
     print(f"Found {n_unique_veh} unique vehicle IDs in this data.")
-
-    # Shingle each trajectory into a subset of smaller chunks, drop chunks with 1 point
-    print(f"Shingling traces into smaller chunks...")
-    train_traces = data_utils.shingle(train_traces, 2, 5)
-    test_traces = data_utils.shingle(test_traces, 2, 5)
-    print(f"Cumulative {np.round(len(train_traces) / len(train_data) * 100, 1)}% of train data retained. Saving {len(train_traces)} samples.")
-    print(f"Cumulative {np.round(len(test_traces) / len(test_data) * 100, 1)}% of test data retained. Saving {len(test_traces)} samples.")
 
     ### Save processed data from raw bus data files
     print("="*30)
@@ -127,12 +127,12 @@ if __name__=="__main__":
         overwrite=True,
         run_name="3_mo_cross_val",
         network_name="kcm",
-        gtfs_folder="./data/kcm_gtfs/2021_10_14/",
+        gtfs_folder="./data/kcm_gtfs/2020_09_23/",
         raw_data_folder="./data/kcm_all/",
         timezone="America/Los_Angeles",
         given_names=['tripid','file','locationtime','lat','lon','vehicleid'],
-        train_dates=data_utils.get_date_list("2022_01_01", 31),
-        test_dates=data_utils.get_date_list("2022_02_01", 7),
+        train_dates=data_utils.get_date_list("2021_01_12", 2),
+        test_dates=data_utils.get_date_list("2021_01_19", 2),
         n_folds=10
     )
     # For now, we can use Norway dates that are post-2022_11_02
