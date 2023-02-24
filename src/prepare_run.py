@@ -125,7 +125,7 @@ if __name__=="__main__":
     torch.manual_seed(0)
     prepare_run(
         overwrite=True,
-        run_name="3_mo_cross_val",
+        run_name="2_day_test",
         network_name="kcm",
         gtfs_folder="./data/kcm_gtfs/2020_09_23/",
         raw_data_folder="./data/kcm_all/",
@@ -137,15 +137,18 @@ if __name__=="__main__":
     )
     # For now, we can use Norway dates that are post-2022_11_02
     # Need to get mapping of old IDs to new IDs in order to use schedule data from prior to that date
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
     prepare_run(
         overwrite=True,
-        run_name="3_mo_cross_val",
+        run_name="2_day_test",
         network_name="atb",
         gtfs_folder="./data/nwy_gtfs/2022_12_01/",
         raw_data_folder="./data/atb_all/",
         timezone="Europe/Oslo",
         given_names=['datedvehiclejourney','file','locationtime','lat','lon','vehicle'],
-        train_dates=data_utils.get_date_list("2022_11_01", 23),
-        test_dates=data_utils.get_date_list("2022_11_24", 12),
+        train_dates=data_utils.get_date_list("2022_11_01", 28),
+        test_dates=data_utils.get_date_list("2022_11_29", 12),
         n_folds=5
     )
