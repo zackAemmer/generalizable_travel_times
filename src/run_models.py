@@ -143,13 +143,13 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/3_mo_cross_val/",
+        run_folder="./results/3_month_test/",
         network_folder="kcm/"
     )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/3_mo_cross_val/",
+        run_folder="./results/3_month_test/",
         network_folder="atb/"
     )
