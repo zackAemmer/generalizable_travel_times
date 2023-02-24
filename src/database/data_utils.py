@@ -8,6 +8,7 @@ import json
 from math import degrees, radians, atan2, cos, sin, asin, sqrt
 import os
 from random import sample
+from sklearn import metrics
 
 import numpy as np
 import pandas as pd
@@ -596,6 +597,52 @@ def extract_results(city, model_results):
         loss_df.append(df_test)
     loss_df = pd.concat(loss_df)
     return result_df, loss_df
+
+def extract_deeptte_results(run_folder, network_folder):
+    # Extract all fold and epoch losses from deeptte run
+    all_run_data = []
+    for res_file in os.listdir(f"{run_folder}{network_folder}deeptte_results/result"):
+        res_preds = pd.read_csv(
+            f"{run_folder}{network_folder}deeptte_results/result/{res_file}",
+            delimiter=" ",
+            header=None,
+            names=["Label", "Pred"],
+            dtype={"Label": float, "Pred": float}
+        )
+        res_labels = res_file.split("_")
+        if len(res_labels)==5:
+            model_name, test_file_name, test_file_num, fold_num, epoch_num = res_labels
+            test_file_name = test_file_name + "_" + test_file_num
+        elif len(res_labels)==4:
+            model_name, test_file_name, fold_num, epoch_num = res_labels
+        epoch_num = epoch_num.split(".")[0]
+        res_data = [
+            "DeepTTE",
+            "Seattle",
+            test_file_name,
+            fold_num,
+            epoch_num,
+            metrics.mean_absolute_percentage_error(res_preds['Label'], res_preds['Pred']),
+            np.sqrt(metrics.mean_squared_error(res_preds['Label'], res_preds['Pred'])),
+            metrics.mean_absolute_error(res_preds['Label'], res_preds['Pred'])
+        ]
+        all_run_data.append(res_data)
+    all_run_data = pd.DataFrame(
+        all_run_data,
+        columns=[
+            "Model",
+            "City",
+            "Loss Set",
+            "Fold",
+            "Epoch",
+            "MAPE",
+            "RMSE",
+            "MAE"
+        ]
+    )
+    all_run_data['Fold'] = all_run_data['Fold'].astype(int)
+    all_run_data['Epoch'] = all_run_data['Epoch'].astype(int)
+    return all_run_data.sort_values(['Fold','Epoch'])
 
 def shingle(trace_df, min_len, max_len):
     """
