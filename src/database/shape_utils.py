@@ -12,12 +12,28 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pickle
-import shapely.geometry
-
 import shapely
+import shapely.geometry
+from scipy.spatial import KDTree
 import warnings
 from shapely.errors import ShapelyDeprecationWarning
+
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
+
+
+def get_points_within_dist(points, query_points, distance):
+    """
+    Get unique indices in points for all that are within distance of a query point.
+    """
+    tree = KDTree(points)
+    idxs = tree.query_ball_point(query_points, distance)
+    flat_list = [item for sublist in idxs for item in sublist]
+    return flat_list
+
+def get_closest_point(points, query_points):
+    tree = KDTree(points)
+    dists, idxs = tree.query(query_points)
+    return dists, idxs
 
 def get_unique_line_geometries(shape_data):
     """

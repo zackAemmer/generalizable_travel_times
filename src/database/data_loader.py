@@ -32,8 +32,8 @@ def make_dataset(data, config, device):
     end_lng = torch.from_numpy(data_utils.normalize(np.array([x['lngs'][-1] for x in data]).astype('float32'), config['lngs_mean'], config['lngs_std'])).unsqueeze(1).to(device=device)
     end_lat = torch.from_numpy(data_utils.normalize(np.array([x['lats'][-1] for x in data]).astype('float32'), config['lats_mean'], config['lats_std'])).unsqueeze(1).to(device=device)
     # Schedule
-    stop_dist_km = torch.from_numpy(data_utils.normalize(np.array([x['stop_dist_km'] for x in data]).astype('float32'), config['stop_dist_km_mean'], config['stop_dist_km_std'])).unsqueeze(1).to(device=device)
-    scheduled_time_s = torch.from_numpy(data_utils.normalize(np.array([x['scheduled_time_s'] for x in data]).astype('float32'), config['scheduled_time_s_mean'], config['scheduled_time_s_std'])).unsqueeze(1).to(device=device)
+    stop_dist_km = torch.from_numpy(data_utils.normalize(np.array([x['stop_dist_km'][-1] for x in data]).astype('float32'), config['stop_dist_km_mean'], config['stop_dist_km_std'])).unsqueeze(1).to(device=device)
+    scheduled_time_s = torch.from_numpy(data_utils.normalize(np.array([x['scheduled_time_s'][-1] for x in data]).astype('float32'), config['scheduled_time_s_mean'], config['scheduled_time_s_std'])).unsqueeze(1).to(device=device)
     # Previous
     speed_m_s = torch.from_numpy(data_utils.normalize(np.array([x['speed_m_s'][0] for x in data]).astype('float32'), config['speed_m_s_mean'], config['speed_m_s_std'])).unsqueeze(1).to(device=device)
     # Network

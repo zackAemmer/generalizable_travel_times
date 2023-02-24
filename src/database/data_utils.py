@@ -15,6 +15,8 @@ import pandas as pd
 import pickle
 from zipfile import ZipFile
 
+from database import shape_utils
+
 
 # Set of unified feature names and dtypes for variables in the GTFS-RT data
 FEATURE_NAMES = ['trip_id','file','locationtime','lat','lon','vehicle_id']
@@ -248,27 +250,21 @@ def clean_trace_df_w_timetables(data, gtfs_data):
     Returns: dataframe with only trips that are in GTFS, and are reasonably close to scheduled stop ids.
     """
     # Remove any trips that are not in the GTFS
-    data = data[data['trip_id'].astype(str).isin(gtfs_data.trip_id)]
-    # Save start time of first points in trajectories, match last points to nearest traversed stops
+    data = data[data['trip_id'].astype(str).isin(gtfs_data.trip_id)].copy()
+    # Save start time of first points in trajectories
     first_points = data.groupby('shingle_id').first().reset_index()[['shingle_id','timeID_s']]
     first_points.columns = ['shingle_id','trip_start_timeID_s']
-    last_points = data.groupby('shingle_id').last().reset_index()[['shingle_id','trip_id','lon','lat']]
     closest_stops = get_scheduled_arrival(
-        last_points['trip_id'].values,
-        last_points['lon'].values,
-        last_points['lat'].values,
+        data['trip_id'].values,
+        data['lon'].values,
+        data['lat'].values,
         gtfs_data
     )
-    last_points['stop_dist_km'], last_points['stop_arrival_s'], last_points['stop_lon'], last_points['stop_lat'] = closest_stops
-    last_points = last_points[['shingle_id','stop_dist_km','stop_arrival_s','stop_lon','stop_lat']]
-    # Remove cases where the closest stop was more than 1km away (note that joining this filters the original points)
-    last_points = last_points[last_points['stop_dist_km'] < 1.0]
-    # Add stop distances and scheduled arrival times (for last tracked point of each trajectory)
-    data = pd.merge(data, last_points, on='shingle_id')
+    data['stop_dist_km'], data['stop_arrival_s'], data['stop_lon'], data['stop_lat'] = closest_stops
     # Get the timeID_s (for the first point of each trajectory)
     data = pd.merge(data, first_points, on='shingle_id')
-    # Calculate the scheduled travel time
-    data['scheduled_time_s'] = data['stop_arrival_s'] - data['trip_start_timeID_s'] # Want time of first point, not last
+    # Calculate the scheduled travel time from the first to each point in the shingle
+    data['scheduled_time_s'] = data['stop_arrival_s'] - data['trip_start_timeID_s']
     return data
 
 def get_scheduled_arrival(trip_ids, lons, lats, gtfs_data):
@@ -279,29 +275,26 @@ def get_scheduled_arrival(trip_ids, lons, lats, gtfs_data):
     gtfs_data: merged GTFS files
     Returns: (distance to closest stop in km, scheduled arrival time at that stop).
     """
-    # Use pd to cross join and calc distances
-    # Must maintain original order to join back to formatted data so reset index
-    data = pd.DataFrame({
-        "trip_id": pd.Series(trip_ids, dtype='str'),
-        "lons": pd.Series(lons, dtype='float'),
-        "lats": pd.Series(lats, dtype='float')
-    }).reset_index()
-    data = pd.merge(data, gtfs_data, on="trip_id")
-    dists = calculate_gps_dist(
-        data.stop_lon,
-        data.stop_lat,
-        data.lons,
-        data.lats
-    )
-    data['dist'], data['bearing'] = dists
-    data = data.sort_values(['index','dist'])
-    # Return distance to closest stop, and arrival time at that stop
-    data = data.groupby('index').first()[['dist','arrival_s','stop_lon','stop_lat']]
-    dists = data['dist'].values.flatten() / 1000.0
-    arrival_s = data['arrival_s'].values.flatten()
-    stop_lons = data['stop_lon'].values.flatten()
-    stop_lats = data['stop_lat'].values.flatten()
-    return dists, arrival_s, stop_lons, stop_lats
+    data = np.column_stack([lons, lats, trip_ids])
+    gtfs_data_ary = gtfs_data[['stop_lon','stop_lat','trip_id','arrival_s']].values
+
+    # Create dictionary mapping trip_ids to lists of points in gtfs
+    id_to_points = {}
+    for point in gtfs_data_ary:
+        id_to_points.setdefault(point[2],[]).append(point)
+
+    # For each point find the closest stop that shares the trip_id
+    results = []
+    for point in data:
+        corresponding_points = np.vstack(id_to_points.get(point[2], []))
+        point = np.expand_dims(point, 0)
+        # Find closest point and add to results
+        closest_point_dist, closest_point_idx = shape_utils.get_closest_point(corresponding_points[:,0:2], point[:,0:2])
+        closest_point = corresponding_points[closest_point_idx]
+        closest_point = np.append(closest_point, closest_point_dist * 111)
+        results.append(closest_point)
+    results = np.vstack(results)
+    return results[:,4], results[:,3], results[:,0], results[:,1]
 
 def remap_vehicle_ids(df_list):
     """
@@ -322,10 +315,10 @@ def map_to_deeptte(trace_data):
     Reshape pandas dataframe to the json format needed to use deeptte.
     trace_data: dataframe with bus trajectories
     Returns: path to json file where deeptte trajectories are saved.
-    """
-    # group by the desired column
+    """    
+    # Group by the desired column
     groups = trace_data.groupby('shingle_id')
-    # create an empty dictionary to store the JSON data
+    # Create an empty dictionary to store the JSON data
     result = {}
     for name, group in groups:
         result[name] = {
@@ -347,10 +340,10 @@ def map_to_deeptte(trace_data):
             'dist_calc_km': group['dist_calc_km'].tolist(),
             'trip_start_timeID_s': min(group['trip_start_timeID_s']),
             'timeID_s': group['timeID_s'].tolist(),
-            'stop_lat': min(group['stop_lat']),
-            'stop_lon': min(group['stop_lon']),
-            'stop_dist_km': min(group['stop_dist_km']),
-            'scheduled_time_s': min(group['scheduled_time_s']),
+            'stop_lat': group['stop_lat'].tolist(),
+            'stop_lon': group['stop_lon'].tolist(),
+            'stop_dist_km': group['stop_dist_km'].tolist(),
+            'scheduled_time_s': group['scheduled_time_s'].tolist(),
             # Labels
             'time': max(group['time_cumulative_s'].tolist())
         }
@@ -369,21 +362,21 @@ def get_summary_config(trace_data, n_unique_veh, gtfs_folder, n_folds):
         'time_gap_std': np.std(trace_data['time_calc_s']),
         'dist_gap_mean': np.mean(trace_data['dist_calc_km']),
         'dist_gap_std': np.std(trace_data['dist_calc_km']),
-        "dist_mean": np.mean(trace_data.groupby(['file','trip_id']).max()[['dist_cumulative_km']].values.flatten()),
-        'dist_std': np.std(trace_data.groupby(['file','trip_id']).max()[['dist_cumulative_km']].values.flatten()),
+        "dist_mean": np.mean(trace_data.groupby(['shingle_id']).max()[['dist_cumulative_km']].values.flatten()),
+        'dist_std': np.std(trace_data.groupby(['shingle_id']).max()[['dist_cumulative_km']].values.flatten()),
         'lngs_mean': np.mean(trace_data['lon']),
         'lngs_std': np.std(trace_data['lon']),
         'lats_mean': np.mean(trace_data['lat']),
         "lats_std": np.std(trace_data['lat']),
-        "time_mean": np.mean(trace_data.groupby(['file','trip_id']).max()[['time_cumulative_s']].values.flatten()),
-        "time_std": np.std(trace_data.groupby(['file','trip_id']).max()[['time_cumulative_s']].values.flatten()),
+        "time_mean": np.mean(trace_data.groupby(['shingle_id']).max()[['time_cumulative_s']].values.flatten()),
+        "time_std": np.std(trace_data.groupby(['shingle_id']).max()[['time_cumulative_s']].values.flatten()),
         # Others
         "speed_m_s_mean": np.mean(trace_data['speed_m_s']),
         "speed_m_s_std": np.std(trace_data['speed_m_s']),
         "stop_dist_km_mean": np.mean(trace_data['stop_dist_km']),
         "stop_dist_km_std": np.std(trace_data['stop_dist_km']),
-        "scheduled_time_s_mean": np.mean(trace_data['scheduled_time_s']),
-        "scheduled_time_s_std": np.std(trace_data['scheduled_time_s']),
+        "scheduled_time_s_mean": np.mean(trace_data.groupby(['shingle_id']).max()[['scheduled_time_s']].values.flatten()),
+        "scheduled_time_s_std": np.std(trace_data.groupby(['shingle_id']).max()[['scheduled_time_s']].values.flatten()),
         "stop_lng_mean": np.mean(trace_data['stop_lon']),
         "stop_lng_std": np.std(trace_data['stop_lon']),
         "stop_lat_mean": np.mean(trace_data['stop_lat']),
@@ -598,7 +591,7 @@ def extract_results(city, model_results):
     loss_df = pd.concat(loss_df)
     return result_df, loss_df
 
-def extract_deeptte_results(run_folder, network_folder):
+def extract_deeptte_results(city, run_folder, network_folder):
     # Extract all fold and epoch losses from deeptte run
     all_run_data = []
     for res_file in os.listdir(f"{run_folder}{network_folder}deeptte_results/result"):
@@ -618,7 +611,7 @@ def extract_deeptte_results(run_folder, network_folder):
         epoch_num = epoch_num.split(".")[0]
         res_data = [
             "DeepTTE",
-            "Seattle",
+            city,
             test_file_name,
             fold_num,
             epoch_num,
@@ -651,7 +644,7 @@ def shingle(trace_df, min_len, max_len):
     trace_df: unified dataframe
     min_len: minimum number of chunks to split a trajectory into.
     max_lan: maximum number of chunks to split a trajectory into.
-    Returns: A copy of trace_df with a new index, traces with <2 points removed.
+    Returns: A copy of trace_df with a new index, traces with <=2 points removed.
     """
     shingle_groups = trace_df.groupby(['file','trip_id']).count()['lat'].values
     idx = 0
