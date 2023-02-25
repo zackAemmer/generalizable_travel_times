@@ -74,8 +74,10 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
 
     # Match trajectories to timetables and do filtering on stop distance, availability
     print(f"Matching traces to GTFS timetables, filtering on schedule availability...")
-    train_traces = data_utils.clean_trace_df_w_timetables(train_traces, gtfs_data)
-    test_traces = data_utils.clean_trace_df_w_timetables(test_traces, gtfs_data)
+    train_traces = data_utils.parallelize_clean_trace_df_w_timetables(train_traces, gtfs_data)
+    test_traces = data_utils.parallelize_clean_trace_df_w_timetables(test_traces, gtfs_data)
+    # train_traces = data_utils.clean_trace_df_w_timetables(train_traces, gtfs_data)
+    # test_traces = data_utils.clean_trace_df_w_timetables(test_traces, gtfs_data)
     print(f"Cumulative {np.round(len(train_traces) / len(train_data) * 100, 1)}% of train data retained. Saving {len(train_traces)} samples.")
     print(f"Cumulative {np.round(len(test_traces) / len(test_data) * 100, 1)}% of test data retained. Saving {len(test_traces)} samples.")
 
@@ -92,24 +94,24 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
 
     # Get the trace data in format for DeepTTE
     print(f"Mapping trace data to DeepTTE format...")
-    train_traces_dict = data_utils.map_to_deeptte(train_traces)
-    test_traces_dict = data_utils.map_to_deeptte(test_traces)
+    deeptte_formatted_path = base_folder + "deeptte_formatted/"
+    data_utils.map_to_deeptte(train_traces, deeptte_formatted_path, n_folds)
+    data_utils.map_to_deeptte(test_traces, deeptte_formatted_path, n_folds)
     summary_config = data_utils.get_summary_config(train_traces, n_unique_veh, gtfs_folder, n_folds)
 
-    # Split data evenly into train files. Dates are split up across train files. Trajectories are not.
-    deeptte_formatted_path = base_folder + "deeptte_formatted/"
-    print(f"Saving formatted data to '{deeptte_formatted_path}', across {n_folds} training files...")
-    for j, obj in enumerate(list(train_traces_dict.keys())):
-        i = j % n_folds
-        with open(deeptte_formatted_path+"train_0"+str(i), mode='a') as out_file:
-            json.dump(train_traces_dict[obj], out_file)
-            out_file.write("\n")
+    # # Split data evenly into train files
+    # print(f"Saving formatted data to '{deeptte_formatted_path}', across {n_folds} training files...")
+    # for j, obj in enumerate(list(train_traces_dict.keys())):
+    #     i = j % n_folds
+    #     with open(deeptte_formatted_path+"train_0"+str(i), mode='a') as out_file:
+    #         json.dump(train_traces_dict[obj], out_file)
+    #         out_file.write("\n")
 
-    # Save separate dates for test file. All test dates/trajectories are in the same file.
-    for j, obj in enumerate(list(test_traces_dict.keys())):
-        with open(deeptte_formatted_path+"test", mode='a') as out_file:
-            json.dump(test_traces_dict[obj], out_file)
-            out_file.write("\n")
+    # # Save separate dates for test file. All test dates/trajectories are in the same file.
+    # for j, obj in enumerate(list(test_traces_dict.keys())):
+    #     with open(deeptte_formatted_path+"test", mode='a') as out_file:
+    #         json.dump(test_traces_dict[obj], out_file)
+    #         out_file.write("\n")
 
     # Write summary dict to config file
     with open(deeptte_formatted_path+"config.json", mode="a") as out_file:
@@ -131,7 +133,7 @@ if __name__=="__main__":
         raw_data_folder="./data/kcm_all/",
         timezone="America/Los_Angeles",
         given_names=['tripid','file','locationtime','lat','lon','vehicleid'],
-        train_dates=data_utils.get_date_list("2020_10_24", 93),
+        train_dates=data_utils.get_date_list("2020_10_24", 90),
         test_dates=data_utils.get_date_list("2021_03_01", 7),
         n_folds=5
     )
