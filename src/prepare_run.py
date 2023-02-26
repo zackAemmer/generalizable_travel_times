@@ -96,7 +96,7 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     print(f"Mapping trace data to DeepTTE format...")
     deeptte_formatted_path = base_folder + "deeptte_formatted/"
     data_utils.map_to_deeptte(train_traces, deeptte_formatted_path, n_folds)
-    data_utils.map_to_deeptte(test_traces, deeptte_formatted_path, n_folds)
+    data_utils.map_to_deeptte(test_traces, deeptte_formatted_path, n_folds, is_test=True)
     summary_config = data_utils.get_summary_config(train_traces, n_unique_veh, gtfs_folder, n_folds)
 
     # Write summary dict to config file
@@ -112,14 +112,14 @@ if __name__=="__main__":
     torch.manual_seed(0)
     prepare_run(
         overwrite=True,
-        run_name="3_month_test",
+        run_name="throwaway",
         network_name="kcm",
         gtfs_folder="./data/kcm_gtfs/2020_09_23/",
         raw_data_folder="./data/kcm_all/",
         timezone="America/Los_Angeles",
         given_names=['tripid','file','locationtime','lat','lon','vehicleid'],
-        train_dates=data_utils.get_date_list("2020_10_24", 90),
-        test_dates=data_utils.get_date_list("2021_03_01", 7),
+        train_dates=data_utils.get_date_list("2020_10_24", 2),
+        test_dates=data_utils.get_date_list("2021_03_01", 2),
         n_folds=5
     )
     # For now, we can use Norway dates that are post-2022_11_02
@@ -129,7 +129,7 @@ if __name__=="__main__":
     torch.manual_seed(0)
     prepare_run(
         overwrite=True,
-        run_name="3_month_test",
+        run_name="throwaway",
         network_name="atb",
         gtfs_folder="./data/nwy_gtfs/2022_12_01/",
         raw_data_folder="./data/atb_all/",
