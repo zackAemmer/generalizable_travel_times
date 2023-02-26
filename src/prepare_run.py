@@ -99,26 +99,11 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     data_utils.map_to_deeptte(test_traces, deeptte_formatted_path, n_folds)
     summary_config = data_utils.get_summary_config(train_traces, n_unique_veh, gtfs_folder, n_folds)
 
-    # # Split data evenly into train files
-    # print(f"Saving formatted data to '{deeptte_formatted_path}', across {n_folds} training files...")
-    # for j, obj in enumerate(list(train_traces_dict.keys())):
-    #     i = j % n_folds
-    #     with open(deeptte_formatted_path+"train_0"+str(i), mode='a') as out_file:
-    #         json.dump(train_traces_dict[obj], out_file)
-    #         out_file.write("\n")
-
-    # # Save separate dates for test file. All test dates/trajectories are in the same file.
-    # for j, obj in enumerate(list(test_traces_dict.keys())):
-    #     with open(deeptte_formatted_path+"test", mode='a') as out_file:
-    #         json.dump(test_traces_dict[obj], out_file)
-    #         out_file.write("\n")
-
     # Write summary dict to config file
     with open(deeptte_formatted_path+"config.json", mode="a") as out_file:
         json.dump(summary_config, out_file)
 
     print(f"RUN PREPARATION COMPLETED '{run_name}/{network_name}'")
-    return None
 
 
 if __name__=="__main__":

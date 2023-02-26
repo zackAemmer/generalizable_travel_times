@@ -329,18 +329,18 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds):
     Returns: path to json file where deeptte trajectories are saved.
     """    
     # Group by the desired column
+    trace_data['dist'] = trace_data['dist_cumulative_km']
+    trace_data['time'] = trace_data['time_cumulative_s']
+    trace_data['dist_gap'] = trace_data['dist_cumulative_km']
+    trace_data['time_gap'] = trace_data['time_cumulative_s']
     groups = trace_data.groupby('shingle_id')
 
     # Get necessary features as scalar or lists
     result = groups.agg({
-        'time_cumulative_s': {
-            'time_gap': lambda x: x.tolist(),
-            'time': 'max'
-        },
-        'dist_cumulative_km': {
-            'dist_gap': lambda x: x.tolist(),
-            'dist': 'max'
-        },
+        'time_gap': lambda x: x.tolist(),
+        'dist_gap': lambda x: x.tolist(),
+        'time': 'max',
+        'dist': 'max',
         'lat': lambda x: x.tolist(),
         'lon': lambda x: x.tolist(),
         'vehicle_id_recode': 'min',
@@ -415,10 +415,10 @@ def get_summary_config(trace_data, n_unique_veh, gtfs_folder, n_folds):
         'dist_gap_std': np.std(trace_data['dist_calc_km']),
         "dist_mean": np.mean(grouped.max()[['dist_cumulative_km']].values.flatten()),
         'dist_std': np.std(grouped.max()[['dist_cumulative_km']].values.flatten()),
-        'lngs_mean': np.mean(trace_data['lon']),
-        'lngs_std': np.std(trace_data['lon']),
-        'lats_mean': np.mean(trace_data['lat']),
-        "lats_std": np.std(trace_data['lat']),
+        'lon_mean': np.mean(trace_data['lon']),
+        'lon_std': np.std(trace_data['lon']),
+        'lat_mean': np.mean(trace_data['lat']),
+        "lat_std": np.std(trace_data['lat']),
         "time_mean": np.mean(grouped.max()[['time_cumulative_s']].values.flatten()),
         "time_std": np.std(grouped.max()[['time_cumulative_s']].values.flatten()),
         # Others
