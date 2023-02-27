@@ -125,8 +125,8 @@ def calculate_trip_speeds(data):
     Returns: array of speeds, dist_diff, time_diff between consecutive points.
     Nan for first point of a trip.
     """
-    x = data[['trip_id','lat','lon','locationtime']]
-    y = data[['trip_id','lat','lon','locationtime']].shift()
+    x = data[['shingle_id','lat','lon','locationtime']]
+    y = data[['shingle_id','lat','lon','locationtime']].shift()
     y.columns = [colname+"_shift" for colname in y.columns]
     z = pd.concat([x,y], axis=1)
     z['dist_diff'], z['bearing'] = calculate_gps_dist(z['lon'], z['lat'], z['lon_shift'], z['lat_shift'])
@@ -219,17 +219,30 @@ def calculate_trace_df(data, timezone):
     """
     # Gets speeds between consecutive points, drop first points, filter
     data['speed_m_s'], data['dist_calc_m'], data['time_calc_s'], data['bearing'] = calculate_trip_speeds(data)
-    data = data[data['dist_calc_m']>0.0]
+    data = data[data['dist_calc_m']>=0.0]
     data = data[data['dist_calc_m']<5000.0]
-    data = data[data['time_calc_s']>0.0]
+    data = data[data['time_calc_s']>=0.0]
     data = data[data['time_calc_s']<120.0]
-    data = data[data['speed_m_s']>0.0]
+    data = data[data['speed_m_s']>=0.0]
     data = data[data['speed_m_s']<35.0]
     data['dist_calc_km'] = data['dist_calc_m'] / 1000.0
     data = data.dropna()
-    # Get unique trajectories in pd groupby, only keep trajectories with at least 10 points
-    data = data.groupby(['file','trip_id']).filter(lambda x: len(x) > 10)
-    unique_traj = data.groupby(['file','trip_id'])
+    data = data.groupby(['shingle_id']).filter(lambda x: len(x) >= 5)
+    
+    # # Filter all groups instead of rows; removes too much data
+    # data['tempID'] = data['file'] + data['trip_id']
+    # groups = data.groupby(['tempID'])
+    # valid_n = groups.filter(lambda x: len(x) >= 10)['tempID'].unique()    
+    # valid_dists = groups.filter(lambda x: (x['dist_calc_m'].between(0.0, 5000.0)).all())['tempID'].unique()
+    # valid_times = groups.filter(lambda x: (x['time_calc_s'].between(0.0, 180.0)).all())['tempID'].unique()
+    # valid_speeds = groups.filter(lambda x: (x['speed_m_s'].between(0.0, 35.0)).all())['tempID'].unique()
+    # data = data[data['tempID'].isin(valid_n)]
+    # data = data[data['tempID'].isin(valid_dists)]
+    # data = data[data['tempID'].isin(valid_times)]
+    # data = data[data['tempID'].isin(valid_speeds)]
+
+    # Calculate values required by deeptte
+    unique_traj = data.groupby('shingle_id')
     # Get cumulative values from trip start
     data['time_cumulative_s'] = data.locationtime - unique_traj.locationtime.transform('min')
     data['dist_cumulative_km'] = unique_traj['dist_calc_km'].cumsum()
@@ -387,6 +400,7 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
             json.dump(row.to_dict(), file_list[j])
             file_list[j].write("\n")
         _ = [f.close() for f in file_list]
+    return trace_data
 
 def get_summary_config(trace_data, n_unique_veh, gtfs_folder, n_folds):
     """
@@ -681,9 +695,9 @@ def shingle(trace_df, min_len, max_len):
     """
     Split a df into even chunks randomly between min and max length.
     Each split comes from a group representing a trajector in the dataframe.
-    trace_df: unified dataframe
-    min_len: minimum number of chunks to split a trajectory into.
-    max_lan: maximum number of chunks to split a trajectory into.
+    trace_df: dataframe of raw bus data
+    min_len: minimum number of chunks to split a trajectory into
+    max_lan: maximum number of chunks to split a trajectory into
     Returns: A copy of trace_df with a new index, traces with <=2 points removed.
     """
     shingle_groups = trace_df.groupby(['file','trip_id']).count()['lat'].values
@@ -698,7 +712,7 @@ def shingle(trace_df, min_len, max_len):
             idx += 1
     z = trace_df.copy()
     z['shingle_id'] = new_idx
-    throwouts = z.groupby(['shingle_id']).count()['lat'].reset_index()
-    throwouts = throwouts[throwouts['lat']<3]['shingle_id'].values
-    z = z[~z['shingle_id'].isin(throwouts)]
+    # throwouts = z.groupby(['shingle_id']).count()['lat'].reset_index()
+    # throwouts = throwouts[throwouts['lat']<3]['shingle_id'].values
+    # z = z[~z['shingle_id'].isin(throwouts)]
     return z
