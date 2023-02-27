@@ -365,22 +365,23 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
         'stop_lat': lambda x: x.tolist(),
         'stop_lon': lambda x: x.tolist(),
         'stop_dist_km': lambda x: x.tolist(),
-        'scheduled_time_s': 'max',
+        'scheduled_time_s': lambda x: x.tolist(),
     })
 
     print(f"Saving formatted data to '{deeptte_formatted_path}', across {n_folds} training files...")
+    # Convert the DataFrame to a dictionary with the original format
     if is_test:
-        for idx, row in result.iterrows():
-            with open(deeptte_formatted_path+"test", mode='a') as out_file:
-                json.dump(row.to_dict(), out_file)
-                out_file.write("\n")
+        with open(deeptte_formatted_path+"test", mode='a') as out_file:
+            for idx, row in result.iterrows():
+                    json.dump(row.to_dict(), out_file)
+                    out_file.write("\n")
     else:
-        # convert the DataFrame to a dictionary with the original format
+        file_list = [open(deeptte_formatted_path+"train_0"+str(j), mode='a') for j in range(n_folds)]
         for idx, row in result.iterrows():
             j = idx % n_folds
-            with open(deeptte_formatted_path+"train_0"+str(j), mode='a') as out_file:
-                json.dump(row.to_dict(), out_file)
-                out_file.write("\n")
+            json.dump(row.to_dict(), file_list[j])
+            file_list[j].write("\n")
+        _ = [f.close() for f in file_list]
 
 def get_summary_config(trace_data, n_unique_veh, gtfs_folder, n_folds):
     """
@@ -696,22 +697,3 @@ def shingle(trace_df, min_len, max_len):
     throwouts = throwouts[throwouts['lat']<3]['shingle_id'].values
     z = z[~z['shingle_id'].isin(throwouts)]
     return z
-
-# def extract_validation():
-#     # Extract zip files of all validation tracks in folder
-#     folder = "../data/kcm_validation_sensor/"
-#     for file in os.listdir(folder):
-#         if file != ".DS_Store" and file[-4] == ".":
-#             with ZipFile(folder+file, 'r') as zip:
-#                 zip.extractall(folder+file[:-4])
-
-#     # Combine all validation data into a dict, filenames are the keys
-#     folder = "../data/kcm_validation_sensor/"
-#     validation_data_lookup = {}
-#     for file in os.listdir(folder):
-#         if file != ".DS_Store" and file[-4:] != ".zip":
-#             df = [pd.read_csv(folder+file+"/"+validation_file) for validation_file in os.listdir(folder+file)]
-#             validation_data_lookup[file] = df
-
-#     # Show available keys
-#     validation_data_lookup.keys()

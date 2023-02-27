@@ -29,7 +29,7 @@ def run_models(run_folder, network_folder):
 
     ### Set run and hyperparameters
     device = torch.device("cpu")
-    EPOCHS = 50
+    EPOCHS = 20
     BATCH_SIZE = 16
     LEARN_RATE = 1e-3
     HIDDEN_SIZE = 32
@@ -143,13 +143,13 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/3_month_test/",
+        run_folder="./results/throwaway/",
         network_folder="kcm/"
     )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/3_month_test/",
+        run_folder="./results/throwaway/",
         network_folder="atb/"
     )
