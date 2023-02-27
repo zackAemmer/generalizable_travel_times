@@ -48,7 +48,6 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     ### Load data from raw bus data files
     print("="*30)
     print(f"Combining raw bus data files...")
-    # Get traces from all data
     train_data, train_fail_dates = data_utils.combine_pkl_data(raw_data_folder, train_dates, given_names)
     test_data, test_fail_dates = data_utils.combine_pkl_data(raw_data_folder, test_dates, given_names)
     print(f"Lost dates train: {train_fail_dates}, {len(train_data)} samples kept.")
@@ -58,34 +57,31 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     print(f"Loading and merging GTFS files from '{gtfs_folder}'...")
     gtfs_data = data_utils.merge_gtfs_files(gtfs_folder)
     
-    # Shingle each trajectory into a subset of smaller chunks
+    ### Process the data into usable features
+    print("="*30)
     print(f"Shingling traces into smaller chunks...")
     train_traces = data_utils.shingle(train_data, 2, 5)
     test_traces = data_utils.shingle(test_data, 2, 5)
     print(f"Cumulative {np.round(len(train_traces) / len(train_data) * 100, 1)}% of train data retained. Saving {len(train_traces)} samples.")
     print(f"Cumulative {np.round(len(test_traces) / len(test_data) * 100, 1)}% of test data retained. Saving {len(test_traces)} samples.")
 
-    # Calculate distance between points in each trajectory, do some filtering on speed, n_points
-    print(f"Calculating trace trajectories, filtering on speed and number of trajectory points...")
+    print(f"Calculating trace trajectories...")
     train_traces = data_utils.calculate_trace_df(train_traces, timezone)
     test_traces = data_utils.calculate_trace_df(test_traces, timezone)
     print(f"Cumulative {np.round(len(train_traces) / len(train_traces) * 100, 1)}% of train data retained.")
     print(f"Cumulative {np.round(len(test_traces) / len(test_traces) * 100, 1)}% of test data retained.")
 
-    # Match trajectories to timetables and do filtering on stop distance, availability
-    print(f"Matching traces to GTFS timetables, filtering on schedule availability...")
+    print(f"Matching traces to GTFS timetables...")
     train_traces = data_utils.parallelize_clean_trace_df_w_timetables(train_traces, gtfs_data)
     test_traces = data_utils.parallelize_clean_trace_df_w_timetables(test_traces, gtfs_data)
-    # train_traces = data_utils.clean_trace_df_w_timetables(train_traces, gtfs_data)
-    # test_traces = data_utils.clean_trace_df_w_timetables(test_traces, gtfs_data)
     print(f"Cumulative {np.round(len(train_traces) / len(train_data) * 100, 1)}% of train data retained. Saving {len(train_traces)} samples.")
     print(f"Cumulative {np.round(len(test_traces) / len(test_data) * 100, 1)}% of test data retained. Saving {len(test_traces)} samples.")
 
-    # Get unique vehicle ids
+    print(f"Finding new unique vehicle IDs...")
     (train_traces, test_traces), n_unique_veh = data_utils.remap_vehicle_ids([train_traces, test_traces])
     print(f"Found {n_unique_veh} unique vehicle IDs in this data.")
 
-    ### Save processed data from raw bus data files
+    ### Save processed data to analysis files
     print("="*30)
     print(f"Mapping trace data to DeepTTE format...")
     deeptte_formatted_path = base_folder + "deeptte_formatted/"
@@ -93,15 +89,15 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     test_traces = data_utils.map_to_deeptte(test_traces, deeptte_formatted_path, n_folds, is_test=True)
     summary_config = data_utils.get_summary_config(train_traces, n_unique_veh, gtfs_folder, n_folds)
 
-    # Write summary dict to config file
+    print(f"Saving config file...")
     with open(deeptte_formatted_path+"config.json", mode="a") as out_file:
         json.dump(summary_config, out_file)
 
     print(f"Saving processed bus data files...")
-    # Save trace dataframes
     data_utils.write_pkl(train_traces, base_folder+"train_traces.pkl")
     data_utils.write_pkl(test_traces, base_folder+"test_traces.pkl")
 
+    print("="*30)
     print(f"RUN PREPARATION COMPLETED '{run_name}/{network_name}'")
 
 
