@@ -40,7 +40,7 @@ def make_dataset(data, config, device):
     timeID = torch.from_numpy(np.array([x['timeID'] for x in data]).astype('float32')).unsqueeze(1).to(device=device)
     weekID = torch.from_numpy(np.array([x['weekID'] for x in data]).astype('float32')).unsqueeze(1).to(device=device)
     # Misc
-    driverID = torch.from_numpy(np.array([x['driverID'] for x in data]).astype('float32')).unsqueeze(1).to(device=device)
+    driverID = torch.from_numpy(np.array([x['vehicleID'] for x in data]).astype('float32')).unsqueeze(1).to(device=device)
     dist = torch.from_numpy(data_utils.normalize(np.array([x['dist_gap'][-1] for x in data]).astype('float32'), config['dist_mean'], config['dist_std'])).unsqueeze(1).to(device=device)
     # noise = torch.from_numpy(np.random.uniform(0.0, 1.0, len(data)).astype('float32')).unsqueeze(1).to(device=device)
 
