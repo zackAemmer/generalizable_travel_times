@@ -279,7 +279,7 @@ def clean_trace_df_w_timetables(data, gtfs_data):
     # Filter trips with less than n observations
     shingle_counts = data['shingle_id'].value_counts()
     valid_trips = shingle_counts.index[shingle_counts >= 5]
-    data = data[data['shingle_id'].isin(valid_trips)].copy()
+    data = data[data['shingle_id'].isin(valid_trips)]
     # Save start time of first points in trajectories
     first_points = data[['shingle_id','timeID_s']].drop_duplicates('shingle_id')
     first_points.columns = ['shingle_id','trip_start_timeID_s']
@@ -289,7 +289,11 @@ def clean_trace_df_w_timetables(data, gtfs_data):
         data['lat'].values,
         gtfs_data
     )
-    data['stop_dist_km'], data['stop_arrival_s'], data['stop_lon'], data['stop_lat'] = closest_stops
+    data = data.assign(stop_dist_km=closest_stops[0])
+    data = data.assign(stop_arrival_s=closest_stops[1])
+    data = data.assign(stop_lon=closest_stops[2])
+    data = data.assign(stop_lat=closest_stops[3])
+    # data['stop_dist_km'], data['stop_arrival_s'], data['stop_lon'], data['stop_lat'] = closest_stops
 
     # Filter out shingles with stops that are too far away
     valid_trips = data.groupby('shingle_id').filter(lambda x: x['stop_dist_km'].max() <= 1.0)['shingle_id'].unique()
