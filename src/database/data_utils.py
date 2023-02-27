@@ -277,6 +277,11 @@ def clean_trace_df_w_timetables(data, gtfs_data):
         gtfs_data
     )
     data['stop_dist_km'], data['stop_arrival_s'], data['stop_lon'], data['stop_lat'] = closest_stops
+
+    # Filter out shingles with stops that are too far away
+    valid_trips = data.groupby('shingle_id').filter(lambda x: x['stop_dist_km'].max() <= 1.0)['shingle_id'].unique()
+    data = data[data['shingle_id'].isin(valid_trips)]
+
     # Get the timeID_s (for the first point of each trajectory)
     data = pd.merge(data, first_points, on='shingle_id')
     # Calculate the scheduled travel time from the first to each point in the shingle
