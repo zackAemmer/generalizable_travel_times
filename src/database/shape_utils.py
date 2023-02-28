@@ -96,6 +96,69 @@ def map_to_network(traces, segments, n_sample):
     traces_n = geopandas.sjoin_nearest(traces_n, segments, distance_col="join_dist").drop_duplicates(['tripid','locationtime'])
     return traces_n
 
+def interpolate_trajectories(df, group_col):
+    traj_bounds = df.groupby(group_col)['timeID_s'].agg(['min', 'max'])
+    ary_len = np.sum(traj_bounds['max']+1 - traj_bounds['min'])
+    interp_lon = np.empty((ary_len,), dtype=float)
+    interp_lat = np.empty((ary_len,), dtype=float)
+    interp_t = np.empty((ary_len,), dtype=int)
+    interp_id = np.empty((ary_len,), dtype=object)
+    i = 0
+    for traj_id, (traj_min, traj_max) in traj_bounds.iterrows():
+        time_steps = np.arange(traj_min, traj_max+1)
+        num_steps = len(time_steps)
+        traj_data = df[df[group_col] == traj_id][['lon', 'lat', 'timeID_s']].values
+        lonint = np.interp(time_steps, traj_data[:,2], traj_data[:,0])
+        latint = np.interp(time_steps, traj_data[:,2], traj_data[:,1])
+        interp_lon[i:i+num_steps] = lonint
+        interp_lat[i:i+num_steps] = latint
+        interp_t[i:i+num_steps] = time_steps
+        interp_id[i:i+num_steps] = np.full((num_steps,), traj_id)
+        i += num_steps
+    # Put in dataframe and format
+    interp = pd.DataFrame({
+        'lon':interp_lon,
+        'lat': interp_lat,
+        'timeID_s': interp_t,
+        group_col: interp_id
+    })
+    return interp
+
+def fill_trajectories(df, min_timeID, max_timeID, group_id):
+    traj_bounds = df.groupby(group_id)['timeID_s'].agg(['min', 'max'])
+    time_steps = np.arange(min_timeID, max_timeID + 1)
+    # Create an array to hold the filled trajectories
+    num_trajectories = len(traj_bounds)
+    num_steps = len(time_steps)
+    fill_arr = np.empty((num_trajectories * num_steps, 4), dtype=object)
+    # Loop over each trajectory and fill in the positions at each time step
+    i = 0
+    for traj_id, (traj_min, traj_max) in traj_bounds.iterrows():
+        traj_data = df[df[group_id] == traj_id][['lat', 'lon', 'timeID_s']].values
+        for j, t in enumerate(time_steps):
+            if t < traj_min:
+                # Use the first observation for this trajectory before the trajectory start time
+                fill_arr[i+j] = [traj_data[0,1], traj_data[0,0], t, traj_id]
+            elif t > traj_max:
+                # Use the last observation for this trajectory after the trajectory end time
+                fill_arr[i+j] = [traj_data[-1,1], traj_data[-1,0], t, traj_id]
+            else:
+                # Use the most recent observation for this trajectory at the current time step
+                mask = traj_data[:,2].astype(int) <= t
+                if np.any(mask):
+                    fill_arr[i+j] = [traj_data[mask][-1,1], traj_data[mask][-1,0], t, traj_id]
+                else:
+                    # There are no observations for this trajectory at or before the current time step
+                    fill_arr[i+j] = [np.nan, np.nan, t, traj_id]
+        i += num_steps
+    # Put in dataframe and format
+    fill = pd.DataFrame(fill_arr)
+    fill.columns = ['lon','lat','timeID_s',group_id]
+    fill['lon'] = fill['lon'].astype(float)
+    fill['lat'] = fill['lat'].astype(float)
+    fill['timeID_s'] = fill['timeID_s'].astype(int)
+    return fill
+
 def plot_gtfsrt_trip(ax, trace_df):
     """
     Plot a single real-time bus trajectory on a map.
@@ -103,7 +166,8 @@ def plot_gtfsrt_trip(ax, trace_df):
     trace_df: data from trip to plot
     Returns: None.
     """
-    to_plot = geopandas.GeoDataFrame(trace_df, geometry=geopandas.points_from_xy(trace_df.lon, trace_df.lat), crs="EPSG:4326")
+    to_plot = trace_df.copy()
+    to_plot = geopandas.GeoDataFrame(to_plot, geometry=geopandas.points_from_xy(to_plot.lon, to_plot.lat), crs="EPSG:4326")
     to_plot_stop = trace_df.iloc[-1:,:]
     to_plot_stop = geopandas.GeoDataFrame(to_plot_stop, geometry=geopandas.points_from_xy(to_plot_stop.stop_lon, to_plot_stop.stop_lat), crs="EPSG:4326")
     # Plot all points
@@ -123,37 +187,8 @@ def plot_gtfs_trip(ax, trip_id, gtfs_data):
     gtfs_data: merged GTFS data
     Returns: None.
     """
-    to_plot = gtfs_data[gtfs_data['trip_id']==trip_id]
+    to_plot = gtfs_data.copy()
+    to_plot = to_plot[to_plot['trip_id']==trip_id]
     to_plot = geopandas.GeoDataFrame(to_plot, geometry=geopandas.points_from_xy(to_plot.stop_lon, to_plot.stop_lat), crs="EPSG:4326")
     to_plot.plot(ax=ax, marker='x', color='lightgreen', markersize=10)
     return None
-
-# def plot_validation_trip():
-#     # Get traces from a single validation trip
-#     validation_trip = "8124-33-2022-10-17_20-52-26"
-#     validation_traces = validation_data_lookup[validation_trip][2]
-#     validation_traces = geopandas.GeoDataFrame(validation_traces, geometry=geopandas.points_from_xy(validation_traces.longitude, validation_traces.latitude), crs="EPSG:4326")
-#     # Use less digits in the epoch time
-#     validation_traces['time'] = [int(str(x)[:10]) for x in validation_traces['time']]
-
-#     # Get corresponding GTFS-RT trip traces (if recorded)
-#     trip_details = validation_trip.split("-")
-#     vehicle_id = trip_details[0]
-#     original_traces = traces[traces['vehicleid']==float(vehicle_id)]
-#     original_traces = original_traces[original_traces['locationtime']>=min(validation_traces['time'])]
-#     original_traces = original_traces[original_traces['locationtime']<=max(validation_traces['time'])]
-#     original_traces = geopandas.GeoDataFrame(original_traces, geometry=geopandas.points_from_xy(original_traces.lon, original_traces.lat), crs="EPSG:4326")
-
-#     # Map trip to shape id
-#     gtfs_trips = pd.read_csv("../data/kcm_gtfs/trips.txt")
-#     gtfs_trips.head()
-
-#     # If the original traces were found in the GTFS-RT, plot them
-#     fig, ax = plt.subplots(1,1)
-#     if (len(original_traces)) == 0:
-#         print("Validation trip was not captured in the GTFS-RT.")
-#     else:
-#         validation_traces.plot(ax=ax, marker='.', color='green', markersize=5)
-#         original_traces.plot(ax=ax, marker='*', color='purple', markersize=20)
-#         cx.add_basemap(ax, crs=original_traces.crs, source=cx.providers.CartoDB.Voyager)
-#         plt.savefig("../plots/original_validation.png", dpi=1800, bbox_inches='tight')
