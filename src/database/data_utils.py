@@ -3,6 +3,7 @@ Functions for processing tracked bus and timetable data.
 """
 
 from datetime import date, datetime, timedelta
+import pyproj
 import itertools
 import json
 from math import degrees, radians, atan2, cos, sin, asin, sqrt
@@ -62,61 +63,16 @@ def recode_nums(ary):
     new_codes = np.arange(0,len(old_codes))
     return dict(zip(old_codes, new_codes))
 
-def calculate_bearing(pos1, pos2):
+def calculate_gps_dist(end_lons, end_lats, start_lons, start_lats):
     """
-    Calculate the bearing between two GPS coordinates.
+    Calculate the spherical distance between a series of points.
     lons1/lats1: arrays of coordinates for the end points
     lons2/lats2: arrays of coordinates for the start points
     Returns: array of distances in meters.
     """
-    # end_lon, end_lat = pos1
-    # start_lon, start_lat = pos2
-    bearings = []
-    for i in range(0, pos1.shape[0]):
-        end_lon, end_lat = pos1[i]
-        start_lon, start_lat = pos2[i]
-        # Convert to radians
-        start_lat, start_lon, end_lat, end_lon = map(radians, [start_lat, start_lon, end_lat, end_lon])
-        # Calculate differences
-        d_lon = end_lon - start_lon
-        # Calculate bearing
-        y = sin(d_lon) * cos(end_lat)
-        x = cos(start_lat) * sin(end_lat) - sin(start_lat) * cos(end_lat) * cos(d_lon)
-        bearing = atan2(y, x)
-        # Convert to degrees
-        bearing = degrees(bearing)
-        # Normalize to 0-360
-        if bearing < 0:
-            bearing += 360
-        bearings.append(np.round(bearing,1))
-    return bearings
-
-def spherical_dist(pos1, pos2, r=6371000):
-    """
-    Calculate spherical distance between two coordinates.
-    pos1/pos2: 2d array with lon and lat for start/end points
-    r: radius of earth in desired units
-    Returns: array of distances.
-    """
-    # r is in meters (6371000)
-    pos1 = pos1 * np.pi / 180
-    pos2 = pos2 * np.pi / 180
-    cos_lat1 = np.cos(pos1[..., 0])
-    cos_lat2 = np.cos(pos2[..., 0])
-    cos_lat_d = np.cos(pos1[..., 0] - pos2[..., 0])
-    cos_lon_d = np.cos(pos1[..., 1] - pos2[..., 1])
-    return r * np.arccos(cos_lat_d - cos_lat1 * cos_lat2 * (1 - cos_lon_d))
-
-def calculate_gps_dist(end_lat, end_lon, start_lat, start_lon):
-    """
-    Calculate the Haversine distance between a series of points.
-    lons1/lats1: arrays of coordinates for the end points
-    lons2/lats2: arrays of coordinates for the start points
-    Returns: array of distances in meters.
-    """
-    end_points = np.array((end_lon, end_lat)).T
-    start_points = np.array((start_lon, start_lat)).T
-    return spherical_dist(end_points, start_points), calculate_bearing(end_points, start_points)
+    geodesic = pyproj.Geod(ellps='WGS84')
+    f_azis, b_azis, dists = geodesic.inv(start_lons, start_lats, end_lons, end_lats)
+    return dists, f_azis
 
 def calculate_trip_speeds(data):
     """
@@ -129,10 +85,10 @@ def calculate_trip_speeds(data):
     y = data[['shingle_id','lat','lon','locationtime']].shift()
     y.columns = [colname+"_shift" for colname in y.columns]
     z = pd.concat([x,y], axis=1)
-    z['dist_diff'], z['bearing'] = calculate_gps_dist(z['lon'], z['lat'], z['lon_shift'], z['lat_shift'])
+    z['dist_diff'], z['bearing'] = calculate_gps_dist(z['lon'].values, z['lat'].values, z['lon_shift'].values, z['lat_shift'].values)
     z['time_diff'] = z['locationtime'] - z['locationtime_shift']
     z['speed_m_s'] = z['dist_diff'] / z['time_diff']
-    return z['speed_m_s'].values.flatten(), z['dist_diff'].values.flatten(), z['time_diff'].values.flatten(), z['bearing'].values.flatten()
+    return z['speed_m_s'].values, z['dist_diff'].values, z['time_diff'].values, z['bearing'].values
 
 def get_validation_dates(validation_path):
     """

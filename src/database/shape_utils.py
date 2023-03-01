@@ -21,6 +21,17 @@ from shapely.errors import ShapelyDeprecationWarning
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 
+def decompose_velocity(speed, bearing):
+    """
+    Break speed vector into its x and y components.
+    speed: array of speeds
+    bearing: azimuth from north, negative for westward movement, positive for east
+    Returns: array of x, y speed components.
+    """
+    x = np.round(np.sin(bearing * np.pi/180) * speed, 1)
+    y = np.round(np.cos(bearing * np.pi/180) * speed, 1)
+    return (x,y)
+
 def get_points_within_dist(points, query_points, distance):
     """
     Get unique indices in points for all that are within distance of a query point.
@@ -34,6 +45,44 @@ def get_closest_point(points, query_points):
     tree = KDTree(points)
     dists, idxs = tree.query(query_points)
     return dists, idxs
+
+def get_2d_bins(lons, lats, resolution=100):
+    x = np.linspace(np.min(lons), np.max(lons), resolution)
+    y = np.linspace(np.min(lats), np.max(lats), resolution)
+    # The bins are off by one dimension from the gridlines; add back a very small extra bin
+    xbins = np.append(x, x[-1]+.0000001)
+    ybins = np.append(y, y[-1]+.0000001)
+    return (xbins, ybins)
+
+def rasterize_values(lons, lats, values, xbins, ybins):
+    # https://stackoverflow.com/questions/36013063/what-is-the-purpose-of-meshgrid-in-python-numpy
+    # Y, X = np.meshgrid(x, y)
+    # lon_bins = np.digitize(point_obs[:,0], x) - 1
+    # lat_bins = np.digitize(point_obs[:,1], y) - 1
+    # Gather values by their 2d lat/lon bins
+    hist, x_edges, y_edges = np.histogram2d(lons, lats, bins=[xbins,ybins], weights=values, normed=False)
+    count_hist, x_edges, y_edges = np.histogram2d(lons, lats, bins=[xbins,ybins], normed=False)
+    # Get the average in each 2d bin
+    hist = hist.T / np.maximum(1, count_hist.T)
+    hist[hist==0] = .000001
+    count_hist = count_hist.T
+    return (hist, count_hist)
+
+def get_adjacent_points(df, shingle_id, t_buffer, dist):
+    shingle_data = df[df['shingle_id']==shingle_id]
+    # Filter on time
+    t_buffer = 120
+    t_min = np.min(shingle_data.locationtime) - t_buffer
+    t_max = np.max(shingle_data.locationtime)
+    adjacent_data = df[df['locationtime'].between(t_min, t_max)]
+    # Filter out points from same shingle
+    adjacent_data = adjacent_data[adjacent_data['shingle_id']!=np.min(shingle_data['shingle_id'])]
+    # Filter on distance
+    points = np.array([adjacent_data['lon'], adjacent_data['lat']]).T.tolist()
+    query_points = np.array([shingle_data['lon'], shingle_data['lat']]).T.tolist()
+    pt_indices = get_points_within_dist(points, query_points, dist)
+    adjacent_data = adjacent_data.iloc[pt_indices].sort_values(['shingle_id','locationtime'])
+    return (shingle_data, adjacent_data)
 
 def get_unique_line_geometries(shape_data):
     """
@@ -175,8 +224,10 @@ def plot_gtfsrt_trip(ax, trace_df):
     # Plot first/last points
     to_plot.iloc[0:1,:].plot(ax=ax, marker='*', color='green', markersize=40)
     to_plot.iloc[-1:,:].plot(ax=ax, marker='*', color='red', markersize=40)
+    # to_plot.apply(lambda x: ax.annotate(text=x['bearing'], xy=x.geometry.centroid.coords[0], ha='center', size=2), axis=1)
     # Also plot closest stop to final point
     to_plot_stop.plot(ax=ax, marker='x', color='blue', markersize=20)
+
     return None
 
 def plot_gtfs_trip(ax, trip_id, gtfs_data):
