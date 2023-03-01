@@ -69,14 +69,14 @@ def rasterize_values(lons, lats, values, xbins, ybins):
     return (hist, count_hist)
 
 def get_adjacent_points(df, shingle_id, t_buffer, dist):
+    # Critical to not reset index on df or intermediate results
     shingle_data = df[df['shingle_id']==shingle_id]
+    adjacent_data = df[df['shingle_id']!=shingle_id]
     # Filter on time
     t_buffer = 120
     t_min = np.min(shingle_data.locationtime) - t_buffer
     t_max = np.max(shingle_data.locationtime)
-    adjacent_data = df[df['locationtime'].between(t_min, t_max)]
-    # Filter out points from same shingle
-    adjacent_data = adjacent_data[adjacent_data['shingle_id']!=np.min(shingle_data['shingle_id'])]
+    adjacent_data = adjacent_data[adjacent_data['locationtime'].between(t_min, t_max)]
     # Filter on distance
     points = np.array([adjacent_data['lon'], adjacent_data['lat']]).T.tolist()
     query_points = np.array([shingle_data['lon'], shingle_data['lat']]).T.tolist()
