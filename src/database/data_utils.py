@@ -437,14 +437,18 @@ def extract_operator(old_folder, new_folder, source_col, op_name):
                 pickle.dump(data, f)
                 
 def extract_operator_gtfs(old_folder, new_folder, source_col, op_name):
-    files = os.listdir(old_folder)
-    for file in files:
-        if file != ".DS_Store":
-            with open(old_folder+'/'+file, 'rb') as f:
-                data = pickle.load(f)
-                data = data[data[source_col]==op_name]
-            with open(f"{new_folder}/{file}", 'wb') as f:
-                pickle.dump(data, f)
+    """
+    First make a copy of the GTFS directory, then this function will overwrite the key files.
+    """
+    gtfs_folders = os.listdir(old_folder)
+    for file in gtfs_folders:
+        if file != ".DS_Store" and len(file)==10:
+            z = pd.read_csv(f"{old_folder}{file}/trips.txt", low_memory=False, dtype=GTFS_LOOKUP)
+            st = pd.read_csv(f"{old_folder}{file}/stop_times.txt", low_memory=False, dtype=GTFS_LOOKUP)
+            z = z[z[source_col].str[:3]==op_name]
+            st = st[st[source_col].str[:3]==op_name]
+            z.to_csv(f"{new_folder}{file}/trips.txt")
+            st.to_csv(f"{new_folder}{file}/stop_times.txt")
 
 def merge_gtfs_files(gtfs_folder):
     """
