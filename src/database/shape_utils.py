@@ -32,6 +32,11 @@ def decompose_velocity(speed, bearing):
     y = np.round(np.cos(bearing * np.pi/180) * speed, 1)
     return (x,y)
 
+def upscale(rast, scalar_dims):
+    scalars = [np.ones((x,x), dtype=float) for x in scalar_dims]
+    res = [np.kron(rast[x], scalars[x]) for x in range(len(scalar_dims))]
+    return res
+
 def get_points_within_dist(points, query_points, distance):
     """
     Get unique indices in points for all that are within distance of a query point.

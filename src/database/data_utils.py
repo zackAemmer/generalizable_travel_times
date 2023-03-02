@@ -2,23 +2,22 @@
 Functions for processing tracked bus and timetable data.
 """
 
-from datetime import date, datetime, timedelta
-import pyproj
 import itertools
 import json
-from math import degrees, radians, atan2, cos, sin, asin, sqrt
-from multiprocessing import Pool
 import os
+import pickle
+from datetime import date, datetime, timedelta
+from math import asin, atan2, cos, degrees, radians, sin, sqrt
+from multiprocessing import Pool
 from random import sample
-from sklearn import metrics
+from zipfile import ZipFile
 
 import numpy as np
 import pandas as pd
-import pickle
-from zipfile import ZipFile
+import pyproj
+from sklearn import metrics
 
 from database import shape_utils
-
 
 # Set of unified feature names and dtypes for variables in the GTFS-RT data
 FEATURE_NAMES = ['trip_id','file','locationtime','lat','lon','vehicle_id']
@@ -133,6 +132,22 @@ def load_train_test_data(data_folder, n_folds):
     contents = open(data_folder + "test", "r").read()
     test_data = [json.loads(str(item)) for item in contents.strip().split('\n')]
     return train_data_chunks, test_data
+
+def load_run_input_data(run_folder, network_folder):
+    train_traces = load_pkl(f"{run_folder}{network_folder}train_traces.pkl")
+    test_traces = load_pkl(f"{run_folder}{network_folder}test_traces.pkl")
+    with open(f"{run_folder}{network_folder}/deeptte_formatted/config.json") as f:
+        config = json.load(f)
+    gtfs_data = merge_gtfs_files(f".{config['gtfs_folder']}")
+    tte_train_chunks, tte_test = load_train_test_data(f"{run_folder}{network_folder}/deeptte_formatted/", config['n_folds'])
+    return {
+        "train_traces": train_traces,
+        "test_traces": test_traces,
+        "config": config,
+        "gtfs_data": gtfs_data,
+        "tte_train_chunks": tte_train_chunks,
+        "tte_test": tte_test
+    }
 
 def combine_pkl_data(folder, file_list, given_names):
     """
@@ -412,6 +427,16 @@ def extract_operator(old_folder, new_folder, source_col, op_name):
     source_col: column name to filter on
     op_name: column value to keep in new files
     """
+    files = os.listdir(old_folder)
+    for file in files:
+        if file != ".DS_Store":
+            with open(old_folder+'/'+file, 'rb') as f:
+                data = pickle.load(f)
+                data = data[data[source_col]==op_name]
+            with open(f"{new_folder}/{file}", 'wb') as f:
+                pickle.dump(data, f)
+                
+def extract_operator_gtfs(old_folder, new_folder, source_col, op_name):
     files = os.listdir(old_folder)
     for file in files:
         if file != ".DS_Store":
