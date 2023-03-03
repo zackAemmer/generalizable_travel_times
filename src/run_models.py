@@ -28,9 +28,9 @@ def run_models(run_folder, network_folder):
     print(f"NETWORK: '{network_folder}'")
 
     ### Set run and hyperparameters
-    device = torch.device("cpu")
+    device = torch.device("cuda")
     EPOCHS = 20
-    BATCH_SIZE = 16
+    BATCH_SIZE = 1024
     LEARN_RATE = 1e-3
     HIDDEN_SIZE = 32
 
@@ -42,7 +42,7 @@ def run_models(run_folder, network_folder):
     with open(data_folder + "config.json", "r") as f:
         config = json.load(f)
     # Load GTFS-RT samples
-    train_data_chunks, valid_data = data_utils.load_train_test_data(data_folder, config['n_folds'])
+    train_data_chunks, valid_data = data_utils.load_train_test_data(data_folder, config['n_folds']) # Validation data no longer used
     # Load GTFS data
     print(f"Loading and merging GTFS files from '{config['gtfs_folder']}'...")
     gtfs_data = data_utils.merge_gtfs_files(config['gtfs_folder'])
@@ -52,17 +52,17 @@ def run_models(run_folder, network_folder):
     for fold_num in range(0, len(train_data_chunks)):
         print("="*30)
         print(f"FOLD: {fold_num}")
+        # Set aside the train/test data according to the current fold number
         test_data = train_data_chunks[fold_num]
         train_data = [x for i,x in enumerate(train_data_chunks) if i!=fold_num]
+        # Combine the training data to single object
         train_data = list(itertools.chain.from_iterable(train_data))
 
         # Construct dataloaders for Pytorch models
-        train_dataset = data_loader.make_dataset(train_data, config, device)
-        test_dataset = data_loader.make_dataset(test_data, config, device)
-        valid_dataset = data_loader.make_dataset(valid_data, config, device)
-        train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
-        test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
-        valid_dataloader = DataLoader(valid_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
+        train_dataset = data_loader.make_dataset(train_data, config)
+        test_dataset = data_loader.make_dataset(test_data, config)
+        train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=True, num_workers=4)
+        test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=True, num_workers=4)
         print(f"Successfully loaded {len(train_data)} training samples and {len(test_data)} testing samples.")
 
         ### Train average time model
@@ -70,15 +70,15 @@ def run_models(run_folder, network_folder):
         print(f"Training average hourly speed model...")
         avg_model = avg_speed.AvgHourlySpeedModel()
         avg_model.fit(train_data)
-        avg_model.save_to(run_folder + network_folder + f"models/avg_model_{fold_num}.pkl")
-        avg_preds = avg_model.predict(valid_data)
+        avg_model.save_to(f"{run_folder}{network_folder}models/avg_model_{fold_num}.pkl")
+        avg_preds = avg_model.predict(test_data)
 
         ### Train time table model
         print("="*30)
         print(f"Training time table model...")
         sch_model = time_table.TimeTableModel(config['gtfs_folder'])
-        sch_model.save_to(run_folder + network_folder + f"models/sch_model_{fold_num}.pkl")
-        sch_preds = sch_model.predict_simple_sch(valid_data, gtfs_data)
+        sch_model.save_to(f"{run_folder}{network_folder}models/sch_model_{fold_num}.pkl")
+        sch_preds = sch_model.predict_simple_sch(test_data, gtfs_data)
 
         ### Train basic ff model
         print("="*30)
@@ -107,16 +107,16 @@ def run_models(run_folder, network_folder):
             embed_dict,
             HIDDEN_SIZE
         ).to(device)
-        ff_train_losses, ff_test_losses = ff_model.fit_to_data(train_dataloader, test_dataloader, LEARN_RATE, EPOCHS)
+        ff_train_losses, ff_test_losses = ff_model.fit_to_data(train_dataloader, test_dataloader, LEARN_RATE, EPOCHS, device)
         torch.save(ff_model.state_dict(), run_folder + network_folder + f"models/ff_model_{fold_num}.pt")
         ff_model.eval()
-        ff_labels, ff_preds = ff_model.predict(valid_dataloader, config)
+        ff_labels, ff_preds = ff_model.predict(test_dataloader, config, device)
 
         ### Calculate metrics
         print("="*30)
         models = ["AVG","SCH","FF"]
         preds = [avg_preds, sch_preds, ff_preds]
-        labels = np.array([x['time_gap'][-1] for x in valid_data])
+        labels = np.array([x['time_gap'][-1] for x in test_data])
         fold_results = {
             "Fold": fold_num,
             "All Losses": [],
@@ -143,13 +143,13 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/throwaway/",
+        run_folder="./results/3_month_test/",
         network_folder="kcm/"
     )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/throwaway/",
+        run_folder="./results/3_month_test/",
         network_folder="atb/"
     )
