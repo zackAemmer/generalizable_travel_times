@@ -21,17 +21,6 @@ from shapely.errors import ShapelyDeprecationWarning
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 
-def decompose_velocity(speed, bearing):
-    """
-    Break speed vector into its x and y components.
-    speed: array of speeds
-    bearing: azimuth from north, negative for westward movement, positive for east
-    Returns: array of x, y speed components.
-    """
-    x = np.round(np.sin(bearing * np.pi/180) * speed, 1)
-    y = np.round(np.cos(bearing * np.pi/180) * speed, 1)
-    return (x,y)
-
 def upscale(rast, scalar_dims):
     scalars = [np.ones((x,x), dtype=float) for x in scalar_dims]
     res = [np.kron(rast[x], scalars[x]) for x in range(len(scalar_dims))]
@@ -51,27 +40,57 @@ def get_closest_point(points, query_points):
     dists, idxs = tree.query(query_points)
     return dists, idxs
 
-def get_2d_bins(lons, lats, resolution=100):
-    x = np.linspace(np.min(lons), np.max(lons), resolution)
-    y = np.linspace(np.min(lats), np.max(lats), resolution)
-    # The bins are off by one dimension from the gridlines; add back a very small extra bin
-    xbins = np.append(x, x[-1]+.0000001)
-    ybins = np.append(y, y[-1]+.0000001)
-    return (xbins, ybins)
+def decompose_vector(scalars, bearings, data_to_attach=None):
+    """
+    Break speed vector into its x and y components.
+    scalars: array of speeds
+    bearings: azimuth from north, negative for westward movement, positive for east
+    data_to_attach: additional columns to keep with the lat/lon/decomposed values
+    Returns: array of x +/-, y +/- scalar components.
+    """
+    # Use bearing to break value into 
+    x = np.round(np.sin(bearings * np.pi/180) * scalars, 1)
+    y = np.round(np.cos(bearings * np.pi/180) * scalars, 1)
+    x_all = np.column_stack([x, data_to_attach])
+    y_all = np.column_stack([y, data_to_attach])
+    # Include 0.0 observations in both channels
+    x_pos = x_all[x>=0.0]
+    x_neg = x_all[x<=0.0]
+    y_pos = y_all[y>=0.0]
+    y_neg = y_all[y<=0.0]
+    
+    x_neg[:,0] = np.abs(x_neg[:,0])
+    y_neg[:,0] = np.abs(y_neg[:,0])
 
-def rasterize_values(lons, lats, values, xbins, ybins):
-    # https://stackoverflow.com/questions/36013063/what-is-the-purpose-of-meshgrid-in-python-numpy
-    # Y, X = np.meshgrid(x, y)
-    # lon_bins = np.digitize(point_obs[:,0], x) - 1
-    # lat_bins = np.digitize(point_obs[:,1], y) - 1
-    # Gather values by their 2d lat/lon bins
-    hist, x_edges, y_edges = np.histogram2d(lons, lats, bins=[xbins,ybins], weights=values, normed=False)
-    count_hist, x_edges, y_edges = np.histogram2d(lons, lats, bins=[xbins,ybins], normed=False)
-    # Get the average in each 2d bin
-    hist = hist.T / np.maximum(1, count_hist.T)
-    hist[hist==0] = .000001
-    count_hist = count_hist.T
-    return (hist, count_hist)
+    return (x_pos, x_neg, y_pos, y_neg)
+
+def create_grid_features(features, bearings, lons, lats, times, timestep, resolution):
+    # Get regularly spaced bins at given resolution/timestep across bbox for all collected points
+    # Need to flip bins for latitude because it should decrease downward through array
+    latbins = np.linspace(np.min(lats), np.max(lats), resolution)
+    latbins = np.append(latbins, latbins[-1]+.0000001)
+    lonbins = np.linspace(np.min(lons), np.max(lons), resolution)
+    lonbins = np.append(lonbins, lonbins[-1]+.0000001)
+    tbins = np.arange(0,1440*60,timestep)
+    tbins = np.append(tbins, tbins[-1]+.0000001)
+    # Split features into quadrant channels
+    channel_obs = decompose_vector(features, bearings, np.column_stack([lats, lons, times]))
+    # For each channel, aggregate by location and timestep bins
+    all_channel_rasts = np.zeros((len(latbins)-1, len(lonbins)-1, len(tbins)-1, len(channel_obs)), dtype='float16')
+    for i, channel in enumerate(channel_obs):
+        # Get the average feature value in each bin
+        count_hist, count_edges = np.histogramdd(channel[:,1:4], bins=[latbins, lonbins, tbins])
+        sum_hist, edges = np.histogramdd(channel[:,1:4], weights=channel[:,0], bins=[latbins, lonbins, tbins])
+        rast = sum_hist / np.maximum(1, count_hist)
+        # Fill zeros with very small value
+        rast[rast==0] = .0000001
+        # Invert latitude values (the bins must be increasing in hist dd, but in reality latitude decreases)
+        # This would not need to be flipped for data below the equator
+        # For longitudes, AtB may need to be flipped
+        rast = np.flip(rast, axis=0)
+        # Save binned values for each channel
+        all_channel_rasts[:,:,:,i] = rast
+    return all_channel_rasts
 
 def get_adjacent_points(df, shingle_id, t_buffer, dist):
     # Critical to not reset index on df or intermediate results
