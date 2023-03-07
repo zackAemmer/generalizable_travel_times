@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -5,16 +7,15 @@ from torch.utils.data import Dataset, DataLoader
 from database import data_utils
 
 
-class DeepTTEDataset(Dataset):
+class BasicDataset(Dataset):
     def __init__(self, dataset, transform_list=None):
-        X, y = dataset
-        X_tensor, y_tensor = X, y
+        X_tensor, y_tensor = dataset
         self.tensors = (X_tensor, y_tensor)
         self.transforms = transform_list
 
     def __getitem__(self, index):
         # Return the X and y tensors at the specified index. Transform X if applicable.
-        x = self.tensors[0][index]
+        x = (self.tensors[0][0][index], self.tensors[0][1][index])
         if self.transforms:
             x = self.transforms(x)
         y = self.tensors[1][index]
@@ -22,7 +23,7 @@ class DeepTTEDataset(Dataset):
 
     def __len__(self):
         # Return the number of samples in the dataset
-        return self.tensors[0].size(0)
+        return len(self.tensors[1])
 
 def make_dataset(data, config):
     # Coordinates
@@ -61,5 +62,24 @@ def make_dataset(data, config):
     y = torch.from_numpy(data_utils.normalize(np.array([x['time_gap'][-1] for x in data]).astype('float32'), config['time_mean'], config['time_std'])).unsqueeze(1)
 
     # Pack everything into dataset/dataloader for training loop
-    dataset = DeepTTEDataset((X,y))
+    dataset = BasicDataset((X,y))
+    return dataset
+
+def make_sequence_dataset(data, config):
+    seq_len = 2
+    # For example, if you have 10 GPS points with 2 features (latitude and longitude) for each sample, and you use a batch size of 32, then your input shape would be [10, 32, 2].
+    context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID']]) for x in data])
+    # Take only the first n steps of each sequence, keep all attr data
+    # Keep info from the predicted step, since it's lat/lon etc. can be used to predict
+    X = np.zeros((len(data), seq_len+1, 5))
+    for i in range(len(data)):
+        X[i,:,0] = data[i]['lats'][:seq_len+1]
+        X[i,:,1] = data[i]['lngs'][:seq_len+1]
+        X[i,:,2] = data[i]['speed_m_s'][:seq_len+1]
+        X[i,:,3] = data[i]['scheduled_time_s'][:seq_len+1]
+        X[i,:,4] = data[i]['dist_calc_km'][:seq_len+1]
+    X = torch.from_numpy(X.astype('float32'))
+    # Predict average speed between the last point in sequence, and the next point
+    y = torch.from_numpy(np.array([x['speed_m_s'][seq_len] for x in data]).astype('float32'))
+    dataset = BasicDataset(((X,context),y))
     return dataset
