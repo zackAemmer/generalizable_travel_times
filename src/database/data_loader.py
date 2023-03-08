@@ -9,13 +9,12 @@ from database import data_utils
 
 class BasicDataset(Dataset):
     def __init__(self, dataset, transform_list=None):
-        X_tensor, y_tensor = dataset
-        self.tensors = (X_tensor, y_tensor)
+        self.tensors = dataset
         self.transforms = transform_list
 
     def __getitem__(self, index):
         # Return the X and y tensors at the specified index. Transform X if applicable.
-        x = (self.tensors[0][0][index], self.tensors[0][1][index])
+        x = self.tensors[0][index]
         if self.transforms:
             x = self.transforms(x)
         y = self.tensors[1][index]
@@ -39,7 +38,6 @@ def make_dataset(data, config):
     # Network
     timeID = torch.from_numpy(np.array([x['timeID'] for x in data]).astype('float32')).unsqueeze(1)
     weekID = torch.from_numpy(np.array([x['weekID'] for x in data]).astype('float32')).unsqueeze(1)
-    # Misc
     driverID = torch.from_numpy(np.array([x['vehicleID'] for x in data]).astype('float32')).unsqueeze(1)
     dist = torch.from_numpy(data_utils.normalize(np.array([x['dist_gap'][-1] for x in data]).astype('float32'), config['dist_mean'], config['dist_std'])).unsqueeze(1)
 
@@ -65,8 +63,7 @@ def make_dataset(data, config):
     dataset = BasicDataset((X,y))
     return dataset
 
-def make_sequence_dataset(data, config):
-    seq_len = 2
+def make_seq_dataset(data, seq_len=2):
     # For example, if you have 10 GPS points with 2 features (latitude and longitude) for each sample, and you use a batch size of 32, then your input shape would be [10, 32, 2].
     context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID']]) for x in data])
     # Take only the first n steps of each sequence, keep all attr data
@@ -81,5 +78,6 @@ def make_sequence_dataset(data, config):
     X = torch.from_numpy(X.astype('float32'))
     # Predict average speed between the last point in sequence, and the next point
     y = torch.from_numpy(np.array([x['speed_m_s'][seq_len] for x in data]).astype('float32'))
-    dataset = BasicDataset(((X,context),y))
+    X = [(i,j) for i,j in zip(X,context)]
+    dataset = BasicDataset((X,y))
     return dataset

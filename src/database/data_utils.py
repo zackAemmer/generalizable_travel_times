@@ -264,12 +264,9 @@ def clean_trace_df_w_timetables(data, gtfs_data):
     data = data.assign(stop_arrival_s=closest_stops[1])
     data = data.assign(stop_lon=closest_stops[2])
     data = data.assign(stop_lat=closest_stops[3])
-    # data['stop_dist_km'], data['stop_arrival_s'], data['stop_lon'], data['stop_lat'] = closest_stops
-
     # Filter out shingles with stops that are too far away
     valid_trips = data.groupby('shingle_id').filter(lambda x: x['stop_dist_km'].max() <= 1.0)['shingle_id'].unique()
     data = data[data['shingle_id'].isin(valid_trips)]
-
     # Get the timeID_s (for the first point of each trajectory)
     data = pd.merge(data, first_points, on='shingle_id')
     # Calculate the scheduled travel time from the first to each point in the shingle
@@ -361,14 +358,16 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
         'scheduled_time_s': lambda x: x.tolist(),
     })
 
-    print(f"Saving formatted data to '{deeptte_formatted_path}', across {n_folds} training files...")
     # Convert the DataFrame to a dictionary with the original format
     if is_test:
-        with open(deeptte_formatted_path+"test", mode='a') as out_file:
-            for idx, row in result.iterrows():
-                    json.dump(row.to_dict(), out_file)
-                    out_file.write("\n")
+        print(f"Saving formatted data to '{deeptte_formatted_path}', across 1 testing file...")
+        out_file = open(deeptte_formatted_path+"test", mode='a')
+        for idx, row in result.iterrows():
+                json.dump(row.to_dict(), out_file)
+                out_file.write("\n")
+        out_file.close()
     else:
+        print(f"Saving formatted data to '{deeptte_formatted_path}', across {n_folds} training files...")
         file_list = [open(deeptte_formatted_path+"train_0"+str(j), mode='a') for j in range(n_folds)]
         for idx, row in result.iterrows():
             j = idx % n_folds
@@ -610,27 +609,49 @@ def extract_results(city, model_results):
         "RMSE": rmses,
         "MAE": maes
     })
-    # Extract FF loss curves
+    # Extract NN loss curves
     loss_df = []
-    fold_train_losses = [x['FF Train Losses'] for x in model_results]
-    fold_test_losses = [x['FF Valid Losses'] for x in model_results]
-    for fold_num in range(0,len(fold_train_losses)):
-        df_train = pd.DataFrame({
+    fold_train_losses_ff = [x['FF Train Losses'] for x in model_results]
+    fold_test_losses_ff = [x['FF Valid Losses'] for x in model_results]
+    fold_train_losses_rnn = [x['RNN Train Losses'] for x in model_results]
+    fold_test_losses_rnn = [x['RNN Valid Losses'] for x in model_results]
+    for fold_num in range(0,len(fold_train_losses_ff)):
+        df_train_ff = pd.DataFrame({
             "City": city,
             "Fold": fold_num,
+            "Model": "FF",
             "Loss Set": "Train",
-            "Epoch": np.arange(len(fold_train_losses[0])),
-            "Loss": fold_train_losses[fold_num]
+            "Epoch": np.arange(len(fold_train_losses_ff[0])),
+            "Loss": fold_train_losses_ff[fold_num]
         })
-        df_test = pd.DataFrame({
+        df_test_ff = pd.DataFrame({
             "City": city,
             "Fold": fold_num,
+            "Model": "FF",
             "Loss Set": "Test",
-            "Epoch": np.arange(len(fold_train_losses[0])),
-            "Loss": fold_test_losses[fold_num]
+            "Epoch": np.arange(len(fold_test_losses_ff[0])),
+            "Loss": fold_test_losses_ff[fold_num]
         })
-        loss_df.append(df_train)
-        loss_df.append(df_test)
+        df_train_rnn = pd.DataFrame({
+            "City": city,
+            "Fold": fold_num,
+            "Model": "RNN",
+            "Loss Set": "Train",
+            "Epoch": np.arange(len(fold_train_losses_rnn[0])),
+            "Loss": fold_train_losses_rnn[fold_num]
+        })
+        df_test_rnn = pd.DataFrame({
+            "City": city,
+            "Fold": fold_num,
+            "Model": "RNN",
+            "Loss Set": "Test",
+            "Epoch": np.arange(len(fold_test_losses_rnn[0])),
+            "Loss": fold_test_losses_rnn[fold_num]
+        })
+        loss_df.append(df_train_ff)
+        loss_df.append(df_test_ff)
+        loss_df.append(df_train_rnn)
+        loss_df.append(df_test_rnn)
     loss_df = pd.concat(loss_df)
     return result_df, loss_df
 

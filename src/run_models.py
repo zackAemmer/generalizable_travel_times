@@ -33,10 +33,11 @@ def run_models(run_folder, network_folder):
         device = torch.device("cpu")
 
     ### Set run and hyperparameters
-    EPOCHS = 20
-    BATCH_SIZE = 1024
+    EPOCHS = 30
+    BATCH_SIZE = 512
     LEARN_RATE = 1e-3
     HIDDEN_SIZE = 32
+    SEQ_LEN = 2
 
     ### Load train/test data
     print("="*30)
@@ -51,7 +52,7 @@ def run_models(run_folder, network_folder):
     print(f"Loading and merging GTFS files from '{config['gtfs_folder']}'...")
     gtfs_data = data_utils.merge_gtfs_files(config['gtfs_folder'])
 
-    ### Run full training process for each validation fold
+    ### Run full training process for each model during each validation fold
     run_results = []
     for fold_num in range(0, len(train_data_chunks)):
         print("="*30)
@@ -65,32 +66,15 @@ def run_models(run_folder, network_folder):
         # Construct dataloaders for Pytorch models
         train_dataset = data_loader.make_dataset(train_data, config)
         test_dataset = data_loader.make_dataset(test_data, config)
-        train_dataset_seq = data_loader.make_sequence_dataset(train_data, config)
-        test_dataset_seq = data_loader.make_sequence_dataset(test_data, config)
+        train_dataset_seq = data_loader.make_seq_dataset(train_data, SEQ_LEN)
+        test_dataset_seq = data_loader.make_seq_dataset(test_data, SEQ_LEN)
         train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
         test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
         train_dataloader_seq = DataLoader(train_dataset_seq, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
         test_dataloader_seq = DataLoader(test_dataset_seq, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
         print(f"Successfully loaded {len(train_data)} training samples and {len(test_data)} testing samples.")
 
-        # ### Train average time model
-        # print("="*30)
-        # print(f"Training average hourly speed model...")
-        # avg_model = avg_speed.AvgHourlySpeedModel()
-        # avg_model.fit(train_data)
-        # avg_model.save_to(f"{run_folder}{network_folder}models/avg_model_{fold_num}.pkl")
-        # avg_preds = avg_model.predict(test_data)
-
-        # ### Train time table model
-        # print("="*30)
-        # print(f"Training time table model...")
-        # sch_model = time_table.TimeTableModel(config['gtfs_folder'])
-        # sch_model.save_to(f"{run_folder}{network_folder}models/sch_model_{fold_num}.pkl")
-        # sch_preds = sch_model.predict_simple_sch(test_data, gtfs_data)
-
-        ### Train RNN model
-        print("="*30)
-        print(f"Training basic rnn model...")
+        # Define embedded variables for nn models
         embed_dict = {
             'timeID': {
                 'vocab_size': 1440,
@@ -108,74 +92,81 @@ def run_models(run_folder, network_folder):
                 'col': 10
             }
         }
+
+        ### Train average time model
+        print("="*30)
+        print(f"Training average hourly speed model...")
+        avg_model = avg_speed.AvgHourlySpeedModel()
+        avg_model.fit(train_data)
+        avg_model.save_to(f"{run_folder}{network_folder}models/avg_model_{fold_num}.pkl")
+        avg_preds = avg_model.predict(test_data)
+
+        ### Train time table model
+        print("="*30)
+        print(f"Training time table model...")
+        sch_model = time_table.TimeTableModel(config['gtfs_folder'])
+        sch_model.save_to(f"{run_folder}{network_folder}models/sch_model_{fold_num}.pkl")
+        sch_preds = sch_model.predict_simple_sch(test_data, gtfs_data)
+
+        ### Train ff model
+        print("="*30)
+        print(f"Training basic ff model...")
+        ff_model = basic_ff.BasicFeedForward(
+            # X tensor, first element, n_features
+            train_dataloader.dataset.tensors[0].shape[1],
+            embed_dict,
+            HIDDEN_SIZE
+        ).to(device)
+        ff_train_losses, ff_test_losses = model_utils.fit_to_data(ff_model, train_dataloader, test_dataloader, LEARN_RATE, EPOCHS, config, device)
+        torch.save(ff_model.state_dict(), run_folder + network_folder + f"models/ff_model_{fold_num}.pt")
+        ff_labels, ff_preds, ff_avg_loss = model_utils.predict(ff_model, test_dataloader, config, device)
+        ff_labels = data_utils.de_normalize(ff_labels, config['time_mean'], config['time_std'])
+        ff_preds = data_utils.de_normalize(ff_preds, config['time_mean'], config['time_std'])
+
+        ### Train RNN model
+        print("="*30)
+        print(f"Training basic rnn model...")
         rnn_model = basic_rnn.BasicRNN(
-            train_dataloader_seq.dataset.tensors[0][0].shape[2],
+            # X tensor, first element, traj component, n_features
+            train_dataloader_seq.dataset.tensors[0][0][0].shape[1],
             1,
             HIDDEN_SIZE,
             BATCH_SIZE,
             embed_dict
         ).to(device)
-
-        rnn_train_losses, rnn_test_losses = model_utils.fit_to_data(rnn_model, train_dataloader_seq, test_dataloader_seq, LEARN_RATE, EPOCHS, device, sequential_flag=True)
+        rnn_train_losses, rnn_test_losses = model_utils.fit_to_data(rnn_model, train_dataloader_seq, test_dataloader_seq, LEARN_RATE, EPOCHS, config, device, sequential_flag=True)
         torch.save(rnn_model.state_dict(), run_folder + network_folder + f"models/rnn_model_{fold_num}.pt")
-        rnn_model.eval()
-        rnn_labels, rnn_preds = model_utils.predict(rnn_model, test_dataloader_seq, config, device, sequential_flag=True)
+        rnn_labels, rnn_preds, rnn_avg_loss = model_utils.predict(rnn_model, test_dataloader_seq, config, device, sequential_flag=True)
+        rnn_labels = data_utils.de_normalize(rnn_labels, config['speed_m_s_mean'], config['speed_m_s_std'])
+        rnn_preds = data_utils.de_normalize(rnn_preds, config['speed_m_s_mean'], config['speed_m_s_std'])
 
-    #     ### Train basic ff model
-    #     print("="*30)
-    #     print(f"Training basic ff network model...")
-    #     # Variables must be changed here, and in data_loader.
-    #     # Must change model file if using only continuous or only embedded variables
-    #     embed_dict = {
-    #         'timeID': {
-    #             'vocab_size': 1440,
-    #             'embed_dims': 24,
-    #             'col': 8
-    #         },
-    #         'weekID': {
-    #             'vocab_size': 7,
-    #             'embed_dims': 4,
-    #             'col': 9
-    #         },
-    #         'driverID': {
-    #             'vocab_size': config['n_unique_veh'],
-    #             'embed_dims': 12,
-    #             'col': 10
-    #         }
-    #     }
-    #     ff_model = basic_ff.BasicFeedForward(
-    #         train_dataloader.dataset[0][0].shape[0],
-    #         embed_dict,
-    #         HIDDEN_SIZE
-    #     ).to(device)
-    #     ff_train_losses, ff_test_losses = ff_model.fit_to_data(train_dataloader, test_dataloader, LEARN_RATE, EPOCHS, device)
-    #     torch.save(ff_model.state_dict(), run_folder + network_folder + f"models/ff_model_{fold_num}.pt")
-    #     ff_model.eval()
-    #     ff_labels, ff_preds = ff_model.predict(test_dataloader, config, device)
+        ### Calculate metrics
+        print("="*30)
+        # Add new models here:
+        models = ["AVG","SCH","FF","RNN"]
+        preds = [avg_preds, sch_preds, ff_preds, rnn_preds]
+        labels = np.array([x['time_gap'][-1] for x in test_data])
+        fold_results = {
+            "Fold": fold_num,
+            "All Losses": [],
+            "FF Train Losses": ff_train_losses,
+            "FF Valid Losses": ff_test_losses,
+            "RNN Train Losses": rnn_train_losses,
+            "RNN Valid Losses": rnn_test_losses
+        }
+        # Add new losses here:
+        for model_name, preds in zip(models, preds):
+            _ = [model_name]
+            _.append(np.round(metrics.mean_absolute_percentage_error(labels, preds), 2))
+            _.append(np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2))
+            _.append(np.round(metrics.mean_absolute_error(labels, preds), 2))
+            fold_results['All Losses'].append(_)
+        print(tabulate(fold_results['All Losses'], headers=["Model", "MAPE", "RMSE", "MAE"]))
+        run_results.append(fold_results)
 
-    #     ### Calculate metrics
-    #     print("="*30)
-    #     models = ["AVG","SCH","FF"]
-    #     preds = [avg_preds, sch_preds, ff_preds]
-    #     labels = np.array([x['time_gap'][-1] for x in test_data])
-    #     fold_results = {
-    #         "Fold": fold_num,
-    #         "All Losses": [],
-    #         "FF Train Losses": ff_train_losses,
-    #         "FF Valid Losses": ff_test_losses
-    #     }
-    #     for model_name, preds in zip(models, preds):
-    #         _ = [model_name]
-    #         _.append(np.round(metrics.mean_absolute_percentage_error(labels, preds), 2))
-    #         _.append(np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2))
-    #         _.append(np.round(metrics.mean_absolute_error(labels, preds), 2))
-    #         fold_results['All Losses'].append(_)
-    #     print(tabulate(fold_results['All Losses'], headers=["Model", "MAPE", "RMSE", "MAE"]))
-    #     run_results.append(fold_results)
-
-    # # Save results
-    # data_utils.write_pkl(run_results, run_folder + network_folder + f"model_results.pkl")
-    # print(f"MODEL RUN COMPLETED '{run_folder}{network_folder}'")
+    # Save results
+    data_utils.write_pkl(run_results, run_folder + network_folder + f"model_results.pkl")
+    print(f"MODEL RUN COMPLETED '{run_folder}{network_folder}'")
     return None
 
 

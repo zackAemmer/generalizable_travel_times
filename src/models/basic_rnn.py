@@ -8,6 +8,7 @@ from torch import nn
 class BasicRNN(nn.Module):
     def __init__(self, input_size, output_size, hidden_size, batch_size, embed_dict):
         super(BasicRNN, self).__init__()
+        self.loss_fn = torch.nn.MSELoss()
         self.input_size = input_size
         self.output_size = output_size
         self.hidden_size = hidden_size
