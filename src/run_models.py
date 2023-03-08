@@ -9,7 +9,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from utils import data_utils, data_loader, model_utils
-from models import avg_speed, time_table, basic_ff, basic_rnn
+from models import avg_speed, avg_speed_seq, time_table, basic_ff, basic_rnn
 
 
 def run_models(run_folder, network_folder):
@@ -21,7 +21,7 @@ def run_models(run_folder, network_folder):
     The test set is used as validation during the training process.
     Model accuracy is measured across the n folds.
     Save the resulting models, and the data generated during training to the same data folder.
-    These are then analyzed in the notebook 04_explore_results.
+    These are then analyzed in a jupyter notebook.
     """
     print("="*30)
     print(f"RUN MODEL: '{run_folder}'")
@@ -29,8 +29,11 @@ def run_models(run_folder, network_folder):
 
     if torch.cuda.is_available():
         device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
     else:
         device = torch.device("cpu")
+    print(f"Using device: {device}")
 
     ### Set run and hyperparameters
     EPOCHS = 30
@@ -57,21 +60,23 @@ def run_models(run_folder, network_folder):
     for fold_num in range(0, len(train_data_chunks)):
         print("="*30)
         print(f"FOLD: {fold_num}")
+
         # Set aside the train/test data according to the current fold number
         test_data = train_data_chunks[fold_num]
         train_data = [x for i,x in enumerate(train_data_chunks) if i!=fold_num]
+
         # Combine the training data to single object
         train_data = list(itertools.chain.from_iterable(train_data))
 
         # Construct dataloaders for Pytorch models
         train_dataset = data_loader.make_dataset(train_data, config)
         test_dataset = data_loader.make_dataset(test_data, config)
-        train_dataset_seq = data_loader.make_seq_dataset(train_data, SEQ_LEN)
-        test_dataset_seq = data_loader.make_seq_dataset(test_data, SEQ_LEN)
-        train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
-        test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
-        train_dataloader_seq = DataLoader(train_dataset_seq, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
-        test_dataloader_seq = DataLoader(test_dataset_seq, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
+        train_dataset_seq = data_loader.make_seq_dataset(train_data, config, SEQ_LEN)
+        test_dataset_seq = data_loader.make_seq_dataset(test_data, config, SEQ_LEN)
+        train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=True, num_workers=2)
+        test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=True, num_workers=2)
+        train_dataloader_seq = DataLoader(train_dataset_seq, batch_size=BATCH_SIZE, shuffle=False, pin_memory=True, num_workers=2)
+        test_dataloader_seq = DataLoader(test_dataset_seq, batch_size=BATCH_SIZE, shuffle=False, pin_memory=True, num_workers=2)
         print(f"Successfully loaded {len(train_data)} training samples and {len(test_data)} testing samples.")
 
         # Define embedded variables for nn models
@@ -93,20 +98,21 @@ def run_models(run_folder, network_folder):
             }
         }
 
+        #### TRAVEL TIME TASK ####
         ### Train average time model
         print("="*30)
         print(f"Training average hourly speed model...")
-        avg_model = avg_speed.AvgHourlySpeedModel()
-        avg_model.fit(train_data)
+        avg_model = avg_speed.AvgHourlySpeedModel(config)
+        avg_model.fit(train_dataloader)
         avg_model.save_to(f"{run_folder}{network_folder}models/avg_model_{fold_num}.pkl")
-        avg_preds = avg_model.predict(test_data)
+        avg_labels, avg_preds = avg_model.predict(test_dataloader)
 
         ### Train time table model
         print("="*30)
         print(f"Training time table model...")
         sch_model = time_table.TimeTableModel(config['gtfs_folder'])
         sch_model.save_to(f"{run_folder}{network_folder}models/sch_model_{fold_num}.pkl")
-        sch_preds = sch_model.predict_simple_sch(test_data, gtfs_data)
+        sch_labels, sch_preds = sch_model.predict_simple_sch(test_data, gtfs_data)
 
         ### Train ff model
         print("="*30)
@@ -122,6 +128,13 @@ def run_models(run_folder, network_folder):
         ff_labels, ff_preds, ff_avg_loss = model_utils.predict(ff_model, test_dataloader, config, device)
         ff_labels = data_utils.de_normalize(ff_labels, config['time_mean'], config['time_std'])
         ff_preds = data_utils.de_normalize(ff_preds, config['time_mean'], config['time_std'])
+
+        #### FORECAST SPEED TASK ####
+        ### Train average speed sequence model
+        avg_seq_model = avg_speed_seq.AvgHourlySpeedSeqModel(config)
+        avg_seq_model.fit(train_dataloader_seq)
+        avg_seq_model.save_to(f"{run_folder}{network_folder}models/avg_model_{fold_num}.pkl")
+        avg_seq_labels, avg_seq_preds = avg_seq_model.predict(test_dataloader_seq)
 
         ### Train RNN model
         print("="*30)
@@ -140,12 +153,12 @@ def run_models(run_folder, network_folder):
         rnn_labels = data_utils.de_normalize(rnn_labels, config['speed_m_s_mean'], config['speed_m_s_std'])
         rnn_preds = data_utils.de_normalize(rnn_preds, config['speed_m_s_mean'], config['speed_m_s_std'])
 
-        ### Calculate metrics
+        #### CALCULATE METRICS ####
         print("="*30)
         # Add new models here:
-        models = ["AVG","SCH","FF","RNN"]
-        preds = [avg_preds, sch_preds, ff_preds, rnn_preds]
-        labels = np.array([x['time_gap'][-1] for x in test_data])
+        models = ["AVG","SCH","FF","AVG_SEQ","RNN"]
+        labels = [avg_labels, sch_labels, ff_labels, avg_seq_labels, rnn_labels]
+        preds = [avg_preds, sch_preds, ff_preds, avg_seq_preds, rnn_preds]
         fold_results = {
             "Fold": fold_num,
             "All Losses": [],
@@ -175,13 +188,13 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/3_month_test/",
+        run_folder="./results/throwaway/",
         network_folder="kcm/"
     )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/3_month_test/",
+        run_folder="./results/throwaway/",
         network_folder="atb/"
     )

@@ -63,21 +63,24 @@ def make_dataset(data, config):
     dataset = BasicDataset((X,y))
     return dataset
 
-def make_seq_dataset(data, seq_len=2):
-    # For example, if you have 10 GPS points with 2 features (latitude and longitude) for each sample, and you use a batch size of 32, then your input shape would be [10, 32, 2].
-    context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID']]) for x in data])
-    # Take only the first n steps of each sequence, keep all attr data
-    # Keep info from the predicted step, since it's lat/lon etc. can be used to predict
-    X = np.zeros((len(data), seq_len+1, 5))
+def make_seq_dataset(data, config, seq_len=2):
+    # Context variables to embed
+    context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID']]) for x in data], dtype='int32')
+    X = np.zeros((len(data), seq_len+1, 6), dtype='float32') # Last dimension is num sequence variables below:
+    # Sequence variables
     for i in range(len(data)):
-        X[i,:,0] = data[i]['lats'][:seq_len+1]
-        X[i,:,1] = data[i]['lngs'][:seq_len+1]
-        X[i,:,2] = data[i]['speed_m_s'][:seq_len+1]
-        X[i,:,3] = data[i]['scheduled_time_s'][:seq_len+1]
-        X[i,:,4] = data[i]['dist_calc_km'][:seq_len+1]
-    X = torch.from_numpy(X.astype('float32'))
-    # Predict average speed between the last point in sequence, and the next point
-    y = torch.from_numpy(np.array([x['speed_m_s'][seq_len] for x in data]).astype('float32'))
+        X[i,:,0] = data_utils.normalize(np.array(data[i]['lats'][:seq_len+1], dtype='float32'), config['lats_mean'], config['lats_std'])
+        X[i,:,1] = data_utils.normalize(np.array(data[i]['lngs'][:seq_len+1], dtype='float32'), config['lngs_mean'], config['lngs_std'])
+        X[i,:,2] = data_utils.normalize(np.array(data[i]['dist_gap'][:seq_len+1], dtype='float32'), config['dist_gap_mean'], config['dist_gap_std'])
+        X[i,:,3] = data_utils.normalize(np.array(data[i]['scheduled_time_s'][:seq_len+1], dtype='float32'), config['scheduled_time_s_mean'], config['scheduled_time_s_std'])
+        X[i,:,4] = data_utils.normalize(np.array(data[i]['stop_dist_km'][:seq_len+1], dtype='float32'), config['stop_dist_km_mean'], config['stop_dist_km_std'])
+        X[i,:,5] = data_utils.normalize(np.array(data[i]['speed_m_s'][:seq_len+1], dtype='float32'), config['speed_m_s_mean'], config['speed_m_s_std'])
+    # Mask out the speed observation for all unknown points
+    X[:,seq_len:,5] = 0.0
+    X = torch.from_numpy(X)
+    context = torch.from_numpy(context)
+    # Prediction variable (speed of final step)
+    y = torch.from_numpy(data_utils.normalize(np.array([x['speed_m_s'][seq_len] for x in data], dtype='float32'), config['speed_m_s_mean'], config['speed_m_s_std']))
     X = [(i,j) for i,j in zip(X,context)]
     dataset = BasicDataset((X,y))
     return dataset
