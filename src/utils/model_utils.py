@@ -88,6 +88,6 @@ def predict(model, dataloader, config, device, sequential_flag=False):
         # Save predictions and labels
         labels.append(vlabels)
         preds.append(vpreds)
-    labels = torch.concat(labels).view(-1).detach().numpy()
-    preds = torch.concat(preds).view(-1).detach().numpy()
+    labels = torch.concat(labels).cpu().view(-1).detach().numpy()
+    preds = torch.concat(preds).cpu().view(-1).detach().numpy()
     return labels, preds, avg_batch_loss / num_batches

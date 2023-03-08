@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from database import data_utils
+from utils import data_utils
 
 
 class BasicFeedForward(nn.Module):

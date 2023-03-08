@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from tabulate import tabulate
 
-from database import data_utils, data_loader
+from utils import data_utils, data_loader
 
 
 def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder, timezone, given_names, train_dates, test_dates, n_folds):

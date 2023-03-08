@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from database import data_utils
+from utils import data_utils
 
 
 class TimeTableModel:

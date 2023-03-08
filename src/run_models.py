@@ -8,7 +8,7 @@ from tabulate import tabulate
 import torch
 from torch.utils.data import DataLoader
 
-from database import data_utils, data_loader, model_utils
+from utils import data_utils, data_loader, model_utils
 from models import avg_speed, time_table, basic_ff, basic_rnn
 
 
@@ -175,13 +175,13 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/throwaway/",
+        run_folder="./results/3_month_test/",
         network_folder="kcm/"
     )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/throwaway/",
+        run_folder="./results/3_month_test/",
         network_folder="atb/"
     )

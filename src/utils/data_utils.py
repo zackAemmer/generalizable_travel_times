@@ -17,7 +17,7 @@ import pandas as pd
 import pyproj
 from sklearn import metrics
 
-from database import shape_utils
+from utils import shape_utils
 
 # Set of unified feature names and dtypes for variables in the GTFS-RT data
 FEATURE_NAMES = ['trip_id','file','locationtime','lat','lon','vehicle_id']
