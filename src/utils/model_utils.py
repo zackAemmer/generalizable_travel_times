@@ -14,10 +14,8 @@ from torch import nn
 
 def fit_to_data(model, train_dataloader, valid_dataloader, LEARN_RATE, EPOCHS, config, device, sequential_flag=False):
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARN_RATE)
-    # loss_fn = torch.nn.MSELoss()
 
     epoch_number = 0
-
     training_losses = []
     validation_losses = []
 

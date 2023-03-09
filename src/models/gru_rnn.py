@@ -3,9 +3,9 @@ import torch
 from torch import nn
 
 
-class BasicRNN(nn.Module):
+class GRU_RNN(nn.Module):
     def __init__(self, input_size, output_size, hidden_size, batch_size, embed_dict):
-        super(BasicRNN, self).__init__()
+        super(GRU_RNN, self).__init__()
         self.loss_fn = torch.nn.MSELoss()
         self.input_size = input_size
         self.output_size = output_size
@@ -19,7 +19,7 @@ class BasicRNN(nn.Module):
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
         self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
         # Recurrent layer
-        self.rnn = nn.RNN(
+        self.rnn = nn.GRU(
             input_size=input_size,
             hidden_size=hidden_size,
             num_layers=1,

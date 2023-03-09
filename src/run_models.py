@@ -9,7 +9,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from utils import data_utils, data_loader, model_utils
-from models import avg_speed, avg_speed_seq, time_table, basic_ff, basic_rnn
+from models import avg_speed, avg_speed_seq, persistent_speed, time_table, basic_ff, basic_rnn, gru_rnn
 
 
 def run_models(run_folder, network_folder):
@@ -29,18 +29,18 @@ def run_models(run_folder, network_folder):
 
     if torch.cuda.is_available():
         device = torch.device("cuda")
-    elif torch.backends.mps.is_available():
-        device = torch.device("mps")
+    # elif torch.backends.mps.is_available():
+    #     device = torch.device("mps")
     else:
         device = torch.device("cpu")
     print(f"Using device: {device}")
 
     ### Set run and hyperparameters
-    EPOCHS = 30
+    EPOCHS = 60
     BATCH_SIZE = 512
     LEARN_RATE = 1e-3
     HIDDEN_SIZE = 32
-    SEQ_LEN = 2
+    SEQ_LEN = 4
 
     ### Load train/test data
     print("="*30)
@@ -73,10 +73,10 @@ def run_models(run_folder, network_folder):
         test_dataset = data_loader.make_dataset(test_data, config)
         train_dataset_seq = data_loader.make_seq_dataset(train_data, config, SEQ_LEN)
         test_dataset_seq = data_loader.make_seq_dataset(test_data, config, SEQ_LEN)
-        train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=True, num_workers=2)
-        test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=True, num_workers=2)
-        train_dataloader_seq = DataLoader(train_dataset_seq, batch_size=BATCH_SIZE, shuffle=False, pin_memory=True, num_workers=2)
-        test_dataloader_seq = DataLoader(test_dataset_seq, batch_size=BATCH_SIZE, shuffle=False, pin_memory=True, num_workers=2)
+        train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
+        test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
+        train_dataloader_seq = DataLoader(train_dataset_seq, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
+        test_dataloader_seq = DataLoader(test_dataset_seq, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
         print(f"Successfully loaded {len(train_data)} training samples and {len(test_data)} testing samples.")
 
         # Define embedded variables for nn models
@@ -131,15 +131,41 @@ def run_models(run_folder, network_folder):
 
         #### FORECAST SPEED TASK ####
         ### Train average speed sequence model
+        print("="*30)
+        print(f"Training average sequential speed model...")
         avg_seq_model = avg_speed_seq.AvgHourlySpeedSeqModel(config)
         avg_seq_model.fit(train_dataloader_seq)
         avg_seq_model.save_to(f"{run_folder}{network_folder}models/avg_model_{fold_num}.pkl")
         avg_seq_labels, avg_seq_preds = avg_seq_model.predict(test_dataloader_seq)
 
-        ### Train RNN model
+        ### Train persistent speed sequence model
+        print("="*30)
+        print(f"Training persistent speed model...")
+        persistent_seq_model = persistent_speed.PersistentSpeedSeqModel(config, SEQ_LEN)
+        persistent_seq_model.save_to(f"{run_folder}{network_folder}models/persistent_seq_model_{fold_num}.pkl")
+        persistent_seq_labels, persistent_seq_preds = persistent_seq_model.predict(test_dataloader_seq)
+
+        ### Train Basic RNN model
         print("="*30)
         print(f"Training basic rnn model...")
-        rnn_model = basic_rnn.BasicRNN(
+        rnn_base_model = basic_rnn.BasicRNN(
+            # X tensor, first element, traj component, n_features
+            train_dataloader_seq.dataset.tensors[0][0][0].shape[1],
+            1,
+            HIDDEN_SIZE,
+            BATCH_SIZE,
+            embed_dict
+        ).to(device)
+        rnn_base_train_losses, rnn_base_test_losses = model_utils.fit_to_data(rnn_base_model, train_dataloader_seq, test_dataloader_seq, LEARN_RATE, EPOCHS, config, device, sequential_flag=True)
+        torch.save(rnn_base_model.state_dict(), run_folder + network_folder + f"models/rnn_base_model_{fold_num}.pt")
+        rnn_base_labels, rnn_base_preds, rnn_base_avg_loss = model_utils.predict(rnn_base_model, test_dataloader_seq, config, device, sequential_flag=True)
+        rnn_base_labels = data_utils.de_normalize(rnn_base_labels, config['speed_m_s_mean'], config['speed_m_s_std'])
+        rnn_base_preds = data_utils.de_normalize(rnn_base_preds, config['speed_m_s_mean'], config['speed_m_s_std'])
+
+        ### Train RNN model
+        print("="*30)
+        print(f"Training rnn model...")
+        rnn_model = gru_rnn.GRU_RNN(
             # X tensor, first element, traj component, n_features
             train_dataloader_seq.dataset.tensors[0][0][0].shape[1],
             1,
@@ -155,24 +181,31 @@ def run_models(run_folder, network_folder):
 
         #### CALCULATE METRICS ####
         print("="*30)
+        print(f"Saving model metrics from fold {fold_num}...")
         # Add new models here:
-        models = ["AVG","SCH","FF","AVG_SEQ","RNN"]
-        labels = [avg_labels, sch_labels, ff_labels, avg_seq_labels, rnn_labels]
-        preds = [avg_preds, sch_preds, ff_preds, avg_seq_preds, rnn_preds]
+        model_names = ["AVG","SCH","FF","AVG_SEQ","PERSISTENT","RNN_BASE","RNN"]
+        model_labels = [avg_labels, sch_labels, ff_labels, avg_seq_labels, persistent_seq_labels, rnn_base_labels, rnn_labels]
+        model_preds = [avg_preds, sch_preds, ff_preds, avg_seq_preds, persistent_seq_preds, rnn_base_preds, rnn_preds]
         fold_results = {
             "Fold": fold_num,
             "All Losses": [],
             "FF Train Losses": ff_train_losses,
             "FF Valid Losses": ff_test_losses,
+            "RNN_BASE Train Losses": rnn_base_train_losses,
+            "RNN_BASE Valid Losses": rnn_base_test_losses,
             "RNN Train Losses": rnn_train_losses,
             "RNN Valid Losses": rnn_test_losses
         }
         # Add new losses here:
-        for model_name, preds in zip(models, preds):
-            _ = [model_name]
-            _.append(np.round(metrics.mean_absolute_percentage_error(labels, preds), 2))
-            _.append(np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2))
-            _.append(np.round(metrics.mean_absolute_error(labels, preds), 2))
+        for mname, mlabels, mpreds in zip(model_names, model_labels, model_preds):
+            _ = [mname]
+            if mname not in ["AVG_SEQ","PERSISTENT","RNN_BASE","RNN"]:
+                # 0.0 speed is common in ytrue so don't use MAPE for these models
+                _.append(np.round(metrics.mean_absolute_percentage_error(mlabels, mpreds), 2))
+            else:
+                _.append(0.0)
+            _.append(np.round(np.sqrt(metrics.mean_squared_error(mlabels, mpreds)), 2))
+            _.append(np.round(metrics.mean_absolute_error(mlabels, mpreds), 2))
             fold_results['All Losses'].append(_)
         print(tabulate(fold_results['All Losses'], headers=["Model", "MAPE", "RMSE", "MAE"]))
         run_results.append(fold_results)
