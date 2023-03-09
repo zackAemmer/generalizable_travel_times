@@ -56,16 +56,16 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     # Load the GTFS
     print(f"Loading and merging GTFS files from '{gtfs_folder}'...")
     gtfs_data = data_utils.merge_gtfs_files(gtfs_folder)
-    
+
     ### Process the data into usable features
     print("="*30)
-    print(f"Shingling traces into smaller chunks...")
+    print(f"Shingling trajectories into smaller chunks...")
     train_traces = data_utils.shingle(train_data, 2, 5)
     test_traces = data_utils.shingle(test_data, 2, 5)
     print(f"Cumulative {np.round(len(train_traces) / len(train_data) * 100, 1)}% of train data retained. Saving {len(train_traces)} samples.")
     print(f"Cumulative {np.round(len(test_traces) / len(test_data) * 100, 1)}% of test data retained. Saving {len(test_traces)} samples.")
 
-    print(f"Calculating trace trajectories...")
+    print(f"Calculating trace values from shingles...")
     train_traces = data_utils.calculate_trace_df(train_traces, timezone)
     test_traces = data_utils.calculate_trace_df(test_traces, timezone)
     print(f"Cumulative {np.round(len(train_traces) / len(train_traces) * 100, 1)}% of train data retained.")
@@ -77,9 +77,11 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     print(f"Cumulative {np.round(len(train_traces) / len(train_data) * 100, 1)}% of train data retained. Saving {len(train_traces)} samples.")
     print(f"Cumulative {np.round(len(test_traces) / len(test_data) * 100, 1)}% of test data retained. Saving {len(test_traces)} samples.")
 
-    print(f"Finding new unique vehicle IDs...")
-    (train_traces, test_traces), n_unique_veh = data_utils.remap_vehicle_ids([train_traces, test_traces])
+    print(f"Finding new unique embedding IDs...")
+    (train_traces, test_traces), n_unique_veh, unique_veh_dict = data_utils.remap_ids([train_traces, test_traces], "vehicle_id")
     print(f"Found {n_unique_veh} unique vehicle IDs in this data.")
+    (train_traces, test_traces), n_unique_trip, unique_trip_dict = data_utils.remap_ids([train_traces, test_traces], "trip_id")
+    print(f"Found {n_unique_trip} unique trip IDs in this data.")
 
     ### Save processed data to analysis files
     print("="*30)
@@ -87,11 +89,15 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     deeptte_formatted_path = base_folder + "deeptte_formatted/"
     train_traces = data_utils.map_to_deeptte(train_traces, deeptte_formatted_path, n_folds)
     test_traces = data_utils.map_to_deeptte(test_traces, deeptte_formatted_path, n_folds, is_test=True)
-    summary_config = data_utils.get_summary_config(train_traces, n_unique_veh, gtfs_folder, n_folds)
+    summary_config = data_utils.get_summary_config(train_traces, n_unique_veh, n_unique_trip, gtfs_folder, n_folds)
 
     print(f"Saving config file...")
     with open(deeptte_formatted_path+"config.json", mode="a") as out_file:
         json.dump(summary_config, out_file)
+
+    print(f"Saving embedding ID mappings...")
+    data_utils.write_pkl(unique_veh_dict, base_folder+"vehicle_id_mapping.pkl")
+    data_utils.write_pkl(unique_trip_dict, base_folder+"trip_id_mapping.pkl")
 
     print(f"Saving processed bus data files...")
     data_utils.write_pkl(train_traces, base_folder+"train_traces.pkl")

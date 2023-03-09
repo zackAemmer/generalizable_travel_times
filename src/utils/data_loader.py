@@ -39,6 +39,7 @@ def make_dataset(data, config):
     timeID = torch.from_numpy(np.array([x['timeID'] for x in data]).astype('float32')).unsqueeze(1)
     weekID = torch.from_numpy(np.array([x['weekID'] for x in data]).astype('float32')).unsqueeze(1)
     driverID = torch.from_numpy(np.array([x['vehicleID'] for x in data]).astype('float32')).unsqueeze(1)
+    tripID = torch.from_numpy(np.array([x['tripID'] for x in data]).astype('float32')).unsqueeze(1)
     dist = torch.from_numpy(data_utils.normalize(np.array([x['dist_gap'][-1] for x in data]).astype('float32'), config['dist_mean'], config['dist_std'])).unsqueeze(1)
 
     # Features
@@ -53,7 +54,8 @@ def make_dataset(data, config):
         dist,
         timeID,
         weekID,
-        driverID
+        driverID,
+        tripID
     ), dim=1)
 
     # Labels
@@ -65,7 +67,7 @@ def make_dataset(data, config):
 
 def make_seq_dataset(data, config, seq_len=2):
     # Context variables to embed
-    context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID']]) for x in data], dtype='int32')
+    context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID'], x['tripID']]) for x in data], dtype='int32')
     # Last dimension is num sequence variables below
     X = np.zeros((len(data), seq_len+1, 7), dtype='float32')
     # Sequence variables

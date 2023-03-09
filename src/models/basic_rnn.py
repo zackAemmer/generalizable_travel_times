@@ -18,6 +18,7 @@ class BasicRNN(nn.Module):
         self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
         self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
+        self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
         # Recurrent layer
         self.rnn = nn.RNN(
             input_size=input_size,
@@ -38,13 +39,13 @@ class BasicRNN(nn.Module):
         timeID_embedded = self.timeID_em(x_em[:,0])
         weekID_embedded = self.weekID_em(x_em[:,1])
         driverID_embedded = self.driverID_em(x_em[:,2])
+        tripID_embedded = self.tripID_em(x_em[:,3])
         # Get recurrent pred
         out, hidden_prev = self.rnn(x_ct, hidden_prev)
-
         # Reshape, add context, combine in linear layer
         # Try just taking last prediction
         out = out[:,-1,:]
-        out = torch.concat([out,timeID_embedded,weekID_embedded,driverID_embedded], dim=1)
+        out = torch.concat([out,timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded], dim=1)
         out = self.linear(out)
         out = out.flatten()
         return out, hidden_prev

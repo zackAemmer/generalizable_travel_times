@@ -178,18 +178,23 @@ def combine_pkl_data(folder, file_list, given_names):
     except:
         x = 1
         print("This should not print unless processing AtB data")
+    # Critical to ensure data frame is sorted by date, then trip_id, then locationtime
     data = data.sort_values(['file','trip_id','locationtime'], ascending=True)
     return data, no_data_list
 
-def calculate_trace_df(data, timezone):
+def calculate_trace_df(data, timezone, min_shingle_len=5):
     """
     Calculate difference in metrics between two consecutive trip points.
     data: pandas df with all bus trips
     timezone: string for timezone the data were collected in
     Returns: combination of original point values, and new _diff values
     """
-    # Gets speeds between consecutive points, drop first points, filter
+    # Calculate feature values between consecutive points, assign to the latter point
     data['speed_m_s'], data['dist_calc_m'], data['time_calc_s'], data['bearing'] = calculate_trip_speeds(data)
+    # Remove first point of every trip, since its features are based on a different trip
+    # This should come after the feature calculations otherwise we would have to remove first points again
+    data = data.groupby(['file','trip_id'], as_index=False).apply(lambda group: group.iloc[1:,:])
+    # Remove any points which seem to be erroneous. This may lead to gaps in the shingles.
     data = data[data['dist_calc_m']>=0.0]
     data = data[data['dist_calc_m']<5000.0]
     data = data[data['time_calc_s']>=0.0]
@@ -197,10 +202,10 @@ def calculate_trace_df(data, timezone):
     data = data[data['speed_m_s']>=0.0]
     data = data[data['speed_m_s']<35.0]
     data['dist_calc_km'] = data['dist_calc_m'] / 1000.0
-    data = data.dropna()
-    data = data.groupby(['shingle_id']).filter(lambda x: len(x) >= 5)
-    
-    # # Filter all groups instead of rows; removes too much data
+    data = data.dropna() # Just a precaution
+    data = data.groupby(['shingle_id']).filter(lambda x: len(x) >= min_shingle_len)
+
+    # # Filter out entire shingles which have erroneous points; removes too much data
     # data['tempID'] = data['file'] + data['trip_id']
     # groups = data.groupby(['tempID'])
     # valid_n = groups.filter(lambda x: len(x) >= 10)['tempID'].unique()    
@@ -302,19 +307,20 @@ def get_scheduled_arrival(trip_ids, lons, lats, gtfs_data):
     results = np.vstack(results)
     return results[:,4], results[:,3], results[:,0], results[:,1]
 
-def remap_vehicle_ids(df_list):
+def remap_ids(df_list, id_col):
     """
-    Remap each vehicle ID in all dfs to start from 0, maintaining order.
+    Remap each ID in all dfs to start from 0, maintaining order.
     df_list: list of pandas dataframes with unified bus data
-    Returns: list of pandas dataframes with new column for vehicle_id_recode.
+    id_col: the column to re-index the unique values of
+    Returns: list of pandas dataframes with new column for id_recode.
     """
-    all_vehicle_ids = pd.concat([x['vehicle_id'] for x in df_list]).values.flatten()
-    # Recode vehicle ids to start from 0
-    mapping = {v:k for k,v in enumerate(set(all_vehicle_ids))}
+    all_ids = pd.concat([x[id_col] for x in df_list]).values.flatten()
+    # Recode ids to start from 0
+    mapping = {v:k for k,v in enumerate(set(all_ids))}
     for df in df_list:
-        recode = [mapping[y] for y in df['vehicle_id'].values.flatten()]
-        df['vehicle_id_recode'] = recode
-    return (df_list, len(pd.unique(all_vehicle_ids)))
+        recode = [mapping[y] for y in df[id_col].values.flatten()]
+        df[f"{id_col}_recode"] = recode
+    return (df_list, len(pd.unique(all_ids)), mapping)
 
 def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
     """
@@ -330,6 +336,7 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
     trace_data['lats'] = trace_data['lat']
     trace_data['lngs'] = trace_data['lon']
     trace_data['vehicleID'] = trace_data['vehicle_id_recode']
+    trace_data['tripID'] = trace_data['trip_id_recode']
 
     groups = trace_data.groupby('shingle_id')
 
@@ -342,6 +349,7 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
         'lats': lambda x: x.tolist(),
         'lngs': lambda x: x.tolist(),
         'vehicleID': 'min',
+        'tripID': 'min',
         'weekID': 'min',
         'timeID': 'min',
         'dateID': 'min',
@@ -376,7 +384,7 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
         _ = [f.close() for f in file_list]
     return trace_data
 
-def get_summary_config(trace_data, n_unique_veh, gtfs_folder, n_folds):
+def get_summary_config(trace_data, n_unique_veh, n_unique_trip, gtfs_folder, n_folds):
     """
     Get a dict of means and sds which are used to normalize data by DeepTTE.
     trace_data: pandas dataframe with unified columns and calculated distances
@@ -411,6 +419,7 @@ def get_summary_config(trace_data, n_unique_veh, gtfs_folder, n_folds):
         "stop_lat_std": np.std(trace_data['stop_lat']),
         # Not variables
         "n_unique_veh": n_unique_veh,
+        "n_unique_trip": n_unique_trip,
         "gtfs_folder": gtfs_folder,
         "n_folds": n_folds,
         "train_set": ["train_0"+str(x) for x in range(0,n_folds)],
@@ -724,7 +733,7 @@ def extract_deeptte_results(city, run_folder, network_folder):
 def shingle(trace_df, min_len, max_len):
     """
     Split a df into even chunks randomly between min and max length.
-    Each split comes from a group representing a trajector in the dataframe.
+    Each split comes from a group representing a trajectory in the dataframe.
     trace_df: dataframe of raw bus data
     min_len: minimum number of chunks to split a trajectory into
     max_lan: maximum number of chunks to split a trajectory into
@@ -742,7 +751,4 @@ def shingle(trace_df, min_len, max_len):
             idx += 1
     z = trace_df.copy()
     z['shingle_id'] = new_idx
-    # throwouts = z.groupby(['shingle_id']).count()['lat'].reset_index()
-    # throwouts = throwouts[throwouts['lat']<3]['shingle_id'].values
-    # z = z[~z['shingle_id'].isin(throwouts)]
     return z

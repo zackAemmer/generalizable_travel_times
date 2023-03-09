@@ -95,6 +95,11 @@ def run_models(run_folder, network_folder):
                 'vocab_size': config['n_unique_veh'],
                 'embed_dims': 12,
                 'col': 10
+            },
+            'tripID': {
+                'vocab_size': config['n_unique_trip'],
+                'embed_dims': 20,
+                'col': 11
             }
         }
 
