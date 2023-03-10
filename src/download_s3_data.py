@@ -7,6 +7,7 @@ import os
 
 from dotenv import load_dotenv
 
+from utils import data_utils
 
 def download_new_s3_files(data_folder, bucket_name):
     print(f"Getting new files for {data_folder} from S3 bucket {bucket_name}")
@@ -36,4 +37,9 @@ def download_new_s3_files(data_folder, bucket_name):
 if __name__ == "__main__":
     load_dotenv()
     download_new_s3_files("./data/kcm_all/", "gtfs-collection-kcm")
-    download_new_s3_files("./data/nwy_all/", "gtfs-collection-nwy")
+    download_new_s3_files("./data/nwy_all_new/", "gtfs-collection-nwy")
+    print(f"Extracting operators from downloaded files...")
+    data_utils.extract_operator("./data/nwy_all_new/", "./data/atb_all_new/", "operator_id", "ATB")
+    # # Only run if new GTFS files are downloaded, will also need to re-copy GTFS files from old_folder
+    # print(f"Extracting operators from GTFS files...")
+    # data_utils.extract_operator_gtfs("./data/nwy_gtfs/", "./data/atb_gtfs/", "trip_id", "ATB")

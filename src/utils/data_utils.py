@@ -7,10 +7,8 @@ import json
 import os
 import pickle
 from datetime import date, datetime, timedelta
-from math import asin, atan2, cos, degrees, radians, sin, sqrt
 from multiprocessing import Pool
 from random import sample
-from zipfile import ZipFile
 
 import numpy as np
 import pandas as pd
@@ -438,12 +436,12 @@ def extract_operator(old_folder, new_folder, source_col, op_name):
     files = os.listdir(old_folder)
     for file in files:
         if file != ".DS_Store":
-            with open(old_folder+'/'+file, 'rb') as f:
+            with open(f"{old_folder}{file}", 'rb') as f:
                 data = pickle.load(f)
                 data = data[data[source_col]==op_name]
-            with open(f"{new_folder}/{file}", 'wb') as f:
+            with open(f"{new_folder}{file}", 'wb') as f:
                 pickle.dump(data, f)
-                
+
 def extract_operator_gtfs(old_folder, new_folder, source_col, op_name):
     """
     First make a copy of the GTFS directory, then this function will overwrite the key files.
