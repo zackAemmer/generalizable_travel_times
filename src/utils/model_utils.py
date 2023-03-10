@@ -26,20 +26,17 @@ def fit_to_data(model, train_dataloader, valid_dataloader, LEARN_RATE, EPOCHS, c
         model.train(True)
         running_tloss = 0.0
 
-        # Iterate over all batches per-epoch
+        # Iterate over all batches per training epoch
         num_batches = len(train_dataloader)
         for i, data in enumerate(train_dataloader):
             # Every data instance is an input + label pair
             inputs, labels = data
-            if sequential_flag:
-                inputs = [i.to(device) for i in inputs]
-                hidden_prev = torch.zeros(1, len(data[1]), model.hidden_size).to(device)
-            else:
-                inputs = inputs.to(device)
+            inputs = [i.to(device) for i in inputs]
             labels = labels.to(device)
             # Run forward/backward
             optimizer.zero_grad()
             if sequential_flag:
+                hidden_prev = torch.zeros(1, len(data[1]), model.hidden_size).to(device)
                 preds, hidden_prev = model(inputs, hidden_prev)
                 hidden_prev = hidden_prev.detach()
             else:
@@ -56,13 +53,13 @@ def fit_to_data(model, train_dataloader, valid_dataloader, LEARN_RATE, EPOCHS, c
         # Don't use gradients when evaluating
         model.train(False)
         # Calculate the average batch validation loss
-        vlabels, vpreds, avg_batch_vloss = predict(model, valid_dataloader, config, device, sequential_flag=sequential_flag)
+        vlabels, vpreds, avg_batch_vloss = predict(model, valid_dataloader, device, sequential_flag=sequential_flag)
         validation_losses.append(avg_batch_vloss)
         print(f"LOSS: train {avg_batch_tloss} valid {avg_batch_vloss}")
         epoch_number += 1
     return training_losses, validation_losses
 
-def predict(model, dataloader, config, device, sequential_flag=False):
+def predict(model, dataloader, device, sequential_flag=False):
     labels = []
     preds = []
     avg_batch_loss = 0.0
@@ -70,15 +67,13 @@ def predict(model, dataloader, config, device, sequential_flag=False):
     for i, vdata in enumerate(dataloader):
         # Move data to device
         vinputs, vlabels = vdata
-        if sequential_flag:
-            vinputs = [vi.to(device) for vi in vinputs]
-            hidden_prev = torch.zeros(1, len(vlabels), model.hidden_size).to(device)
-        else:
-            vinputs = vinputs.to(device)
+        vinputs = [vi.to(device) for vi in vinputs]
         vlabels = vlabels.to(device)
         # Make predictions
         if sequential_flag:
+            hidden_prev = torch.zeros(1, len(vlabels), model.hidden_size).to(device)
             vpreds, hidden_prev = model(vinputs, hidden_prev)
+            hidden_prev = hidden_prev.detach()
         else:
             vpreds = model(vinputs)
         # Accumulate batch loss

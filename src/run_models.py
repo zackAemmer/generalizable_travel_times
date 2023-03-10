@@ -36,7 +36,7 @@ def run_models(run_folder, network_folder):
     print(f"Using device: {device}")
 
     ### Set run and hyperparameters
-    EPOCHS = 60
+    EPOCHS = 30
     BATCH_SIZE = 512
     LEARN_RATE = 1e-3
     HIDDEN_SIZE = 32
@@ -71,10 +71,13 @@ def run_models(run_folder, network_folder):
         # Construct dataloaders for Pytorch models
         train_dataset = data_loader.make_dataset(train_data, config)
         test_dataset = data_loader.make_dataset(test_data, config)
+
         train_dataset_seq = data_loader.make_seq_dataset(train_data, config, SEQ_LEN)
         test_dataset_seq = data_loader.make_seq_dataset(test_data, config, SEQ_LEN)
+
         train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
         test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
+
         train_dataloader_seq = DataLoader(train_dataset_seq, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
         test_dataloader_seq = DataLoader(test_dataset_seq, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
         print(f"Successfully loaded {len(train_data)} training samples and {len(test_data)} testing samples.")
@@ -115,22 +118,22 @@ def run_models(run_folder, network_folder):
         ### Train time table model
         print("="*30)
         print(f"Training time table model...")
-        sch_model = time_table.TimeTableModel(config['gtfs_folder'])
+        sch_model = time_table.TimeTableModel(config)
         sch_model.save_to(f"{run_folder}{network_folder}models/sch_model_{fold_num}.pkl")
-        sch_labels, sch_preds = sch_model.predict_simple_sch(test_data, gtfs_data)
+        sch_labels, sch_preds = sch_model.predict_simple_sch(test_dataloader)
 
         ### Train ff model
         print("="*30)
         print(f"Training basic ff model...")
         ff_model = basic_ff.BasicFeedForward(
-            # X tensor, first element, n_features
-            train_dataloader.dataset.tensors[0].shape[1],
+            # X tensor, first element, x_ct, n_features
+            train_dataloader.dataset.tensors[0][0][0].shape[0],
             embed_dict,
             HIDDEN_SIZE
         ).to(device)
         ff_train_losses, ff_test_losses = model_utils.fit_to_data(ff_model, train_dataloader, test_dataloader, LEARN_RATE, EPOCHS, config, device)
         torch.save(ff_model.state_dict(), run_folder + network_folder + f"models/ff_model_{fold_num}.pt")
-        ff_labels, ff_preds, ff_avg_loss = model_utils.predict(ff_model, test_dataloader, config, device)
+        ff_labels, ff_preds, ff_avg_loss = model_utils.predict(ff_model, test_dataloader, device)
         ff_labels = data_utils.de_normalize(ff_labels, config['time_mean'], config['time_std'])
         ff_preds = data_utils.de_normalize(ff_preds, config['time_mean'], config['time_std'])
 
@@ -138,7 +141,7 @@ def run_models(run_folder, network_folder):
         ### Train average speed sequence model
         print("="*30)
         print(f"Training average sequential speed model...")
-        avg_seq_model = avg_speed_seq.AvgHourlySpeedSeqModel(config)
+        avg_seq_model = avg_speed_seq.AvgHourlySpeedSeqModel(config, SEQ_LEN)
         avg_seq_model.fit(train_dataloader_seq)
         avg_seq_model.save_to(f"{run_folder}{network_folder}models/avg_model_{fold_num}.pkl")
         avg_seq_labels, avg_seq_preds = avg_seq_model.predict(test_dataloader_seq)
@@ -163,7 +166,7 @@ def run_models(run_folder, network_folder):
         ).to(device)
         rnn_base_train_losses, rnn_base_test_losses = model_utils.fit_to_data(rnn_base_model, train_dataloader_seq, test_dataloader_seq, LEARN_RATE, EPOCHS, config, device, sequential_flag=True)
         torch.save(rnn_base_model.state_dict(), run_folder + network_folder + f"models/rnn_base_model_{fold_num}.pt")
-        rnn_base_labels, rnn_base_preds, rnn_base_avg_loss = model_utils.predict(rnn_base_model, test_dataloader_seq, config, device, sequential_flag=True)
+        rnn_base_labels, rnn_base_preds, rnn_base_avg_loss = model_utils.predict(rnn_base_model, test_dataloader_seq, device, sequential_flag=True)
         rnn_base_labels = data_utils.de_normalize(rnn_base_labels, config['speed_m_s_mean'], config['speed_m_s_std'])
         rnn_base_preds = data_utils.de_normalize(rnn_base_preds, config['speed_m_s_mean'], config['speed_m_s_std'])
 
@@ -180,7 +183,7 @@ def run_models(run_folder, network_folder):
         ).to(device)
         rnn_train_losses, rnn_test_losses = model_utils.fit_to_data(rnn_model, train_dataloader_seq, test_dataloader_seq, LEARN_RATE, EPOCHS, config, device, sequential_flag=True)
         torch.save(rnn_model.state_dict(), run_folder + network_folder + f"models/rnn_model_{fold_num}.pt")
-        rnn_labels, rnn_preds, rnn_avg_loss = model_utils.predict(rnn_model, test_dataloader_seq, config, device, sequential_flag=True)
+        rnn_labels, rnn_preds, rnn_avg_loss = model_utils.predict(rnn_model, test_dataloader_seq, device, sequential_flag=True)
         rnn_labels = data_utils.de_normalize(rnn_labels, config['speed_m_s_mean'], config['speed_m_s_std'])
         rnn_preds = data_utils.de_normalize(rnn_preds, config['speed_m_s_mean'], config['speed_m_s_std'])
 

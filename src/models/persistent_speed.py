@@ -13,9 +13,8 @@ class PersistentSpeedSeqModel:
     def predict(self, dataloader):
         data, labels = dataloader.dataset.tensors
         # Predict that next speed will be same as previous speed
-        speeds = np.array([x[0][self.seq_len-1,5].numpy() for x in data])
-        speeds = data_utils.de_normalize(speeds, self.config['speed_m_s_mean'], self.config['speed_m_s_std'])
-        preds = np.array(speeds, dtype='float32')
+        speeds = np.array([x[0][self.seq_len-1,5].numpy() for x in data], dtype='float32')        
+        preds = data_utils.de_normalize(speeds, self.config['speed_m_s_mean'], self.config['speed_m_s_std'])
         labels = data_utils.de_normalize(labels.numpy().flatten(), self.config['speed_m_s_mean'], self.config['speed_m_s_std'])
         return labels, preds
 
