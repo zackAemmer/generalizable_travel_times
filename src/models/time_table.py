@@ -13,10 +13,9 @@ class TimeTableModel:
     def predict_simple_sch(self, dataloader):
         data, labels = dataloader.dataset.tensors
         # The scheduled arrival times, and current times, are already features in the data
-        arrival_s_from_midnight = np.array([x[0][3].numpy() for x in data])
-        arrival_s_from_midnight = data_utils.de_normalize(arrival_s_from_midnight, self.config['scheduled_time_s_mean'], self.config['scheduled_time_s_std'])
-        current_s_from_midnight = np.array([x[1][0].numpy() for x in data])
-        preds = arrival_s_from_midnight - current_s_from_midnight
+        scheduled_time_s = np.array([x[0][4].numpy() for x in data])
+        scheduled_time_s = data_utils.de_normalize(scheduled_time_s, self.config['scheduled_time_s_mean'], self.config['scheduled_time_s_std'])
+        preds = scheduled_time_s
         labels = data_utils.de_normalize(labels.numpy(), self.config['time_mean'], self.config['time_std'])
         return labels, preds
 
