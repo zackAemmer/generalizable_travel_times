@@ -208,18 +208,6 @@ def calculate_trace_df(data, timezone, min_shingle_len=5):
     data = data.dropna() # Just a precaution
     data = data.groupby(['shingle_id']).filter(lambda x: len(x) >= min_shingle_len)
 
-    # # Filter out entire shingles which have erroneous points; removes too much data
-    # data['tempID'] = data['file'] + data['trip_id']
-    # groups = data.groupby(['tempID'])
-    # valid_n = groups.filter(lambda x: len(x) >= 10)['tempID'].unique()    
-    # valid_dists = groups.filter(lambda x: (x['dist_calc_m'].between(0.0, 5000.0)).all())['tempID'].unique()
-    # valid_times = groups.filter(lambda x: (x['time_calc_s'].between(0.0, 180.0)).all())['tempID'].unique()
-    # valid_speeds = groups.filter(lambda x: (x['speed_m_s'].between(0.0, 35.0)).all())['tempID'].unique()
-    # data = data[data['tempID'].isin(valid_n)]
-    # data = data[data['tempID'].isin(valid_dists)]
-    # data = data[data['tempID'].isin(valid_times)]
-    # data = data[data['tempID'].isin(valid_speeds)]
-
     # Calculate values required by deeptte
     unique_traj = data.groupby('shingle_id')
     # Get cumulative values from trip start
@@ -279,6 +267,10 @@ def clean_trace_df_w_timetables(data, gtfs_data):
     data = pd.merge(data, first_points, on='shingle_id')
     # Calculate the scheduled travel time from the first to each point in the shingle
     data = data.assign(scheduled_time_s=data['stop_arrival_s'] - data['trip_start_timeID_s'])
+    # Filter out shingles where the data started after midnight, but the trip started before
+    # If the data started before the scheduled time difference is still accurate
+    valid_trips = data.groupby('shingle_id').filter(lambda x: x['scheduled_time_s'].max() <= 10000)['shingle_id'].unique()
+    data = data[data['shingle_id'].isin(valid_trips)]
     return data
 
 def get_scheduled_arrival(trip_ids, lons, lats, gtfs_data):

@@ -32,7 +32,12 @@ class AvgHourlySpeedModel:
     def get_speed_if_available(self, hour):
         # If no data was available for the requested hour, return the mean of all available hours
         if hour in self.speed_lookup['speed'].keys():
-            return self.speed_lookup['speed'][hour]
+            speed = self.speed_lookup['speed'][hour]
+            # If there is an hour with 0.0 speeds due to small sample size it will cause errors
+            if speed == 0.0:
+                return np.mean(list(self.speed_lookup['speed'].values()))
+            else:
+                return speed
         else:
             return np.mean(list(self.speed_lookup['speed'].values()))
 

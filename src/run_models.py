@@ -96,11 +96,11 @@ def run_models(run_folder, network_folder):
             },
             'driverID': {
                 'vocab_size': config['n_unique_veh'],
-                'embed_dims': 12
+                'embed_dims': 6
             },
             'tripID': {
                 'vocab_size': config['n_unique_trip'],
-                'embed_dims': 4
+                'embed_dims': 20
             }
         }
 

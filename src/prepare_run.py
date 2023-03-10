@@ -114,8 +114,8 @@ if __name__=="__main__":
         timezone="America/Los_Angeles",
         # given_names=['tripid','file','locationtime','lat','lon','vehicleid'],
         given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
-        train_dates=data_utils.get_date_list("2023_02_19", 3),
-        test_dates=data_utils.get_date_list("2023_03_01", 2),
+        train_dates=data_utils.get_date_list("2023_02_19", 1),
+        test_dates=data_utils.get_date_list("2023_03_01", 1),
         n_folds=5
     )
     # For now, we can use Norway dates that are post-2022_11_02
