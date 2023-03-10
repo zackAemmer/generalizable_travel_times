@@ -13,7 +13,6 @@ class BasicRNN(nn.Module):
         self.batch_size = batch_size
         self.embed_dict = embed_dict
         # Embeddings
-        self.embed_cols = [embed_dict[x]['col'] for x in embed_dict.keys()]
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
         self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])

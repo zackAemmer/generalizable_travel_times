@@ -86,23 +86,19 @@ def run_models(run_folder, network_folder):
         embed_dict = {
             'timeID': {
                 'vocab_size': 1440,
-                'embed_dims': 24,
-                'col': 8
+                'embed_dims': 24
             },
             'weekID': {
                 'vocab_size': 7,
-                'embed_dims': 4,
-                'col': 9
+                'embed_dims': 4
             },
             'driverID': {
                 'vocab_size': config['n_unique_veh'],
-                'embed_dims': 12,
-                'col': 10
+                'embed_dims': 12
             },
             'tripID': {
                 'vocab_size': config['n_unique_trip'],
-                'embed_dims': 20,
-                'col': 11
+                'embed_dims': 4
             }
         }
 
