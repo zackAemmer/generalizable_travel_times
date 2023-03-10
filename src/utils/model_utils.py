@@ -1,15 +1,4 @@
-from datetime import date, datetime, timedelta
-from math import asin, atan2, cos, degrees, radians, sin, sqrt
-from multiprocessing import Pool
-from random import sample
-from zipfile import ZipFile
-
-import numpy as np
-import pandas as pd
-import pyproj
-from sklearn import metrics
 import torch
-from torch import nn
 
 
 def fit_to_data(model, train_dataloader, valid_dataloader, LEARN_RATE, EPOCHS, config, device, sequential_flag=False):

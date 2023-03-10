@@ -1,13 +1,13 @@
 """
 Download all days of data on S3 that are not currently in the given data directory.
 """
-
-import boto3
 import os
 
+import boto3
 from dotenv import load_dotenv
 
 from utils import data_utils
+
 
 def download_new_s3_files(data_folder, bucket_name):
     print(f"Getting new files for {data_folder} from S3 bucket {bucket_name}")

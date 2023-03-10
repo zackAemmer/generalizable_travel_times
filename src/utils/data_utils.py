@@ -1,7 +1,6 @@
 """
 Functions for processing tracked bus and timetable data.
 """
-
 import itertools
 import json
 import os
@@ -16,6 +15,7 @@ import pyproj
 from sklearn import metrics
 
 from utils import shape_utils
+
 
 # Set of unified feature names and dtypes for variables in the GTFS-RT data
 FEATURE_NAMES = ['trip_id','file','locationtime','lat','lon','vehicle_id']
@@ -165,7 +165,12 @@ def combine_pkl_data(folder, file_list, given_names):
             # Get unified column names, data types
             data = data[given_names]            
             data.columns = FEATURE_LOOKUP.keys()
-            data = data.astype(FEATURE_LOOKUP)
+            # Fix locationtimes that were read as floats during data download
+            try:
+                data = data.astype(FEATURE_LOOKUP)
+            except ValueError:
+                data['locationtime'] = data['locationtime'].astype(float)
+                data = data.astype(FEATURE_LOOKUP)
             data_list.append(data)
         except FileNotFoundError:
             no_data_list.append(file)

@@ -2,11 +2,9 @@
 Gather all trips from a given database table, and save the distinct tracked locations 
 locally.
 """
-
-from utils import summarize_rds
-from utils import data_utils
-from datetime import datetime, timedelta
 from dotenv import load_dotenv
+
+from utils import data_utils, summarize_rds
 
 
 if __name__ == "__main__":

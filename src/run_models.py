@@ -1,26 +1,28 @@
 #!/usr/bin python3
 import itertools
 import json
-import numpy as np
 import random
+
+import numpy as np
+import torch
 from sklearn import metrics
 from tabulate import tabulate
-import torch
 from torch.utils.data import DataLoader
 
-from utils import data_utils, data_loader, model_utils
-from models import avg_speed, avg_speed_seq, persistent_speed, time_table, basic_ff, basic_rnn, gru_rnn
+from models import (avg_speed, avg_speed_seq, basic_ff, basic_rnn, gru_rnn,
+                    persistent_speed, time_table)
+from utils import data_loader, data_utils, model_utils
 
 
 def run_models(run_folder, network_folder):
     """
     Train each of the specified models on bus data found in the data folder.
-    The data folder is generated using 03_map_features_to_deeptte.
+    The data folder is generated using prepare_run.py.
     The data in the folder will have many attributes, not all necessariliy used.
     Use k-fold cross validation to split the data n times into train/test.
     The test set is used as validation during the training process.
-    Model accuracy is measured across the n folds.
-    Save the resulting models, and the data generated during training to the same data folder.
+    Model accuracy is measured at the end of each folds.
+    Save the resulting models, and the data generated during training to the results folder.
     These are then analyzed in a jupyter notebook.
     """
     print("="*30)

@@ -3,6 +3,7 @@ import pandas as pd
 
 from utils import data_utils
 
+
 class AvgHourlySpeedModel:
     def __init__(self, config):
         self.config = config

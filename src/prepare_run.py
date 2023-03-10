@@ -1,18 +1,15 @@
 #!/usr/bin python3
-import itertools
 import json
-import logging
 import os
-import pickle
 import random
 import shutil
-import torch
 
 import numpy as np
 import pandas as pd
+import torch
 from tabulate import tabulate
 
-from utils import data_utils, data_loader
+from utils import data_utils
 
 
 def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder, timezone, given_names, train_dates, test_dates, n_folds):
@@ -21,8 +18,7 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     All run data is copied from the original download directory to the run folder.
     Separate folders are made for the ATB and KCM networks.
     The formatted data is saved in "deeptte_formatted". Since we are benchmarking
-    with that model, it is convenient to use their same format for all models.
-    Create a separate folder for baseline and new model results.
+    with that model, it is convenient to use the same data format for all models.
     """
     print("="*30)
     print(f"PREPARE RUN: '{run_name}'")
@@ -62,8 +58,6 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     print(f"Shingling trajectories into smaller chunks...")
     train_traces = data_utils.shingle(train_data, 2, 5)
     test_traces = data_utils.shingle(test_data, 2, 5)
-    print(f"Cumulative {np.round(len(train_traces) / len(train_data) * 100, 1)}% of train data retained. Saving {len(train_traces)} samples.")
-    print(f"Cumulative {np.round(len(test_traces) / len(test_data) * 100, 1)}% of test data retained. Saving {len(test_traces)} samples.")
 
     print(f"Calculating trace values from shingles...")
     train_traces = data_utils.calculate_trace_df(train_traces, timezone)
@@ -115,12 +109,13 @@ if __name__=="__main__":
         overwrite=True,
         run_name="throwaway",
         network_name="kcm",
-        gtfs_folder="./data/kcm_gtfs/2020_09_23/",
+        gtfs_folder="./data/kcm_gtfs/2023_01_23/",
         raw_data_folder="./data/kcm_all/",
         timezone="America/Los_Angeles",
-        given_names=['tripid','file','locationtime','lat','lon','vehicleid'],
-        train_dates=data_utils.get_date_list("2020_10_24", 3),
-        test_dates=data_utils.get_date_list("2021_03_01", 2),
+        # given_names=['tripid','file','locationtime','lat','lon','vehicleid'],
+        given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
+        train_dates=data_utils.get_date_list("2023_02_19", 3),
+        test_dates=data_utils.get_date_list("2023_03_01", 2),
         n_folds=5
     )
     # For now, we can use Norway dates that are post-2022_11_02
@@ -132,11 +127,11 @@ if __name__=="__main__":
         overwrite=True,
         run_name="throwaway",
         network_name="atb",
-        gtfs_folder="./data/nwy_gtfs/2022_12_01/",
-        raw_data_folder="./data/atb_all/",
+        gtfs_folder="./data/atb_gtfs/2023_02_12/",
+        raw_data_folder="./data/atb_all_new/",
         timezone="Europe/Oslo",
-        given_names=['datedvehiclejourney','file','locationtime','lat','lon','vehicle'],
-        train_dates=data_utils.get_date_list("2022_11_01", 28),
-        test_dates=data_utils.get_date_list("2022_11_29", 12),
+        given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
+        train_dates=data_utils.get_date_list("2023_02_19", 3),
+        test_dates=data_utils.get_date_list("2023_03_01", 2),
         n_folds=5
     )

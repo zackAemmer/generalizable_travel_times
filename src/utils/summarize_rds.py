@@ -10,20 +10,16 @@ RAM must be managed carefully to avoid OOM errors, so for a 24hr query at least
 3gb is recommended. If using less, the query time period should be split up
 smaller than 24hrs.
 """
-
-
-from datetime import datetime, timezone, timedelta
-import json
 import os
-import requests
+import pickle
+from datetime import datetime, timedelta, timezone
 from zipfile import ZipFile
 
-import boto3
 import numpy as np
 import pandas as pd
-import pickle
 import psycopg2
 import pytz
+import requests
 from sklearn.neighbors import BallTree
 
 

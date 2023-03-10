@@ -1,21 +1,15 @@
 """
 Functions for processing and working with tracked bus data.
 """
-
-from datetime import date, timedelta
-from math import radians, cos, sin, asin, sqrt
-import os
+import warnings
 from random import sample
 
 import geopandas
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pickle
 import shapely
 import shapely.geometry
 from scipy.spatial import KDTree
-import warnings
 from shapely.errors import ShapelyDeprecationWarning
 
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
