@@ -6,7 +6,7 @@ cd ~/Skrivebord/valle
 
 ### KCM ###
 # Copy files to Deeptte
-cp -a ./results/3_month_test/kcm/deeptte_formatted/* ../DeepTTE/data
+cp -a ./results/1mo_new_data/kcm/deeptte_formatted/* ../DeepTTE/data
 cp ../DeepTTE/data/config.json ../DeepTTE/config.json
 
 # Run Deeptte
@@ -18,13 +18,13 @@ python main.py --task train --batch_size 10 --epochs 50 --result_file ./result/d
 
 # Copy Deeptte results back to results folder
 cd ~/Skrivebord/valle
-cp -a ../DeepTTE/result ./results/3_month_test/kcm/deeptte_results/
-cp -a ../DeepTTE/saved_weights ./results/3_month_test/kcm/deeptte_results/
+cp -a ../DeepTTE/result ./results/1mo_new_data/kcm/deeptte_results/
+cp -a ../DeepTTE/saved_weights ./results/1mo_new_data/kcm/deeptte_results/
 
 
 ### ATB ###
 # Copy files to Deeptte
-cp -a ./results/3_month_test/atb/deeptte_formatted/* ../DeepTTE/data
+cp -a ./results/1mo_new_data/atb/deeptte_formatted/* ../DeepTTE/data
 cp ../DeepTTE/data/config.json ../DeepTTE/config.json
 
 # Run Deeptte
@@ -36,5 +36,5 @@ python main.py --task train --batch_size 10 --epochs 50 --result_file ./result/d
 
 # Copy Deeptte results back to results folder
 cd ~/Skrivebord/valle
-cp -a ../DeepTTE/result ./results/3_month_test/atb/deeptte_results/
-cp -a ../DeepTTE/saved_weights ./results/3_month_test/atb/deeptte_results/
+cp -a ../DeepTTE/result ./results/1mo_new_data/atb/deeptte_results/
+cp -a ../DeepTTE/saved_weights ./results/1mo_new_data/atb/deeptte_results/

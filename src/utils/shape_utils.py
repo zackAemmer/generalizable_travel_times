@@ -14,6 +14,16 @@ from shapely.errors import ShapelyDeprecationWarning
 
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
+def apply_bbox(point_obs, bbox):
+    min_lat = bbox[0]
+    min_lon = bbox[1]
+    max_lat = bbox[2]
+    max_lon = bbox[3]
+    point_obs = point_obs[point_obs[:,3]>=min_lat]
+    point_obs = point_obs[point_obs[:,3]<=max_lat]
+    point_obs = point_obs[point_obs[:,2]>=min_lon]
+    point_obs = point_obs[point_obs[:,2]<=max_lon]
+    return point_obs
 
 def upscale(rast, scalar_dims):
     scalars = [np.ones((x,x), dtype=float) for x in scalar_dims]
