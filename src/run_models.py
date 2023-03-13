@@ -38,11 +38,10 @@ def run_models(run_folder, network_folder):
     print(f"Using device: {device}")
 
     ### Set run and hyperparameters
-    EPOCHS = 30
-    BATCH_SIZE = 512
+    EPOCHS = 20
+    BATCH_SIZE = 256
     LEARN_RATE = 1e-3
     HIDDEN_SIZE = 32
-    SEQ_LEN = 4
 
     ### Load train/test data
     print("="*30)
@@ -74,8 +73,8 @@ def run_models(run_folder, network_folder):
         train_dataset = data_loader.make_dataset(train_data, config)
         test_dataset = data_loader.make_dataset(test_data, config)
 
-        train_dataset_seq = data_loader.make_seq_dataset(train_data, config, SEQ_LEN)
-        test_dataset_seq = data_loader.make_seq_dataset(test_data, config, SEQ_LEN)
+        train_dataset_seq, train_seq_mask = data_loader.make_seq_dataset(train_data, config)
+        test_dataset_seq, test_seq_mask = data_loader.make_seq_dataset(test_data, config)
 
         train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
         test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
@@ -139,24 +138,25 @@ def run_models(run_folder, network_folder):
         ### Train average speed sequence model
         print("="*30)
         print(f"Training average sequential speed model...")
-        avg_seq_model = avg_speed_seq.AvgHourlySpeedSeqModel(config, SEQ_LEN)
+        avg_seq_model = avg_speed_seq.AvgHourlySpeedSeqModel(config, train_seq_mask)
         avg_seq_model.fit(train_dataloader_seq)
         avg_seq_model.save_to(f"{run_folder}{network_folder}models/avg_model_{fold_num}.pkl")
-        avg_seq_labels, avg_seq_preds = avg_seq_model.predict(test_dataloader_seq)
+        avg_seq_labels, avg_seq_preds = avg_seq_model.predict(test_dataloader_seq, test_seq_mask)
 
         ### Train persistent speed sequence model
         print("="*30)
         print(f"Training persistent speed model...")
-        persistent_seq_model = persistent_speed.PersistentSpeedSeqModel(config, SEQ_LEN)
+        persistent_seq_model = persistent_speed.PersistentSpeedSeqModel(config, train_seq_mask)
         persistent_seq_model.save_to(f"{run_folder}{network_folder}models/persistent_seq_model_{fold_num}.pkl")
-        persistent_seq_labels, persistent_seq_preds = persistent_seq_model.predict(test_dataloader_seq)
+        persistent_seq_labels, persistent_seq_preds = persistent_seq_model.predict(test_dataloader_seq, test_seq_mask)
 
         ### Train Basic RNN model
         print("="*30)
         print(f"Training basic rnn model...")
         rnn_base_model = basic_rnn.BasicRNN(
             # X tensor, first element, traj component, n_features
-            train_dataloader_seq.dataset.tensors[0][0][0].shape[1],
+            # Subtract features such as speed, time_gap that cannot be known and are for other models
+            train_dataloader_seq.dataset.tensors[0][0][0].shape[1] - 2,
             1,
             HIDDEN_SIZE,
             BATCH_SIZE,
@@ -173,7 +173,7 @@ def run_models(run_folder, network_folder):
         print(f"Training rnn model...")
         rnn_model = gru_rnn.GRU_RNN(
             # X tensor, first element, traj component, n_features
-            train_dataloader_seq.dataset.tensors[0][0][0].shape[1],
+            train_dataloader_seq.dataset.tensors[0][0][0].shape[1] - 2,
             1,
             HIDDEN_SIZE,
             BATCH_SIZE,
@@ -186,6 +186,8 @@ def run_models(run_folder, network_folder):
         rnn_preds = data_utils.de_normalize(rnn_preds, config['speed_m_s_mean'], config['speed_m_s_std'])
 
         #### CALCULATE METRICS ####
+        # NEED TO GET TT FROM SPD
+
         print("="*30)
         print(f"Saving model metrics from fold {fold_num}...")
         # Add new models here:
@@ -227,13 +229,13 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/1mo_new_data/",
+        run_folder="./results/throwaway_small/",
         network_folder="kcm/"
     )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/1mo_new_data/",
+        run_folder="./results/throwaway_small/",
         network_folder="atb/"
     )

@@ -44,27 +44,27 @@ def make_dataset(data, config):
     dataset = BasicDataset((X,y))
     return dataset
 
-def make_seq_dataset(data, config, seq_len=2):
+def make_seq_dataset(data, config):
     # Context variables to embed
     context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID'], x['tripID']]) for x in data], dtype='int32')
-    # Last dimension is num sequence variables below
-    X = np.zeros((len(data), seq_len+1, 7), dtype='float32')
+    # Last dimension is number of sequence variables below
+    seq_lens = [len(x['lats']) for x in data]
+    max_len = np.max(seq_lens)
+    mask = np.array([np.concatenate([np.repeat(True,slen), np.repeat(False,max_len-slen)]) for slen in seq_lens], dtype='bool')
+    X = np.zeros((len(data), max_len, 7), dtype='float32')
     # Sequence variables
-    for i in range(len(data)):
-        X[i,:,0] = data_utils.normalize(np.array(data[i]['lats'][:seq_len+1], dtype='float32'), config['lats_mean'], config['lats_std'])
-        X[i,:,1] = data_utils.normalize(np.array(data[i]['lngs'][:seq_len+1], dtype='float32'), config['lngs_mean'], config['lngs_std'])
-        X[i,:,2] = data_utils.normalize(np.array(data[i]['dist_gap'][:seq_len+1], dtype='float32'), config['dist_gap_mean'], config['dist_gap_std'])
-        X[i,:,3] = data_utils.normalize(np.array(data[i]['scheduled_time_s'][:seq_len+1], dtype='float32'), config['scheduled_time_s_mean'], config['scheduled_time_s_std'])
-        X[i,:,4] = data_utils.normalize(np.array(data[i]['stop_dist_km'][:seq_len+1], dtype='float32'), config['stop_dist_km_mean'], config['stop_dist_km_std'])
-        X[i,:,5] = data_utils.normalize(np.array(data[i]['speed_m_s'][:seq_len+1], dtype='float32'), config['speed_m_s_mean'], config['speed_m_s_std'])
-        X[i,:,6] = data_utils.normalize(np.array(data[i]['time_gap'][:seq_len+1], dtype='float32'), config['time_gap_mean'], config['time_gap_std'])
-    # Mask out the speed/time observations for all unknown points
-    X[:,seq_len:,5] = 0.0
-    X[:,seq_len:,6] = 0.0
+    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(data_utils.normalize(np.array(x['lats'], dtype='float32'), config['lats_mean'], config['lats_std'])) for x in data], batch_first=True)
+    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(data_utils.normalize(np.array(x['lngs'], dtype='float32'), config['lngs_mean'], config['lngs_std'])) for x in data], batch_first=True)
+    X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(data_utils.normalize(np.array(x['dist_gap'], dtype='float32'), config['dist_gap_mean'], config['dist_gap_std'])) for x in data], batch_first=True)
+    X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(data_utils.normalize(np.array(x['scheduled_time_s'], dtype='float32'), config['scheduled_time_s_mean'], config['scheduled_time_s_std'])) for x in data], batch_first=True)
+    X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(data_utils.normalize(np.array(x['stop_dist_km'], dtype='float32'), config['stop_dist_km_mean'], config['stop_dist_km_std'])) for x in data], batch_first=True)
+    # Note that last two have info that should not be included with RNN model
+    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(data_utils.normalize(np.array(x['time_gap'], dtype='float32'), config['time_gap_mean'], config['time_gap_std'])) for x in data], batch_first=True)
+    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(data_utils.normalize(np.array(x['speed_m_s'], dtype='float32'), config['speed_m_s_mean'], config['speed_m_s_std'])) for x in data], batch_first=True)
     X = torch.from_numpy(X)
     context = torch.from_numpy(context)
     # Prediction variable (speed of final step)
-    y = torch.from_numpy(data_utils.normalize(np.array([x['speed_m_s'][seq_len] for x in data], dtype='float32'), config['speed_m_s_mean'], config['speed_m_s_std']))
+    y = torch.nn.utils.rnn.pad_sequence([torch.tensor(data_utils.normalize(np.array(x['speed_m_s'], dtype='float32'), config['speed_m_s_mean'], config['speed_m_s_std'])) for x in data], batch_first=True)
     X = [(i,j) for i,j in zip(X,context)]
     dataset = BasicDataset((X,y))
-    return dataset
+    return dataset, mask

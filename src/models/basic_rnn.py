@@ -32,7 +32,8 @@ class BasicRNN(nn.Module):
         )
 
     def forward(self, x, hidden_prev):
-        x_ct = x[0]
+        # Must mask out all features that cannot be known
+        x_ct = x[0][:,:,:5]
         x_em = x[1]
         # Embed categorical variables
         timeID_embedded = self.timeID_em(x_em[:,0])
@@ -42,9 +43,9 @@ class BasicRNN(nn.Module):
         # Get recurrent pred
         out, hidden_prev = self.rnn(x_ct, hidden_prev)
         # Reshape, add context, combine in linear layer
-        # Try just taking last prediction
-        out = out[:,-1,:]
-        out = torch.concat([out,timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded], dim=1)
+        embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
+        embeddings = embeddings.repeat(1,out.shape[1],1)
+        out = torch.cat((out, embeddings), dim=2)
         out = self.linear(out)
-        out = out.flatten()
+        out = out.squeeze(2)
         return out, hidden_prev
