@@ -221,6 +221,8 @@ def calculate_trace_df(data, timezone, min_shingle_len=5):
     # (be careful with these last two as they change across the trajectory)
     data['timeID'] = (data['datetime'].dt.hour * 60) + (data['datetime'].dt.minute)
     data['timeID_s'] = (data['datetime'].dt.hour * 60 * 60) + (data['datetime'].dt.minute * 60) + (data['datetime'].dt.second)
+    # Remove shingles that don't traverse more than a kilometer
+    data = data.groupby(['shingle_id']).filter(lambda x: np.max(x.dist_cumulative_km) >= 1.0)
     return data
 
 def parallel_clean_trace_df_w_timetables(args):

@@ -85,6 +85,6 @@ def convert_speeds_to_tts(speeds, dataloader, mask, config):
     dists = [data_utils.de_normalize(x, config['dist_calc_km_mean'], config['dist_calc_km_std']) for x in dists]
     masked_speeds = [x[mask[i]] for i,x in enumerate(speeds)]
     # Get travel time for every step of every sequence, sum to get shingle tt
-    res = [i*1000.0/j for i,j in zip(dists,masked_speeds)]
+    res = [i*1000.0/np.max(0.001,j) for i,j in zip(dists,masked_speeds)]
     res = np.array([np.sum(x) for x in res], dtype='float32')
     return res

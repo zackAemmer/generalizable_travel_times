@@ -187,8 +187,6 @@ def run_models(run_folder, network_folder):
         rnn_preds[test_seq_mask] = data_utils.de_normalize(rnn_preds[test_seq_mask], config['speed_m_s_mean'], config['speed_m_s_std'])
 
         #### CALCULATE METRICS ####
-
-        # NEED TO GET TT FROM SPD
         avg_seq_preds_tt = model_utils.convert_speeds_to_tts(avg_seq_preds, test_dataloader_seq, test_seq_mask, config)
         persistent_seq_preds_tt = model_utils.convert_speeds_to_tts(persistent_seq_preds, test_dataloader_seq, test_seq_mask, config)
         rnn_base_preds_tt = model_utils.convert_speeds_to_tts(rnn_base_preds, test_dataloader_seq, test_seq_mask, config)
