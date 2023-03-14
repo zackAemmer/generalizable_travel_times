@@ -28,9 +28,14 @@ class AvgHourlySpeedSeqModel:
         # Predict travel time based on historical average speeds
         hours = np.array([x[1][0].numpy() for x in data]) // 60
         preds = np.array([self.get_speed_if_available(x) for x in hours], dtype='float32')
-        labels = np.array([np.mean(x.numpy()[test_mask[i]]) for i,x in enumerate(labels)])
-        labels = data_utils.de_normalize(labels, self.config['speed_m_s_mean'], self.config['speed_m_s_std'])
-        return labels, preds
+        # Repeat and pad predictions to get values for every step of sequence
+        max_len = data[0][0].shape[0]
+        preds = [np.repeat(x,np.sum(test_mask[i])) for i,x in enumerate(preds)]
+        preds = np.array([np.pad(x,(0,max_len-len(x))) for x in preds], dtype='float32')
+        # Must not modify dataloader
+        norm_labels = labels.numpy().copy()
+        norm_labels[test_mask] = data_utils.de_normalize(norm_labels[test_mask], self.config['speed_m_s_mean'], self.config['speed_m_s_std'])
+        return norm_labels, preds
 
     def get_speed_if_available(self, hour):
         # If no data was available for the requested hour, return the mean of all available hours

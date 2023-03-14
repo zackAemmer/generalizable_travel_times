@@ -55,7 +55,7 @@ def make_seq_dataset(data, config):
     # Sequence variables
     X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(data_utils.normalize(np.array(x['lats'], dtype='float32'), config['lats_mean'], config['lats_std'])) for x in data], batch_first=True)
     X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(data_utils.normalize(np.array(x['lngs'], dtype='float32'), config['lngs_mean'], config['lngs_std'])) for x in data], batch_first=True)
-    X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(data_utils.normalize(np.array(x['dist_gap'], dtype='float32'), config['dist_gap_mean'], config['dist_gap_std'])) for x in data], batch_first=True)
+    X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(data_utils.normalize(np.array(x['dist_calc_km'], dtype='float32'), config['dist_calc_km_mean'], config['dist_calc_km_std'])) for x in data], batch_first=True)
     X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(data_utils.normalize(np.array(x['scheduled_time_s'], dtype='float32'), config['scheduled_time_s_mean'], config['scheduled_time_s_std'])) for x in data], batch_first=True)
     X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(data_utils.normalize(np.array(x['stop_dist_km'], dtype='float32'), config['stop_dist_km_mean'], config['stop_dist_km_std'])) for x in data], batch_first=True)
     # Note that last two have info that should not be included with RNN model

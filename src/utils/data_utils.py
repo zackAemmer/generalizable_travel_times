@@ -404,6 +404,8 @@ def get_summary_config(trace_data, n_unique_veh, n_unique_trip, gtfs_folder, n_f
         # Others
         "speed_m_s_mean": np.mean(trace_data['speed_m_s']),
         "speed_m_s_std": np.std(trace_data['speed_m_s']),
+        "dist_calc_km_mean": np.mean(trace_data['dist_calc_km']),
+        "dist_calc_km_std": np.std(trace_data['dist_calc_km']),
         "stop_dist_km_mean": np.mean(trace_data['stop_dist_km']),
         "stop_dist_km_std": np.std(trace_data['stop_dist_km']),
         "scheduled_time_s_mean": np.mean(grouped.max()[['scheduled_time_s']].values.flatten()),

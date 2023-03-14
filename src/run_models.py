@@ -146,7 +146,7 @@ def run_models(run_folder, network_folder):
         ### Train persistent speed sequence model
         print("="*30)
         print(f"Training persistent speed model...")
-        persistent_seq_model = persistent_speed.PersistentSpeedSeqModel(config, train_seq_mask)
+        persistent_seq_model = persistent_speed.PersistentSpeedSeqModel(config, train_seq_mask, min_value=3.0)
         persistent_seq_model.save_to(f"{run_folder}{network_folder}models/persistent_seq_model_{fold_num}.pkl")
         persistent_seq_labels, persistent_seq_preds = persistent_seq_model.predict(test_dataloader_seq, test_seq_mask)
 
@@ -165,8 +165,9 @@ def run_models(run_folder, network_folder):
         rnn_base_train_losses, rnn_base_test_losses = model_utils.fit_to_data(rnn_base_model, train_dataloader_seq, test_dataloader_seq, LEARN_RATE, EPOCHS, config, device, sequential_flag=True)
         torch.save(rnn_base_model.state_dict(), run_folder + network_folder + f"models/rnn_base_model_{fold_num}.pt")
         rnn_base_labels, rnn_base_preds, rnn_base_avg_loss = model_utils.predict(rnn_base_model, test_dataloader_seq, device, sequential_flag=True)
-        rnn_base_labels = data_utils.de_normalize(rnn_base_labels, config['speed_m_s_mean'], config['speed_m_s_std'])
-        rnn_base_preds = data_utils.de_normalize(rnn_base_preds, config['speed_m_s_mean'], config['speed_m_s_std'])
+        # Don't denormalize masked labels or predictions
+        rnn_base_labels[test_seq_mask] = data_utils.de_normalize(rnn_base_labels[test_seq_mask], config['speed_m_s_mean'], config['speed_m_s_std'])
+        rnn_base_preds[test_seq_mask] = data_utils.de_normalize(rnn_base_preds[test_seq_mask], config['speed_m_s_mean'], config['speed_m_s_std'])
 
         ### Train RNN model
         print("="*30)
@@ -182,18 +183,24 @@ def run_models(run_folder, network_folder):
         rnn_train_losses, rnn_test_losses = model_utils.fit_to_data(rnn_model, train_dataloader_seq, test_dataloader_seq, LEARN_RATE, EPOCHS, config, device, sequential_flag=True)
         torch.save(rnn_model.state_dict(), run_folder + network_folder + f"models/rnn_model_{fold_num}.pt")
         rnn_labels, rnn_preds, rnn_avg_loss = model_utils.predict(rnn_model, test_dataloader_seq, device, sequential_flag=True)
-        rnn_labels = data_utils.de_normalize(rnn_labels, config['speed_m_s_mean'], config['speed_m_s_std'])
-        rnn_preds = data_utils.de_normalize(rnn_preds, config['speed_m_s_mean'], config['speed_m_s_std'])
+        rnn_labels[test_seq_mask] = data_utils.de_normalize(rnn_labels[test_seq_mask], config['speed_m_s_mean'], config['speed_m_s_std'])
+        rnn_preds[test_seq_mask] = data_utils.de_normalize(rnn_preds[test_seq_mask], config['speed_m_s_mean'], config['speed_m_s_std'])
 
         #### CALCULATE METRICS ####
+
         # NEED TO GET TT FROM SPD
+        avg_seq_preds_tt = model_utils.convert_speeds_to_tts(avg_seq_preds, test_dataloader_seq, test_seq_mask, config)
+        persistent_seq_preds_tt = model_utils.convert_speeds_to_tts(persistent_seq_preds, test_dataloader_seq, test_seq_mask, config)
+        rnn_base_preds_tt = model_utils.convert_speeds_to_tts(rnn_base_preds, test_dataloader_seq, test_seq_mask, config)
+        rnn_preds_tt = model_utils.convert_speeds_to_tts(rnn_preds, test_dataloader_seq, test_seq_mask, config)
 
         print("="*30)
         print(f"Saving model metrics from fold {fold_num}...")
         # Add new models here:
         model_names = ["AVG","SCH","FF","AVG_SEQ","PERSISTENT","RNN_BASE","RNN"]
-        model_labels = [avg_labels, sch_labels, ff_labels, avg_seq_labels, persistent_seq_labels, rnn_base_labels, rnn_labels]
-        model_preds = [avg_preds, sch_preds, ff_preds, avg_seq_preds, persistent_seq_preds, rnn_base_preds, rnn_preds]
+        # Note that all model labels for same task should be identical, as a check, use only one set of labels here to evaluate
+        model_labels = [avg_labels, avg_labels, avg_labels, avg_labels, avg_labels, avg_labels, avg_labels]
+        model_preds = [avg_preds, sch_preds, ff_preds, avg_seq_preds_tt, persistent_seq_preds_tt, rnn_base_preds_tt, rnn_preds_tt]
         fold_results = {
             "Fold": fold_num,
             "All Losses": [],
@@ -207,7 +214,8 @@ def run_models(run_folder, network_folder):
         # Add new losses here:
         for mname, mlabels, mpreds in zip(model_names, model_labels, model_preds):
             _ = [mname]
-            if mname not in ["AVG_SEQ","PERSISTENT","RNN_BASE","RNN"]:
+            # if mname not in ["AVG_SEQ","PERSISTENT","RNN_BASE","RNN"]:
+            if mname not in ["NONE"]:
                 # 0.0 speed is common in ytrue so don't use MAPE for these models
                 _.append(np.round(metrics.mean_absolute_percentage_error(mlabels, mpreds), 2))
             else:
@@ -229,13 +237,13 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/throwaway_small/",
+        run_folder="./results/throwaway/",
         network_folder="kcm/"
     )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/throwaway_small/",
+        run_folder="./results/throwaway/",
         network_folder="atb/"
     )

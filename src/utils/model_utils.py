@@ -1,4 +1,7 @@
+import numpy as np
 import torch
+
+from utils import data_utils
 
 
 def fit_to_data(model, train_dataloader, valid_dataloader, LEARN_RATE, EPOCHS, config, device, sequential_flag=False):
@@ -41,6 +44,7 @@ def fit_to_data(model, train_dataloader, valid_dataloader, LEARN_RATE, EPOCHS, c
 
         # Don't use gradients when evaluating
         model.train(False)
+
         # Calculate the average batch validation loss
         vlabels, vpreds, avg_batch_vloss = predict(model, valid_dataloader, device, sequential_flag=sequential_flag)
         validation_losses.append(avg_batch_vloss)
@@ -73,3 +77,14 @@ def predict(model, dataloader, device, sequential_flag=False):
     labels = torch.concat(labels).cpu().detach().numpy()
     preds = torch.concat(preds).cpu().detach().numpy()
     return labels, preds, avg_batch_loss / num_batches
+
+def convert_speeds_to_tts(speeds, dataloader, mask, config):
+    # Calculate travel time given a dataloader with sequential distances and speed predictions
+    data, labels = dataloader.dataset.tensors
+    dists = [x[0][:,2][mask[i]].numpy() for i,x in enumerate(data)]
+    dists = [data_utils.de_normalize(x, config['dist_calc_km_mean'], config['dist_calc_km_std']) for x in dists]
+    masked_speeds = [x[mask[i]] for i,x in enumerate(speeds)]
+    # Get travel time for every step of every sequence, sum to get shingle tt
+    res = [i*1000.0/j for i,j in zip(dists,masked_speeds)]
+    res = np.array([np.sum(x) for x in res], dtype='float32')
+    return res

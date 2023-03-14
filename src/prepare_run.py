@@ -117,8 +117,7 @@ if __name__=="__main__":
         test_dates=data_utils.get_date_list("2023_03_04", 2),
         n_folds=5
     )
-    # For now, we can use Norway dates that are post-2022_11_02
-    # Need to get mapping of old IDs to new IDs in order to use schedule data from prior to that date
+    # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
