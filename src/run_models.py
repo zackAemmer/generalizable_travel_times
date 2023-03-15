@@ -7,14 +7,13 @@ import numpy as np
 import torch
 from sklearn import metrics
 from tabulate import tabulate
-from torch.utils.data import DataLoader
 
 from models import (avg_speed, avg_speed_seq, basic_ff, basic_rnn, gru_rnn,
                     persistent_speed, time_table)
 from utils import data_loader, data_utils, model_utils
 
 
-def run_models(run_folder, network_folder):
+def run_models(run_folder, network_folder, hyperparameters):
     """
     Train each of the specified models on bus data found in the data folder.
     The data folder is generated using prepare_run.py.
@@ -38,10 +37,10 @@ def run_models(run_folder, network_folder):
     print(f"Using device: {device}")
 
     ### Set run and hyperparameters
-    EPOCHS = 20
-    BATCH_SIZE = 256
-    LEARN_RATE = 1e-3
-    HIDDEN_SIZE = 32
+    EPOCHS = hyperparameters['EPOCHS']
+    BATCH_SIZE = hyperparameters['BATCH_SIZE']
+    LEARN_RATE = hyperparameters['LEARN_RATE']
+    HIDDEN_SIZE = hyperparameters['HIDDEN_SIZE']
 
     ### Load train/test data
     print("="*30)
@@ -55,6 +54,43 @@ def run_models(run_folder, network_folder):
     # Load GTFS data
     print(f"Loading and merging GTFS files from '{config['gtfs_folder']}'...")
     gtfs_data = data_utils.merge_gtfs_files(config['gtfs_folder'])
+
+    # Define embedded variables for nn models
+    embed_dict = {
+        'timeID': {
+            'vocab_size': 1440,
+            'embed_dims': 24
+        },
+        'weekID': {
+            'vocab_size': 7,
+            'embed_dims': 4
+        },
+        'vehicleID': {
+            'vocab_size': config['n_unique_veh'],
+            'embed_dims': 6
+        },
+        'tripID': {
+            'vocab_size': config['n_unique_trip'],
+            'embed_dims': 20
+        }
+    }
+    # Define continuous variables for nn models
+    continuous_dict = {
+        'lats': {
+            'lats_start': 0,
+            'lats_end': -1
+        },
+        'lngs': {
+            'lngs_start': 0,
+            'lngs_end': -1
+        },
+        'dist_gap': {
+            'dist_gap': "sequence"
+        },
+        'dist': {
+            'dist': "singular"
+        }
+    }
 
     ### Run full training process for each model during each validation fold
     run_results = []
@@ -70,38 +106,33 @@ def run_models(run_folder, network_folder):
         train_data = list(itertools.chain.from_iterable(train_data))
 
         # Construct dataloaders for Pytorch models
-        train_dataset = data_loader.make_dataset(train_data, config)
-        test_dataset = data_loader.make_dataset(test_data, config)
+        train_dataloader = data_loader.make_dataloader(train_data, embed_dict, continuous_dict, config, BATCH_SIZE, "basic")
+        # test_dataloader = data_loader.make_dataloader(test_data, config, BATCH_SIZE, "basic")
+        
+        train_dataloader_seq = data_loader.make_dataloader(train_data, embed_dict, continuous_dict, config, BATCH_SIZE, "sequential")
+        # test_dataloader_seq = data_loader.make_dataloader(train_data, config, BATCH_SIZE, "sequential")
 
-        train_dataset_seq, train_seq_mask = data_loader.make_seq_dataset(train_data, config)
-        test_dataset_seq, test_seq_mask = data_loader.make_seq_dataset(test_data, config)
+        for i, vdata in enumerate(train_dataloader):
+            print(i)
+            print(vdata)
+        for i, vdata in enumerate(train_dataloader_seq):
+            print(i)
+            print(vdata)
 
-        train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
-        test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
+        # train_dataset = data_loader.make_dataset(train_data, config)
+        # test_dataset = data_loader.make_dataset(test_data, config)
 
-        train_dataloader_seq = DataLoader(train_dataset_seq, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
-        test_dataloader_seq = DataLoader(test_dataset_seq, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
+        # train_dataset_seq, train_seq_mask = data_loader.make_seq_dataset(train_data, config)
+        # test_dataset_seq, test_seq_mask = data_loader.make_seq_dataset(test_data, config)
+
+        # train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
+        # test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
+
+        # train_dataloader_seq = DataLoader(train_dataset_seq, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
+        # test_dataloader_seq = DataLoader(test_dataset_seq, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
         print(f"Successfully loaded {len(train_data)} training samples and {len(test_data)} testing samples.")
 
-        # Define embedded variables for nn models
-        embed_dict = {
-            'timeID': {
-                'vocab_size': 1440,
-                'embed_dims': 24
-            },
-            'weekID': {
-                'vocab_size': 7,
-                'embed_dims': 4
-            },
-            'driverID': {
-                'vocab_size': config['n_unique_veh'],
-                'embed_dims': 6
-            },
-            'tripID': {
-                'vocab_size': config['n_unique_trip'],
-                'embed_dims': 20
-            }
-        }
+
 
         #### TRAVEL TIME TASK ####
         ### Train average time model
@@ -235,13 +266,25 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/throwaway/",
-        network_folder="kcm/"
+        run_folder="./results/throwaway_small/",
+        network_folder="kcm/",
+        hyperparameters={
+            "EPOCHS": 30,
+            "BATCH_SIZE": 512,
+            "LEARN_RATE": 1e-3,
+            "HIDDEN_SIZE": 32
+        }
     )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/throwaway/",
-        network_folder="atb/"
+        run_folder="./results/throwaway_small/",
+        network_folder="atb/",
+        hyperparameters={
+            "EPOCHS": 50,
+            "BATCH_SIZE": 512,
+            "LEARN_RATE": 1e-3,
+            "HIDDEN_SIZE": 32
+        }
     )
