@@ -1,95 +1,8 @@
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import Dataset
 
 from utils import data_utils
-
-class MyDataLoader(DataLoader):
-    def __init__(self, dataset, batch_size, model_type):
-        # Define a dictionary that maps the model type to the collate function
-        collate_fn_dict = {
-            "basic": collate_fn_basic,
-            "sequential": collate_fn_sequential,
-        }
-        # Get the collate function for the given model type
-        collate_fn = collate_fn_dict[model_type]
-        # Pass the dataset, batch_size and collate_fn to the super class
-        super().__init__(dataset, batch_size=batch_size, collate_fn=collate_fn)
-
-class MyDataset(Dataset):
-  def __init__(self, data, em_dict, ct_dict, config, transform=None):
-    self.data = data
-    self.config = config
-    self.em_dict = em_dict
-    self.ct_dict = ct_dict
-    self.transform = transform
-
-  def __len__(self):
-    return len(self.data)
-
-  def __getitem__(self, index):
-    sample = self.data[index]
-    new_sample = {}
-    for var_name in self.em_dict.keys():
-        new_sample[var_name] = sample[var_name]
-    for var_name in self.ct_dict.keys():
-        for key in self.ct_dict[var_name].keys():
-            if self.ct_dict[var_name][key]=="all":
-                new_sample[key] = sample[var_name]
-            else:
-                new_sample[key] = sample[var_name][self.ct_dict[var_name][key]]
-    return new_sample
-
-# def normalize(sample, stats):
-#     # sample is a dictionary of values
-#     # stats is a dictionary of means and standard deviations
-#     # create a new dictionary to store the normalized values
-#     normalized = {}
-#     # loop through the keys and values in the sample
-#     for key, value in sample.items():
-#         # get the mean and standard deviation for the current key
-#         mean = stats[key]["mean"]
-#         std = stats[key]["std"]
-#         # normalize the value using the mean and standard deviation
-#         normalized[key] = (value - mean) / std
-#     # return the normalized dictionary
-#     return normalized
-
-def collate_fn_basic(batch):
-    em_vals = np.stack([x['em_vars'] for x in batch])
-    ctf_vals = np.stack([x['ctf_vars'] for x in batch])
-    ctl_vals = np.stack([x['ctl_vars'] for x in batch])
-    all_vals = np.hstack([ctf_vals, ctl_vals])
-    X = torch.from_numpy(all_vals)
-    context = torch.from_numpy(em_vals)
-    return zip(X, context)
-
-def collate_fn_sequential(batch):
-    em_vals = np.stack([x['em_vars'] for x in batch])
-    ct_vals = [torch.nn.utils.rnn.pad_sequence(x['ct_vars']) for x in batch]
-    ct_vals[0][i] = torch.nn.utils.rnn.pad_sequence(torch.from_numpy(ct_vals[0][i]),100)
-    
-    # unzip the batch into sequential variables and concatenate them along a new dimension
-    seq_vars = np.concatenate([np.stack(sample["ct_vars"], axis=0) for sample in batch], axis=1)
-    # get the lengths of each sequential variable
-    lengths = [len(seq_var) for seq_var in seq_vars]
-    # pad and pack the sequential variables
-    seq_vars = pad_sequence(seq_vars, batch_first=True)
-    seq_vars = pack_padded_sequence(seq_vars, lengths=lengths, batch_first=True)
-    # stack the embedding variables and single values
-    emb_vars = torch.stack(emb_vars)
-    sing_vals = torch.stack(sing_vals)
-    # return the stacked embedding variables, the padded and packed sequential variables and the stacked single values
-    return emb_vars, seq_vars, sing_vals
-
-def make_dataloader(data, em_dict, ct_dict, config, batch_size, model_type):
-    dataset = MyDataset(data, em_dict, ct_dict, config)
-    dataloader = MyDataLoader(dataset, batch_size, model_type)
-    return dataloader
-
-
-
-
 
 
 class BasicDataset(Dataset):
@@ -149,12 +62,9 @@ def make_seq_dataset(data, config):
     X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(data_utils.normalize(np.array(x['time_gap'], dtype='float32'), config['time_gap_mean'], config['time_gap_std'])) for x in data], batch_first=True)
     X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(data_utils.normalize(np.array(x['speed_m_s'], dtype='float32'), config['speed_m_s_mean'], config['speed_m_s_std'])) for x in data], batch_first=True)
     X = torch.from_numpy(X)
-    X = torch.nn.utils.rnn.pack_padded_sequence(X, seq_lens, batch_first=True, enforce_sorted=False)
-    # Embeddings
     context = torch.from_numpy(context)
-    # Prediction variable
+    # Prediction variable (speed of final step)
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(data_utils.normalize(np.array(x['speed_m_s'], dtype='float32'), config['speed_m_s_mean'], config['speed_m_s_std'])) for x in data], batch_first=True)
-    y = torch.nn.utils.rnn.pack_padded_sequence(y, seq_lens, batch_first=True, enforce_sorted=False)
     X = [(i,j) for i,j in zip(X,context)]
     dataset = BasicDataset((X,y))
     return dataset, mask
