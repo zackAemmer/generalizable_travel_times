@@ -70,17 +70,10 @@ def run_models(run_folder, network_folder):
         train_data = list(itertools.chain.from_iterable(train_data))
 
         # Construct dataloaders for Pytorch models
-        train_dataset = data_loader.make_dataset(train_data, config)
-        test_dataset = data_loader.make_dataset(test_data, config)
-
-        train_dataset_seq, train_seq_mask = data_loader.make_seq_dataset(train_data, config)
-        test_dataset_seq, test_seq_mask = data_loader.make_seq_dataset(test_data, config)
-
-        train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
-        test_dataloader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
-
-        train_dataloader_seq = DataLoader(train_dataset_seq, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
-        test_dataloader_seq = DataLoader(test_dataset_seq, batch_size=BATCH_SIZE, shuffle=False, pin_memory=False, num_workers=0)
+        train_dataloader = data_loader.make_dataloader(train_data, config, BATCH_SIZE, "basic")
+        test_dataloader = data_loader.make_dataloader(test_data, config, BATCH_SIZE, "basic")
+        train_dataloader_seq, train_seq_mask = data_loader.make_dataloader(train_data, config, BATCH_SIZE, "sequential")
+        test_dataloader_seq, test_seq_mask = data_loader.make_dataloader(test_data, config, BATCH_SIZE, "sequential")
         print(f"Successfully loaded {len(train_data)} training samples and {len(test_data)} testing samples.")
 
         # Define embedded variables for nn models

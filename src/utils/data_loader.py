@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 from utils import data_utils
 
@@ -68,3 +68,13 @@ def make_seq_dataset(data, config):
     X = [(i,j) for i,j in zip(X,context)]
     dataset = BasicDataset((X,y))
     return dataset, mask
+
+def make_dataloader(data, config, batch_size, task_type):
+    if task_type == "basic":
+        dataset = make_dataset(data, config)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=0)
+        return dataloader
+    elif task_type == "sequential":
+        dataset, mask = make_seq_dataset(data, config)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=0)
+        return dataloader, mask
