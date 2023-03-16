@@ -817,3 +817,13 @@ def convert_speeds_to_tts(speeds, dataloader, mask, config):
     masked_a = np.ma.masked_array(travel_times, mask)
     res = np.array(np.ma.sum(masked_a, axis=1))
     return res
+
+def create_tensor_mask(seq_lens):
+    """
+    Create a mask based on a tensor of sequence lengths.
+    """
+    max_len = max(seq_lens)
+    mask = torch.zeros(len(seq_lens), max_len, dtype=torch.bool)
+    for i, seq_len in enumerate(seq_lens):
+        mask[i, :seq_len] = 1
+    return mask

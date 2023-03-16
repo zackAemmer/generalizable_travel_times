@@ -29,9 +29,11 @@ def fit_to_data(model, train_dataloader, valid_dataloader, LEARN_RATE, EPOCHS, c
                 hidden_prev = torch.zeros(1, len(data[1]), model.hidden_size).to(device)
                 preds, hidden_prev = model(inputs, hidden_prev)
                 hidden_prev = hidden_prev.detach()
+                mask = data_utils.create_tensor_mask(inputs[2])
+                loss = model.loss_fn(preds, labels, mask)
             else:
                 preds = model(inputs)
-            loss = model.loss_fn(preds, labels)
+                loss = model.loss_fn(preds, labels)
             loss.backward()
             # Adjust weights, save loss
             optimizer.step()
@@ -64,10 +66,13 @@ def predict(model, dataloader, device, sequential_flag=False):
             hidden_prev = torch.zeros(1, len(vlabels), model.hidden_size).to(device)
             vpreds, hidden_prev = model(vinputs, hidden_prev)
             hidden_prev = hidden_prev.detach()
+            vmask = data_utils.create_tensor_mask(vinputs[2])
+            loss = model.loss_fn(vpreds, vlabels, vmask)
         else:
             vpreds = model(vinputs)
+            loss = model.loss_fn(vpreds, vlabels)
         # Accumulate batch loss
-        avg_batch_loss += model.loss_fn(vpreds, vlabels).item()
+        avg_batch_loss += loss.item()
         # Save predictions and labels
         labels.append(vlabels)
         preds.append(vpreds)

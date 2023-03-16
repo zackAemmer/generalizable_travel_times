@@ -9,8 +9,7 @@ from sklearn import metrics
 from tabulate import tabulate
 from torch.utils.data import DataLoader
 
-from models import (avg_speed, avg_speed_seq, basic_ff, basic_rnn, gru_rnn,
-                    persistent_speed, time_table)
+from models import (avg_speed, basic_ff, basic_rnn, gru_rnn, persistent_speed, time_table)
 from utils import data_loader, data_utils, model_utils
 
 
@@ -38,8 +37,8 @@ def run_models(run_folder, network_folder):
     print(f"Using device: {device}")
 
     ### Set run and hyperparameters
-    EPOCHS = 3
-    BATCH_SIZE = 256
+    EPOCHS = 30
+    BATCH_SIZE = 512
     LEARN_RATE = 1e-3
     HIDDEN_SIZE = 32
 
@@ -129,8 +128,6 @@ def run_models(run_folder, network_folder):
         ff_preds = data_utils.de_normalize(ff_preds, config['time_mean'], config['time_std'])
 
         #### FORECAST SPEED TASK ####
-        # TODO: check masking rnns
-
         ### Train persistent speed sequence model
         print("="*30)
         print(f"Training persistent speed model...")

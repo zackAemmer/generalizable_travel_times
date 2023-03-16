@@ -6,7 +6,7 @@ from torch import nn
 class BasicRNN(nn.Module):
     def __init__(self, input_size, output_size, hidden_size, batch_size, embed_dict):
         super(BasicRNN, self).__init__()
-        self.loss_fn = torch.nn.MSELoss()
+        self.loss_fn = MaskedMSELoss()
         self.input_size = input_size
         self.output_size = output_size
         self.hidden_size = hidden_size
@@ -40,7 +40,9 @@ class BasicRNN(nn.Module):
         driverID_embedded = self.driverID_em(x_em[:,2])
         tripID_embedded = self.tripID_em(x_em[:,3])
         # Get recurrent pred
-        out, hidden_prev = self.rnn(x_ct, hidden_prev)
+        x_ct_packed = torch.nn.utils.rnn.pack_padded_sequence(x_ct, x[2], batch_first=True)
+        out_packed, hidden_prev = self.rnn(x_ct_packed, hidden_prev)
+        out, _ = torch.nn.utils.rnn.pad_packed_sequence(out_packed, batch_first=True)
         # Reshape, add context, combine in linear layer
         embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
         embeddings = embeddings.repeat(1,out.shape[1],1)
@@ -48,3 +50,15 @@ class BasicRNN(nn.Module):
         out = self.linear(out)
         out = out.squeeze(2)
         return out, hidden_prev
+
+class MaskedMSELoss(nn.Module):
+    def __init__(self):
+        super(MaskedMSELoss, self).__init__()
+        self.mse_loss = nn.MSELoss(reduction='none')
+
+    def forward(self, input, target, mask):
+        loss = self.mse_loss(input, target)
+        loss = (loss * mask.float()).sum()
+        num_non_padded = mask.float().sum()
+        loss = loss / num_non_padded
+        return loss
