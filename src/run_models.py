@@ -37,8 +37,8 @@ def run_models(run_folder, network_folder):
     print(f"Using device: {device}")
 
     ### Set run and hyperparameters
-    EPOCHS = 30
-    BATCH_SIZE = 512
+    EPOCHS = 2
+    BATCH_SIZE = 2048
     LEARN_RATE = 1e-3
     HIDDEN_SIZE = 32
 
@@ -218,13 +218,13 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/throwaway/",
+        run_folder="./results/throwaway_small/",
         network_folder="kcm/"
     )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/throwaway/",
+        run_folder="./results/throwaway_small/",
         network_folder="atb/"
     )

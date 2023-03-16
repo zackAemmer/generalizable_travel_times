@@ -21,7 +21,7 @@ def fit_to_data(model, train_dataloader, valid_dataloader, LEARN_RATE, EPOCHS, c
         for i, data in enumerate(train_dataloader):
             # Every data instance is an input + label pair
             inputs, labels = data
-            inputs = [i.to(device) for i in inputs]
+            inputs[:2] = [i.to(device) for i in inputs[:2]]
             labels = labels.to(device)
             # Run forward/backward
             optimizer.zero_grad()
@@ -29,7 +29,7 @@ def fit_to_data(model, train_dataloader, valid_dataloader, LEARN_RATE, EPOCHS, c
                 hidden_prev = torch.zeros(1, len(data[1]), model.hidden_size).to(device)
                 preds, hidden_prev = model(inputs, hidden_prev)
                 hidden_prev = hidden_prev.detach()
-                mask = data_utils.create_tensor_mask(inputs[2])
+                mask = data_utils.create_tensor_mask(inputs[2]).to(device)
                 loss = model.loss_fn(preds, labels, mask)
             else:
                 preds = model(inputs)
@@ -59,14 +59,14 @@ def predict(model, dataloader, device, sequential_flag=False):
     for i, vdata in enumerate(dataloader):
         # Move data to device
         vinputs, vlabels = vdata
-        vinputs = [vi.to(device) for vi in vinputs]
+        vinputs[:2] = [vi.to(device) for vi in vinputs[:2]]
         vlabels = vlabels.to(device)
         # Make predictions
         if sequential_flag:
             hidden_prev = torch.zeros(1, len(vlabels), model.hidden_size).to(device)
             vpreds, hidden_prev = model(vinputs, hidden_prev)
             hidden_prev = hidden_prev.detach()
-            vmask = data_utils.create_tensor_mask(vinputs[2])
+            vmask = data_utils.create_tensor_mask(vinputs[2]).to(device)
             loss = model.loss_fn(vpreds, vlabels, vmask)
         else:
             vpreds = model(vinputs)

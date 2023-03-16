@@ -69,9 +69,9 @@ def sequential_collate(batch):
 def make_generic_dataloader(data, config, batch_size, task_type):
     dataset = GenericDataset(data, config)
     if task_type == "basic":
-        dataloader = DataLoader(dataset, collate_fn=basic_collate, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=0)
+        dataloader = DataLoader(dataset, collate_fn=basic_collate, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4)
     elif task_type == "sequential":
-        dataloader = DataLoader(dataset, collate_fn=sequential_collate, batch_size=batch_size, shuffle=False, pin_memory=False, num_workers=0)
+        dataloader = DataLoader(dataset, collate_fn=sequential_collate, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4)
     return dataloader
 
 def apply_normalization(sample, config):
