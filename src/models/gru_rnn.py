@@ -32,9 +32,8 @@ class GRU_RNN(nn.Module):
         )
 
     def forward(self, x, hidden_prev):
-        # Must mask out all features that cannot be known
-        x_ct = x[0][:,:,:5]
-        x_em = x[1]
+        x_em = x[0]
+        x_ct = x[1][:,:,:5] # Must remove all features that cannot be known
         # Embed categorical variables
         timeID_embedded = self.timeID_em(x_em[:,0])
         weekID_embedded = self.weekID_em(x_em[:,1])

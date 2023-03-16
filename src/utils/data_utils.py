@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import pyproj
 from sklearn import metrics
+import torch
 
 from utils import shape_utils
 
@@ -751,3 +752,68 @@ def shingle(trace_df, min_len, max_len):
     z = trace_df.copy()
     z['shingle_id'] = new_idx
     return z
+
+def extract_all_dataloader(dataloader, sequential_flag=False):
+    """
+    Get all contents of a dataloader from batches.
+    Consider removing and just using .dataset.content
+    """
+    all_context = []
+    all_X = []
+    all_y = []
+    seq_lens = []
+    for i, data in enumerate(dataloader):
+        data, y = data
+        context, X = data[:2]
+        all_context.append(context)
+        all_X.append(X)
+        all_y.append(y)
+        if sequential_flag:
+            seq_lens.append(data[2])
+    if sequential_flag:
+        # Pad batches to match batch w/longest sequence
+        max_len = max(torch.cat(seq_lens))
+        all_X = [torch.nn.functional.pad(tensor, (0, 0, 0, max_len - tensor.shape[1])) for tensor in all_X]
+        all_y = [torch.nn.functional.pad(tensor, (0, max_len - tensor.shape[1])) for tensor in all_y]
+        return torch.cat(all_context, dim=0), torch.cat(all_X, dim=0), torch.cat(all_y, dim=0), torch.cat(seq_lens, dim=0)
+    else:
+        return torch.cat(all_context, dim=0), torch.cat(all_X, dim=0), torch.cat(all_y, dim=0)
+
+def get_seq_info(data):
+    """
+    Get lengths and mask for sequence lengths in data.
+    """
+    seq_lens = [len(x['lats']) for x in data.dataset.content]
+    max_length = max(seq_lens)
+    mask = [[1] * length + [0] * (max_length - length) for length in seq_lens]
+    return seq_lens, np.array(mask, dtype='bool')
+
+def pad_tensors(tensor_list, pad_dim):
+    """
+    Pad list of tensors with unequal lengths on pad_dim and combine.
+    """
+    tensor_lens = [tensor.shape[pad_dim] for tensor in tensor_list]
+    max_len = max(tensor_lens)
+    total_dim = len(tensor_list[0].shape)
+    paddings = []
+    for tensor in tensor_list:
+        padding = list(0 for i in range(total_dim))
+        padding[pad_dim] = max_len - tensor.shape[pad_dim]
+        paddings.append(tuple(padding))
+    padded_tensor_list = [torch.nn.functional.pad(tensor, paddings[i]) for i, tensor in enumerate(tensor_list)]
+    padded_tensor_list = torch.cat(padded_tensor_list, dim=0)
+    return padded_tensor_list
+
+def convert_speeds_to_tts(speeds, dataloader, mask, config):
+    """
+    Convert a sequence of predicted speeds to travel times.
+    """
+    context, X, y, seq_lens = extract_all_dataloader(dataloader, sequential_flag=True)
+    dists = X[:,:,2].numpy()
+    dists = de_normalize(dists, config['dist_calc_km_mean'], config['dist_calc_km_std'])
+    # Replace speeds near 0.0 with small number
+    speeds[speeds<0.0001] = 0.0001
+    travel_times = dists*1000.0 / speeds
+    masked_a = np.ma.masked_array(travel_times, mask)
+    res = np.array(np.ma.sum(masked_a, axis=1))
+    return res
