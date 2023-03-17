@@ -42,10 +42,11 @@ class GRU_RNN(nn.Module):
         driverID_embedded = self.driverID_em(x_em[:,2])
         tripID_embedded = self.tripID_em(x_em[:,3])
         # Get recurrent pred
-        x_ct_packed = torch.nn.utils.rnn.pack_padded_sequence(x_ct, x[2], batch_first=True)
-        out_packed, hidden_prev = self.rnn(x_ct_packed, hidden_prev)
-        out, _ = torch.nn.utils.rnn.pad_packed_sequence(out_packed, batch_first=True)
-        # Reshape, add context, combine in linear layer
+        out, hidden_prev = self.rnn(x_ct, hidden_prev)
+        # x_ct_packed = torch.nn.utils.rnn.pack_padded_sequence(x_ct, x[2], batch_first=True)
+        # out_packed, hidden_prev = self.rnn(x_ct_packed, hidden_prev)
+        # out, _ = torch.nn.utils.rnn.pad_packed_sequence(out_packed, batch_first=True)
+        # Add context, combine in linear layer
         embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
         embeddings = embeddings.repeat(1,out.shape[1],1)
         out = torch.cat((out, embeddings), dim=2)

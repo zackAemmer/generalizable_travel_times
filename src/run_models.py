@@ -13,7 +13,7 @@ from models import (avg_speed, basic_ff, basic_rnn, gru_rnn, persistent_speed, t
 from utils import data_loader, data_utils, model_utils
 
 
-def run_models(run_folder, network_folder):
+def run_models(run_folder, network_folder, hyperparameters):
     """
     Train each of the specified models on bus data found in the data folder.
     The data folder is generated using prepare_run.py.
@@ -34,13 +34,15 @@ def run_models(run_folder, network_folder):
     #     device = torch.device("mps")
     else:
         device = torch.device("cpu")
+    NUM_WORKERS = 0
     print(f"Using device: {device}")
+    print(f"Using num_workers: {NUM_WORKERS}")
 
     ### Set run and hyperparameters
-    EPOCHS = 30
-    BATCH_SIZE = 512
-    LEARN_RATE = 1e-3
-    HIDDEN_SIZE = 32
+    EPOCHS = hyperparameters['EPOCHS']
+    BATCH_SIZE = hyperparameters['BATCH_SIZE']
+    LEARN_RATE = hyperparameters['LEARN_RATE']
+    HIDDEN_SIZE = hyperparameters['HIDDEN_SIZE']
 
     ### Load train/test data
     print("="*30)
@@ -69,18 +71,17 @@ def run_models(run_folder, network_folder):
         train_data = list(itertools.chain.from_iterable(train_data))
 
         # Construct dataloaders for Pytorch models
-        train_dataloader = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "basic")
-        test_dataloader = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "basic")
-        train_dataloader_seq = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "sequential")
-        test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "sequential")
+        train_dataloader = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "basic", NUM_WORKERS)
+        test_dataloader = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "basic", NUM_WORKERS)
+        train_dataloader_seq = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "sequential", NUM_WORKERS)
+        test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "sequential", NUM_WORKERS)
         train_lens, train_mask = data_utils.get_seq_info(train_dataloader_seq)
         test_lens, test_mask = data_utils.get_seq_info(test_dataloader_seq)
         
-        train_dataloader_seq_tt = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "sequential_tt")
-        test_dataloader_seq_tt = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "sequential_tt")
+        train_dataloader_seq_tt = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "sequential_tt", NUM_WORKERS)
+        test_dataloader_seq_tt = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "sequential_tt", NUM_WORKERS)
         train_lens_tt, train_mask_tt = data_utils.get_seq_info(train_dataloader_seq_tt)
         test_lens_tt, test_mask_tt = data_utils.get_seq_info(test_dataloader_seq_tt)
-
         print(f"Successfully loaded {len(train_data)} training samples and {len(test_data)} testing samples.")
 
         # Define embedded variables for nn models
@@ -174,10 +175,12 @@ def run_models(run_folder, network_folder):
         rnn_preds = data_utils.de_normalize(rnn_preds, config['time_calc_s_mean'], config['time_calc_s_std'])
 
         #### CALCULATE METRICS ####
-        # avg_seq_preds_tt = model_utils.convert_speeds_to_tts(avg_seq_preds, test_dataloader_seq, test_seq_mask, config)
         persistent_seq_preds_tt = data_utils.convert_speeds_to_tts(persistent_seq_preds, test_dataloader_seq, test_mask, config)
+        persistent_seq_labels_tt = data_utils.convert_speeds_to_tts(persistent_seq_labels, test_dataloader_seq, test_mask, config)
         rnn_base_preds_tt = data_utils.convert_speeds_to_tts(rnn_base_preds, test_dataloader_seq, test_mask, config)
+        rnn_base_labels_tt = data_utils.convert_speeds_to_tts(rnn_base_labels, test_dataloader_seq, test_mask, config)
         rnn_preds_tt = data_utils.aggregate_tts(rnn_preds, test_mask_tt)
+        rnn_labels_tt = data_utils.aggregate_tts(rnn_labels, test_mask)
 
         print("="*30)
         print(f"Saving model metrics from fold {fold_num}...")
@@ -224,13 +227,25 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/small/",
-        network_folder="kcm/"
+        run_folder="./results/debug/",
+        network_folder="kcm/",
+        hyperparameters={
+            "EPOCHS": 2,
+            "BATCH_SIZE": 512,
+            "LEARN_RATE": 1e-3,
+            "HIDDEN_SIZE": 32
+        }
     )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/small/",
-        network_folder="atb/"
+        run_folder="./results/debug/",
+        network_folder="atb/",
+        hyperparameters={
+            "EPOCHS": 2,
+            "BATCH_SIZE": 512,
+            "LEARN_RATE": 1e-3,
+            "HIDDEN_SIZE": 32
+        }
     )

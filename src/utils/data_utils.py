@@ -209,12 +209,13 @@ def calculate_trace_df(data, timezone, min_shingle_len=5):
     data = data.dropna() # Just a precaution
     data = data.groupby(['shingle_id']).filter(lambda x: len(x) >= min_shingle_len)
 
-    # Calculate values required by deeptte
-    unique_traj = data.groupby('shingle_id')
-    # Get cumulative values from trip start
-    data['time_cumulative_s'] = data.locationtime - unique_traj.locationtime.transform('min')
-    data['dist_cumulative_km'] = unique_traj['dist_calc_km'].cumsum()
-    data['dist_cumulative_km'] = data.dist_cumulative_km - unique_traj.dist_cumulative_km.transform('min')
+    # # Calculate values required by deeptte
+    # unique_traj = data.groupby('shingle_id')
+    # # Get cumulative values from trip start
+    # data['time_cumulative_s'] = data.locationtime - unique_traj.locationtime.transform('min')
+    # data['dist_cumulative_km'] = unique_traj['dist_calc_km'].cumsum()
+    # data['dist_cumulative_km'] = data.dist_cumulative_km - unique_traj.dist_cumulative_km.transform('min')
+
     # Time values for deeptte
     data['datetime'] = pd.to_datetime(data['locationtime'], unit='s', utc=True).map(lambda x: x.tz_convert(timezone))
     data['dateID'] = (data['datetime'].dt.day)
@@ -222,6 +223,20 @@ def calculate_trace_df(data, timezone, min_shingle_len=5):
     # (be careful with these last two as they change across the trajectory)
     data['timeID'] = (data['datetime'].dt.hour * 60) + (data['datetime'].dt.minute)
     data['timeID_s'] = (data['datetime'].dt.hour * 60 * 60) + (data['datetime'].dt.minute * 60) + (data['datetime'].dt.second)
+    # # Remove shingles that don't traverse more than a kilometer
+    # data = data.groupby(['shingle_id']).filter(lambda x: np.max(x.dist_cumulative_km) >= 1.0)
+    return data
+
+def calculate_cumulative_values(data):
+    """
+    Calculate values that accumulate across each trajectory.
+    """
+    unique_traj = data.groupby('shingle_id')
+    # Get cumulative values from trip start
+    data['time_cumulative_s'] = unique_traj['time_calc_s'].cumsum()
+    data['dist_cumulative_km'] = unique_traj['dist_calc_km'].cumsum()
+    data['time_cumulative_s'] = data.time_cumulative_s - unique_traj.time_cumulative_s.transform('min')
+    data['dist_cumulative_km'] = data.dist_cumulative_km - unique_traj.dist_cumulative_km.transform('min')
     # Remove shingles that don't traverse more than a kilometer
     data = data.groupby(['shingle_id']).filter(lambda x: np.max(x.dist_cumulative_km) >= 1.0)
     return data
@@ -797,11 +812,12 @@ def extract_all_dataloader(dataloader, sequential_flag=False):
     else:
         return torch.cat(all_context, dim=0), torch.cat(all_X, dim=0), torch.cat(all_y, dim=0)
 
-def get_seq_info(data):
+def get_seq_info(seq_dataloader):
     """
     Get lengths and mask for sequence lengths in data.
     """
-    seq_lens = [len(x['lats']) for x in data.dataset.content]
+    context, X, y, seq_lens = extract_all_dataloader(seq_dataloader, sequential_flag=True)
+    seq_lens = list(seq_lens.numpy())
     max_length = max(seq_lens)
     mask = [[1] * length + [0] * (max_length - length) for length in seq_lens]
     return seq_lens, np.array(mask, dtype='bool')
@@ -832,17 +848,19 @@ def convert_speeds_to_tts(speeds, dataloader, mask, config):
     # Replace speeds near 0.0 with small number
     speeds[speeds<0.0001] = 0.0001
     travel_times = dists*1000.0 / speeds
-    masked_a = np.ma.masked_array(travel_times, mask)
-    res = np.array(np.ma.sum(masked_a, axis=1))
+    res = aggregate_tts(travel_times, mask)
     return res
 
-def aggregate_tts(tts, mask):
+def aggregate_tts(tts, mask, drop_first=True):
     """
     Convert a sequence of predicted travel times to total travel time.
     """
-    masked_a = np.ma.masked_array(tts, mask)
-    res = np.array(np.ma.sum(masked_a, axis=1))
-    return res
+    if drop_first:
+        # The first point has a predicted tt, but don't sum it to match total time
+        mask[:,0] = False
+    masked_tts = (tts*mask)
+    total_tts = np.sum(masked_tts, axis=1)
+    return total_tts
 
 def create_tensor_mask(seq_lens):
     """

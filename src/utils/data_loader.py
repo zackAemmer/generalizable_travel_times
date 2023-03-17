@@ -21,6 +21,9 @@ class GenericDataset(Dataset):
 def basic_collate(batch):
     # Context variables to embed
     context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID'], x['tripID']]) for x in batch], dtype='int32')
+    # Last dimension is number of sequence variables below
+    seq_lens = [len(x['lats']) for x in batch]
+    max_len = max(seq_lens)
     X = np.zeros((len(batch), 8))
     # Sequence variables
     for i in range(len(batch)):
@@ -32,11 +35,17 @@ def basic_collate(batch):
         X[i,5] = batch[i]['stop_dist_km'][-1]
         X[i,6] = batch[i]['speed_m_s'][0]
         X[i,7] = batch[i]['dist']
-    X = torch.from_numpy(X).float()
-    context = torch.from_numpy(context).int()
+    X = torch.from_numpy(X)
+    context = torch.from_numpy(context)
     # Prediction variable (travel time from first to last observation)
-    y = torch.from_numpy(np.array([x['time'] for x in batch])).float()
-    return (context, X), y
+    y = torch.from_numpy(np.array([x['time'] for x in batch]))
+    # Sort all dataloaders so that they are consistent in the results
+    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
+    sorted_slens = sorted_slens.int()
+    context = context[sorted_indices,:].int()
+    X = X[sorted_indices,:].float()
+    y = y[sorted_indices].float()
+    return [context, X], y
 
 def sequential_collate(batch):
     # Context variables to embed
@@ -62,7 +71,7 @@ def sequential_collate(batch):
     context = context[sorted_indices,:].int()
     X = X[sorted_indices,:,:].float()
     y = y[sorted_indices,:].float()
-    return (context, X, sorted_slens), y
+    return [context, X, sorted_slens], y
 
 def sequential_tt_collate(batch):
     # Context variables to embed
@@ -91,16 +100,20 @@ def sequential_tt_collate(batch):
     context = context[sorted_indices,:].int()
     X = X[sorted_indices,:,:].float()
     y = y[sorted_indices,:].float()
-    return (context, X, sorted_slens), y
+    return [context, X, sorted_slens], y
 
-def make_generic_dataloader(data, config, batch_size, task_type):
+def make_generic_dataloader(data, config, batch_size, task_type, num_workers):
     dataset = GenericDataset(data, config)
+    if num_workers > 0:
+        pin_memory=True
+    else:
+        pin_memory=False
     if task_type == "basic":
-        dataloader = DataLoader(dataset, collate_fn=basic_collate, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=10)
+        dataloader = DataLoader(dataset, collate_fn=basic_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
     elif task_type == "sequential":
-        dataloader = DataLoader(dataset, collate_fn=sequential_collate, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=10)
+        dataloader = DataLoader(dataset, collate_fn=sequential_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
     elif task_type == "sequential_tt":
-        dataloader = DataLoader(dataset, collate_fn=sequential_tt_collate, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=10)
+        dataloader = DataLoader(dataset, collate_fn=sequential_tt_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
     return dataloader
 
 def apply_normalization(sample, config):
