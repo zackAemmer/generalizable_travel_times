@@ -32,10 +32,10 @@ def basic_collate(batch):
         X[i,5] = batch[i]['stop_dist_km'][-1]
         X[i,6] = batch[i]['speed_m_s'][0]
         X[i,7] = batch[i]['dist']
-    X = torch.from_numpy(X)
-    context = torch.from_numpy(context)
+    X = torch.from_numpy(X).float()
+    context = torch.from_numpy(context).int()
     # Prediction variable (travel time from first to last observation)
-    y = torch.from_numpy(np.array([x['time'] for x in batch]))
+    y = torch.from_numpy(np.array([x['time'] for x in batch])).float()
     return (context, X), y
 
 def sequential_collate(batch):
@@ -44,7 +44,6 @@ def sequential_collate(batch):
     # Last dimension is number of sequence variables below
     seq_lens = [len(x['lats']) for x in batch]
     max_len = max(seq_lens)
-    # mask = np.array([np.concatenate([np.repeat(True,slen), np.repeat(False,max_len-slen)]) for slen in seq_lens], dtype='bool')
     X = torch.zeros((len(batch), max_len, 7))
     # Sequence variables
     X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lats']) for x in batch], batch_first=True)
@@ -54,24 +53,54 @@ def sequential_collate(batch):
     X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
     # Used for persistent model, do not use in RNN
     X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['speed_m_s']) for x in batch], batch_first=True)
-    # X = torch.from_numpy(X)
     context = torch.from_numpy(context)
     # Prediction variable (speed of each step)
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['speed_m_s']) for x in batch], batch_first=True)
     # Sort all by sequence length descending, for potential packing of each batch
     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    sorted_slens = sorted_slens.type(torch.int32)
-    context = context[sorted_indices,:]
-    X = X[sorted_indices,:,:]
-    y = y[sorted_indices,:]
+    sorted_slens = sorted_slens.int()
+    context = context[sorted_indices,:].int()
+    X = X[sorted_indices,:,:].float()
+    y = y[sorted_indices,:].float()
+    return (context, X, sorted_slens), y
+
+def sequential_tt_collate(batch):
+    # Context variables to embed
+    context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID'], x['tripID']]) for x in batch], dtype='int32')
+    # Last dimension is number of sequence variables below
+    seq_lens = [len(x['lats']) for x in batch]
+    max_len = max(seq_lens)
+    X = torch.zeros((len(batch), max_len, 9))
+    # Sequence variables
+    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lats']) for x in batch], batch_first=True)
+    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lngs']) for x in batch], batch_first=True)
+    X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
+    X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
+    X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
+    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lat']) for x in batch], batch_first=True)
+    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lon']) for x in batch], batch_first=True)
+    X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
+    # Used for persistent model, do not use in RNN
+    X[:,:,8] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['speed_m_s']) for x in batch], batch_first=True)
+    context = torch.from_numpy(context)
+    # Prediction variable (speed of each step)
+    y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
+    # Sort all by sequence length descending, for potential packing of each batch
+    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
+    sorted_slens = sorted_slens.int()
+    context = context[sorted_indices,:].int()
+    X = X[sorted_indices,:,:].float()
+    y = y[sorted_indices,:].float()
     return (context, X, sorted_slens), y
 
 def make_generic_dataloader(data, config, batch_size, task_type):
     dataset = GenericDataset(data, config)
     if task_type == "basic":
-        dataloader = DataLoader(dataset, collate_fn=basic_collate, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4)
+        dataloader = DataLoader(dataset, collate_fn=basic_collate, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=10)
     elif task_type == "sequential":
-        dataloader = DataLoader(dataset, collate_fn=sequential_collate, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=4)
+        dataloader = DataLoader(dataset, collate_fn=sequential_collate, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=10)
+    elif task_type == "sequential_tt":
+        dataloader = DataLoader(dataset, collate_fn=sequential_tt_collate, batch_size=batch_size, shuffle=False, pin_memory=True, num_workers=10)
     return dataloader
 
 def apply_normalization(sample, config):
@@ -79,8 +108,10 @@ def apply_normalization(sample, config):
         # DeepTTE is inconsistent with sample and config naming schema.
         # These variables are in the sample (as cumulatives), but not the config.
         # The same variable names are in the config, but refer to non-cumulative values.
-        if var_name in ["time_gap","dist_gap"]:
-            continue
+        if var_name == "time_gap":
+            sample[var_name] = data_utils.normalize(np.array(sample[var_name]), config[f"time_cumulative_s_mean"], config[f"time_cumulative_s_std"])
+        elif var_name == "dist_gap":
+            sample[var_name] = data_utils.normalize(np.array(sample[var_name]), config["dist_cumulative_km_mean"], config["dist_cumulative_km_std"])
         elif f"{var_name}_mean" in config.keys():
-            sample[var_name] = data_utils.normalize(np.array(sample[var_name]), config[f"{var_name}_mean"], config[f"{var_name}_mean"])
+            sample[var_name] = data_utils.normalize(np.array(sample[var_name]), config[f"{var_name}_mean"], config[f"{var_name}_std"])
     return sample

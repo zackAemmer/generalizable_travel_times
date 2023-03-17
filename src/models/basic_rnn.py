@@ -2,11 +2,13 @@ import numpy as np
 import torch
 from torch import nn
 
+from models import masked_loss
+
 
 class BasicRNN(nn.Module):
     def __init__(self, input_size, output_size, hidden_size, batch_size, embed_dict):
         super(BasicRNN, self).__init__()
-        self.loss_fn = MaskedMSELoss()
+        self.loss_fn = masked_loss.MaskedMSELoss()
         self.input_size = input_size
         self.output_size = output_size
         self.hidden_size = hidden_size
@@ -50,15 +52,3 @@ class BasicRNN(nn.Module):
         out = self.linear(out)
         out = out.squeeze(2)
         return out, hidden_prev
-
-class MaskedMSELoss(nn.Module):
-    def __init__(self):
-        super(MaskedMSELoss, self).__init__()
-        self.mse_loss = nn.MSELoss(reduction='none')
-
-    def forward(self, input, target, mask):
-        loss = self.mse_loss(input, target)
-        loss = (loss * mask.float()).sum()
-        num_non_padded = mask.float().sum()
-        loss = loss / num_non_padded
-        return loss

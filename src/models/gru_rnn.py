@@ -2,11 +2,13 @@ import numpy as np
 import torch
 from torch import nn
 
+from models import masked_loss
+
 
 class GRU_RNN(nn.Module):
     def __init__(self, input_size, output_size, hidden_size, batch_size, embed_dict):
         super(GRU_RNN, self).__init__()
-        self.loss_fn = MaskedMSELoss()
+        self.loss_fn = masked_loss.MaskedMSELoss()
         self.input_size = input_size
         self.output_size = output_size
         self.hidden_size = hidden_size
@@ -33,7 +35,7 @@ class GRU_RNN(nn.Module):
 
     def forward(self, x, hidden_prev):
         x_em = x[0]
-        x_ct = x[1][:,:,:5] # Must remove all features that cannot be known
+        x_ct = x[1][:,:,:8] # Must remove all features that cannot be known
         # Embed categorical variables
         timeID_embedded = self.timeID_em(x_em[:,0])
         weekID_embedded = self.weekID_em(x_em[:,1])
@@ -50,17 +52,3 @@ class GRU_RNN(nn.Module):
         out = self.linear(out)
         out = out.squeeze(2)
         return out, hidden_prev
-    
-    mse_loss = nn.MSELoss(reduction='none')
-
-class MaskedMSELoss(nn.Module):
-    def __init__(self):
-        super(MaskedMSELoss, self).__init__()
-        self.mse_loss = nn.MSELoss(reduction='none')
-
-    def forward(self, input, target, mask):
-        loss = self.mse_loss(input, target)
-        loss = (loss * mask.float()).sum()
-        num_non_padded = mask.float().sum()
-        loss = loss / num_non_padded
-        return loss

@@ -37,8 +37,8 @@ def run_models(run_folder, network_folder):
     print(f"Using device: {device}")
 
     ### Set run and hyperparameters
-    EPOCHS = 2
-    BATCH_SIZE = 2048
+    EPOCHS = 30
+    BATCH_SIZE = 512
     LEARN_RATE = 1e-3
     HIDDEN_SIZE = 32
 
@@ -75,6 +75,12 @@ def run_models(run_folder, network_folder):
         test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "sequential")
         train_lens, train_mask = data_utils.get_seq_info(train_dataloader_seq)
         test_lens, test_mask = data_utils.get_seq_info(test_dataloader_seq)
+        
+        train_dataloader_seq_tt = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "sequential_tt")
+        test_dataloader_seq_tt = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "sequential_tt")
+        train_lens_tt, train_mask_tt = data_utils.get_seq_info(train_dataloader_seq_tt)
+        test_lens_tt, test_mask_tt = data_utils.get_seq_info(test_dataloader_seq_tt)
+
         print(f"Successfully loaded {len(train_data)} training samples and {len(test_data)} testing samples.")
 
         # Define embedded variables for nn models
@@ -155,23 +161,23 @@ def run_models(run_folder, network_folder):
         print("="*30)
         print(f"Training rnn model...")
         rnn_model = gru_rnn.GRU_RNN(
-            5,
+            8,
             1,
             HIDDEN_SIZE,
             BATCH_SIZE,
             embed_dict
         ).to(device)
-        rnn_train_losses, rnn_test_losses = model_utils.fit_to_data(rnn_model, train_dataloader_seq, test_dataloader_seq, LEARN_RATE, EPOCHS, config, device, sequential_flag=True)
+        rnn_train_losses, rnn_test_losses = model_utils.fit_to_data(rnn_model, train_dataloader_seq_tt, test_dataloader_seq_tt, LEARN_RATE, EPOCHS, config, device, sequential_flag=True)
         torch.save(rnn_model.state_dict(), run_folder + network_folder + f"models/rnn_model_{fold_num}.pt")
-        rnn_labels, rnn_preds, rnn_avg_loss = model_utils.predict(rnn_model, test_dataloader_seq, device, sequential_flag=True)
-        rnn_labels = data_utils.de_normalize(rnn_labels, config['speed_m_s_mean'], config['speed_m_s_std'])
-        rnn_preds = data_utils.de_normalize(rnn_preds, config['speed_m_s_mean'], config['speed_m_s_std'])
+        rnn_labels, rnn_preds, rnn_avg_loss = model_utils.predict(rnn_model, test_dataloader_seq_tt, device, sequential_flag=True)
+        rnn_labels = data_utils.de_normalize(rnn_labels, config['time_calc_s_mean'], config['time_calc_s_std'])
+        rnn_preds = data_utils.de_normalize(rnn_preds, config['time_calc_s_mean'], config['time_calc_s_std'])
 
         #### CALCULATE METRICS ####
         # avg_seq_preds_tt = model_utils.convert_speeds_to_tts(avg_seq_preds, test_dataloader_seq, test_seq_mask, config)
         persistent_seq_preds_tt = data_utils.convert_speeds_to_tts(persistent_seq_preds, test_dataloader_seq, test_mask, config)
         rnn_base_preds_tt = data_utils.convert_speeds_to_tts(rnn_base_preds, test_dataloader_seq, test_mask, config)
-        rnn_preds_tt = data_utils.convert_speeds_to_tts(rnn_preds, test_dataloader_seq, test_mask, config)
+        rnn_preds_tt = data_utils.aggregate_tts(rnn_preds, test_mask_tt)
 
         print("="*30)
         print(f"Saving model metrics from fold {fold_num}...")
@@ -212,19 +218,19 @@ def run_models(run_folder, network_folder):
 
 
 if __name__=="__main__":
-    torch.set_default_dtype(torch.float64)
+    torch.set_default_dtype(torch.float)
 
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/throwaway_small/",
+        run_folder="./results/small/",
         network_folder="kcm/"
     )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/throwaway_small/",
+        run_folder="./results/small/",
         network_folder="atb/"
     )

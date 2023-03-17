@@ -293,16 +293,15 @@ def get_scheduled_arrival(trip_ids, lons, lats, gtfs_data):
         id_to_points.setdefault(point[2],[]).append(point)
 
     # For each point find the closest stop that shares the trip_id
-    results = []
-    for point in data:
+    results = np.zeros((len(data), 5), dtype=object)
+    for i, point in enumerate(data):
         corresponding_points = np.vstack(id_to_points.get(point[2], []))
         point = np.expand_dims(point, 0)
         # Find closest point and add to results
         closest_point_dist, closest_point_idx = shape_utils.get_closest_point(corresponding_points[:,0:2], point[:,0:2])
         closest_point = corresponding_points[closest_point_idx]
         closest_point = np.append(closest_point, closest_point_dist * 111)
-        results.append(closest_point)
-    results = np.vstack(results)
+        results[i,:] = closest_point
     return results[:,4], results[:,3], results[:,0], results[:,1]
 
 def remap_ids(df_list, id_col):
@@ -326,11 +325,14 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
     trace_data: dataframe with bus trajectories
     Returns: path to json file where deeptte trajectories are saved.
     """    
-    # Group by the desired column
+    # Group by the desired column use correct naming schema
+    # These will be trip-totals
     trace_data['dist'] = trace_data['dist_cumulative_km']
     trace_data['time'] = trace_data['time_cumulative_s']
+    # Cumulative values
     trace_data['dist_gap'] = trace_data['dist_cumulative_km']
     trace_data['time_gap'] = trace_data['time_cumulative_s']
+    # Lists
     trace_data['lats'] = trace_data['lat']
     trace_data['lngs'] = trace_data['lon']
     trace_data['vehicleID'] = trace_data['vehicle_id_recode']
@@ -340,12 +342,13 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
 
     # Get necessary features as scalar or lists
     result = groups.agg({
+        # Cumulative point time/dist
         'time_gap': lambda x: x.tolist(),
         'dist_gap': lambda x: x.tolist(),
+        # Trip time/dist
         'time': 'max',
         'dist': 'max',
-        'lats': lambda x: x.tolist(),
-        'lngs': lambda x: x.tolist(),
+        # IDs
         'vehicleID': 'min',
         'tripID': 'min',
         'weekID': 'min',
@@ -353,11 +356,18 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
         'dateID': 'min',
         'trip_id': 'min',
         'file': 'min',
+        # Individual point time/dist
+        'lats': lambda x: x.tolist(),
+        'lngs': lambda x: x.tolist(),
         'speed_m_s': lambda x: x.tolist(),
         'time_calc_s': lambda x: x.tolist(),
         'dist_calc_km': lambda x: x.tolist(),
+        'bearing': lambda x: x.tolist(),
+        # Trip start time
         'trip_start_timeID_s': 'min',
+        # Trip ongoing time
         'timeID_s': lambda x: x.tolist(),
+        # Nearest stop
         'stop_lat': lambda x: x.tolist(),
         'stop_lon': lambda x: x.tolist(),
         'stop_dist_km': lambda x: x.tolist(),
@@ -367,19 +377,16 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
     # Convert the DataFrame to a dictionary with the original format
     if is_test:
         print(f"Saving formatted data to '{deeptte_formatted_path}', across 1 testing file...")
-        out_file = open(deeptte_formatted_path+"test", mode='a')
-        for idx, row in result.iterrows():
-                json.dump(row.to_dict(), out_file)
-                out_file.write("\n")
-        out_file.close()
+        result_json_string = result.to_json(orient='records', lines=True)
+        with open(deeptte_formatted_path+"test", mode='w+') as out_file:
+            out_file.write(result_json_string)
     else:
         print(f"Saving formatted data to '{deeptte_formatted_path}', across {n_folds} training files...")
-        file_list = [open(deeptte_formatted_path+"train_0"+str(j), mode='a') for j in range(n_folds)]
-        for idx, row in result.iterrows():
-            j = idx % n_folds
-            json.dump(row.to_dict(), file_list[j])
-            file_list[j].write("\n")
-        _ = [f.close() for f in file_list]
+        dfs = np.array_split(result, n_folds)
+        for i, df in enumerate(dfs):
+            df_json_string = df.to_json(orient='records', lines=True)
+            with open(deeptte_formatted_path+"train_0"+str(i), mode='w+') as out_file:
+                out_file.write(df_json_string)
     return trace_data
 
 def get_summary_config(trace_data, n_unique_veh, n_unique_trip, gtfs_folder, n_folds):
@@ -391,24 +398,36 @@ def get_summary_config(trace_data, n_unique_veh, n_unique_trip, gtfs_folder, n_f
     # config.json
     grouped = trace_data.groupby('shingle_id')
     summary_dict = {
-        # DeepTTE
+        # DeepTTE variables:
+        # Total trip values
+        "time_mean": np.mean(grouped.max()[['time_cumulative_s']].values.flatten()),
+        "time_std": np.std(grouped.max()[['time_cumulative_s']].values.flatten()),
+        "dist_mean": np.mean(grouped.max()[['dist_cumulative_km']].values.flatten()),
+        'dist_std': np.std(grouped.max()[['dist_cumulative_km']].values.flatten()),
+        # Individual point values (no cumulative)
         'time_gap_mean': np.mean(trace_data['time_calc_s']),
         'time_gap_std': np.std(trace_data['time_calc_s']),
         'dist_gap_mean': np.mean(trace_data['dist_calc_km']),
         'dist_gap_std': np.std(trace_data['dist_calc_km']),
-        "dist_mean": np.mean(grouped.max()[['dist_cumulative_km']].values.flatten()),
-        'dist_std': np.std(grouped.max()[['dist_cumulative_km']].values.flatten()),
         'lngs_mean': np.mean(trace_data['lon']),
         'lngs_std': np.std(trace_data['lon']),
         'lats_mean': np.mean(trace_data['lat']),
         "lats_std": np.std(trace_data['lat']),
-        "time_mean": np.mean(grouped.max()[['time_cumulative_s']].values.flatten()),
-        "time_std": np.std(grouped.max()[['time_cumulative_s']].values.flatten()),
-        # Others
+        # Other variables:
         "speed_m_s_mean": np.mean(trace_data['speed_m_s']),
         "speed_m_s_std": np.std(trace_data['speed_m_s']),
+        "bearing_mean": np.mean(trace_data['bearing']),
+        "bearing_std": np.std(trace_data['bearing']),
+        # Normalization for both cumulative and individual time/dist values
+        "dist_cumulative_km_mean": np.mean(trace_data['dist_cumulative_km']),
+        "dist_cumulative_km_std": np.std(trace_data['dist_cumulative_km']),
+        "time_cumulative_s_mean": np.mean(trace_data['time_cumulative_s']),
+        "time_cumulative_s_std": np.std(trace_data['time_cumulative_s']),
         "dist_calc_km_mean": np.mean(trace_data['dist_calc_km']),
         "dist_calc_km_std": np.std(trace_data['dist_calc_km']),
+        "time_calc_s_mean": np.mean(trace_data['time_calc_s']),
+        "time_calc_s_std": np.std(trace_data['time_calc_s']),
+        # Nearest stop
         "stop_dist_km_mean": np.mean(trace_data['stop_dist_km']),
         "stop_dist_km_std": np.std(trace_data['stop_dist_km']),
         "scheduled_time_s_mean": np.mean(grouped.max()[['scheduled_time_s']].values.flatten()),
@@ -756,7 +775,6 @@ def shingle(trace_df, min_len, max_len):
 def extract_all_dataloader(dataloader, sequential_flag=False):
     """
     Get all contents of a dataloader from batches.
-    Consider removing and just using .dataset.content
     """
     all_context = []
     all_X = []
@@ -815,6 +833,14 @@ def convert_speeds_to_tts(speeds, dataloader, mask, config):
     speeds[speeds<0.0001] = 0.0001
     travel_times = dists*1000.0 / speeds
     masked_a = np.ma.masked_array(travel_times, mask)
+    res = np.array(np.ma.sum(masked_a, axis=1))
+    return res
+
+def aggregate_tts(tts, mask):
+    """
+    Convert a sequence of predicted travel times to total travel time.
+    """
+    masked_a = np.ma.masked_array(tts, mask)
     res = np.array(np.ma.sum(masked_a, axis=1))
     return res
 
