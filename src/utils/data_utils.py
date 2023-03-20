@@ -186,36 +186,52 @@ def combine_pkl_data(folder, file_list, given_names):
     data = data.sort_values(['file','trip_id','locationtime'], ascending=True)
     return data, no_data_list
 
-def calculate_trace_df(data, timezone, min_shingle_len=5):
+def calculate_trace_df(data, timezone, remove_stopped_pts=True):
     """
     Calculate difference in metrics between two consecutive trip points.
+    This is the only place where points are filtered rather than entire shingles.
     data: pandas df with all bus trips
     timezone: string for timezone the data were collected in
+    remove_stopeed_pts: whether to include consecutive points with no bus movement
     Returns: combination of original point values, and new _diff values
     """
+    # Some points with collection issues
+    data = data[data['lat']!=0]
+    data = data[data['lon']!=0]
     # Calculate feature values between consecutive points, assign to the latter point
     data['speed_m_s'], data['dist_calc_m'], data['time_calc_s'], data['bearing'] = calculate_trip_speeds(data)
-    # Remove first point of every trip, since its features are based on a different trip
-    # This should come after the feature calculations otherwise we would have to remove first points again
+    # Remove first point of every trip (not shingle), since its features are based on a different trip
     data = data.groupby(['file','trip_id'], as_index=False).apply(lambda group: group.iloc[1:,:])
-    # Remove any points which seem to be erroneous. This may lead to gaps in the shingles.
+    # Remove any points which seem to be erroneous or repeated
     data = data[data['dist_calc_m']>=0.0]
     data = data[data['dist_calc_m']<5000.0]
-    data = data[data['time_calc_s']>=0.0]
+    data = data[data['time_calc_s']>0.0]
     data = data[data['time_calc_s']<120.0]
     data = data[data['speed_m_s']>=0.0]
     data = data[data['speed_m_s']<35.0]
+    if remove_stopped_pts:
+        data = data[data['dist_calc_m']>0.0]
+        data = data[data['speed_m_s']>0.0]
+    # Now error points are removed, recalculate time and speed features
+    # From here out, must filter shingles in order to not change time/dist calcs
+    # Note that any point filtering necessitates recalculating travel times for individual points
+    data['speed_m_s'], data['dist_calc_m'], data['time_calc_s'], data['bearing'] = calculate_trip_speeds(data)
+    data = data.groupby(['shingle_id'], as_index=False).apply(lambda group: group.iloc[1:,:])
+    # Remove (shingles this time) based on final calculation of speeds, distances, times
+    invalid_shingles = []
+    invalid_shingles.append(data[data['dist_calc_m']<0.0].shingle_id)
+    invalid_shingles.append(data[data['dist_calc_m']>5000.0].shingle_id)
+    invalid_shingles.append(data[data['time_calc_s']<=0.0].shingle_id)
+    invalid_shingles.append(data[data['time_calc_s']>120.0].shingle_id)
+    invalid_shingles.append(data[data['speed_m_s']<0.0].shingle_id)
+    invalid_shingles.append(data[data['speed_m_s']>35.0].shingle_id)
+    if remove_stopped_pts:
+        invalid_shingles.append(data[data['dist_calc_m']<=0.0].shingle_id)
+        invalid_shingles.append(data[data['speed_m_s']<=0.0].shingle_id)
+    invalid_shingles = pd.concat(invalid_shingles).values
+    data = data[~data['shingle_id'].isin(invalid_shingles)]
     data['dist_calc_km'] = data['dist_calc_m'] / 1000.0
-    data = data.dropna() # Just a precaution
-    data = data.groupby(['shingle_id']).filter(lambda x: len(x) >= min_shingle_len)
-
-    # # Calculate values required by deeptte
-    # unique_traj = data.groupby('shingle_id')
-    # # Get cumulative values from trip start
-    # data['time_cumulative_s'] = data.locationtime - unique_traj.locationtime.transform('min')
-    # data['dist_cumulative_km'] = unique_traj['dist_calc_km'].cumsum()
-    # data['dist_cumulative_km'] = data.dist_cumulative_km - unique_traj.dist_cumulative_km.transform('min')
-
+    data = data.dropna()
     # Time values for deeptte
     data['datetime'] = pd.to_datetime(data['locationtime'], unit='s', utc=True).map(lambda x: x.tz_convert(timezone))
     data['dateID'] = (data['datetime'].dt.day)
@@ -223,8 +239,6 @@ def calculate_trace_df(data, timezone, min_shingle_len=5):
     # (be careful with these last two as they change across the trajectory)
     data['timeID'] = (data['datetime'].dt.hour * 60) + (data['datetime'].dt.minute)
     data['timeID_s'] = (data['datetime'].dt.hour * 60 * 60) + (data['datetime'].dt.minute * 60) + (data['datetime'].dt.second)
-    # # Remove shingles that don't traverse more than a kilometer
-    # data = data.groupby(['shingle_id']).filter(lambda x: np.max(x.dist_cumulative_km) >= 1.0)
     return data
 
 def calculate_cumulative_values(data):
@@ -237,8 +251,9 @@ def calculate_cumulative_values(data):
     data['dist_cumulative_km'] = unique_traj['dist_calc_km'].cumsum()
     data['time_cumulative_s'] = data.time_cumulative_s - unique_traj.time_cumulative_s.transform('min')
     data['dist_cumulative_km'] = data.dist_cumulative_km - unique_traj.dist_cumulative_km.transform('min')
-    # Remove shingles that don't traverse more than a kilometer
+    # Remove shingles that don't traverse more than a kilometer, or have less than n points
     data = data.groupby(['shingle_id']).filter(lambda x: np.max(x.dist_cumulative_km) >= 1.0)
+    data = data.groupby(['shingle_id']).filter(lambda x: len(x) >= 5)
     return data
 
 def parallel_clean_trace_df_w_timetables(args):
@@ -846,7 +861,7 @@ def convert_speeds_to_tts(speeds, dataloader, mask, config):
     dists = X[:,:,2].numpy()
     dists = de_normalize(dists, config['dist_calc_km_mean'], config['dist_calc_km_std'])
     # Replace speeds near 0.0 with small number
-    speeds[speeds<0.0001] = 0.0001
+    speeds[speeds<=0.0] = 0.000001
     travel_times = dists*1000.0 / speeds
     res = aggregate_tts(travel_times, mask)
     return res

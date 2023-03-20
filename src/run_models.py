@@ -104,7 +104,7 @@ def run_models(run_folder, network_folder, hyperparameters):
             }
         }
 
-        #### TRAVEL TIME TASK ####
+        #### TOTAL TRAVEL TIME TASK ####
         ### Train average time model
         print("="*30)
         print(f"Training average hourly speed model...")
@@ -134,11 +134,11 @@ def run_models(run_folder, network_folder, hyperparameters):
         ff_labels = data_utils.de_normalize(ff_labels, config['time_mean'], config['time_std'])
         ff_preds = data_utils.de_normalize(ff_preds, config['time_mean'], config['time_std'])
 
-        #### FORECAST SPEED TASK ####
+        #### FORECAST TASK ####
         ### Train persistent speed sequence model
         print("="*30)
         print(f"Training persistent speed model...")
-        persistent_seq_model = persistent_speed.PersistentSpeedSeqModel(config, min_value=3.0)
+        persistent_seq_model = persistent_speed.PersistentSpeedSeqModel(config, 2.0)
         persistent_seq_model.save_to(f"{run_folder}{network_folder}models/persistent_seq_model_{fold_num}.pkl")
         persistent_seq_labels, persistent_seq_preds = persistent_seq_model.predict(test_dataloader_seq)
 
@@ -230,7 +230,7 @@ if __name__=="__main__":
         run_folder="./results/debug/",
         network_folder="kcm/",
         hyperparameters={
-            "EPOCHS": 2,
+            "EPOCHS": 30,
             "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
@@ -243,7 +243,7 @@ if __name__=="__main__":
         run_folder="./results/debug/",
         network_folder="atb/",
         hyperparameters={
-            "EPOCHS": 2,
+            "EPOCHS": 40,
             "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
