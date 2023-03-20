@@ -47,7 +47,7 @@ def basic_collate(batch):
     y = y[sorted_indices].float()
     return [context, X], y
 
-def sequential_collate(batch):
+def sequential_spd_collate(batch):
     # Context variables to embed
     context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID'], x['tripID']]) for x in batch], dtype='int32')
     # Last dimension is number of sequence variables below
@@ -108,8 +108,8 @@ def make_generic_dataloader(data, config, batch_size, task_type, num_workers):
         pin_memory=False
     if task_type == "basic":
         dataloader = DataLoader(dataset, collate_fn=basic_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
-    elif task_type == "sequential":
-        dataloader = DataLoader(dataset, collate_fn=sequential_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
+    elif task_type == "sequential_spd":
+        dataloader = DataLoader(dataset, collate_fn=sequential_spd_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
     elif task_type == "sequential_tt":
         dataloader = DataLoader(dataset, collate_fn=sequential_tt_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
     return dataloader
