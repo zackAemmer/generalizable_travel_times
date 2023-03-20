@@ -147,7 +147,7 @@ def run_models(run_folder, network_folder, hyperparameters):
         print("="*30)
         print(f"Training basic rnn model...")
         rnn_base_model = basic_rnn.Base_RNN(
-            5,
+            8,
             1,
             HIDDEN_SIZE,
             BATCH_SIZE,
