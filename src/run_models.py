@@ -30,11 +30,12 @@ def run_models(run_folder, network_folder, hyperparameters):
 
     if torch.cuda.is_available():
         device = torch.device("cuda")
+        NUM_WORKERS = 10
     # elif torch.backends.mps.is_available():
     #     device = torch.device("mps")
     else:
         device = torch.device("cpu")
-    NUM_WORKERS = 0
+        NUM_WORKERS = 0
     print(f"Using device: {device}")
     print(f"Using num_workers: {NUM_WORKERS}")
 
@@ -227,7 +228,7 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/debug/",
+        run_folder="./results/small/",
         network_folder="kcm/",
         hyperparameters={
             "EPOCHS": 30,
@@ -240,10 +241,10 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/debug/",
+        run_folder="./results/small/",
         network_folder="atb/",
         hyperparameters={
-            "EPOCHS": 40,
+            "EPOCHS": 30,
             "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
