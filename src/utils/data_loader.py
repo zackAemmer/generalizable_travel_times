@@ -53,15 +53,18 @@ def sequential_spd_collate(batch):
     # Last dimension is number of sequence variables below
     seq_lens = [len(x['lats']) for x in batch]
     max_len = max(seq_lens)
-    X = torch.zeros((len(batch), max_len, 7))
+    X = torch.zeros((len(batch), max_len, 9))
     # Sequence variables
     X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lats']) for x in batch], batch_first=True)
     X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lngs']) for x in batch], batch_first=True)
     X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
     X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
     X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
+    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lat']) for x in batch], batch_first=True)
+    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lon']) for x in batch], batch_first=True)
+    X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
     # Used for persistent model, do not use in RNN
-    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['speed_m_s']) for x in batch], batch_first=True)
+    X[:,:,8] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['speed_m_s']) for x in batch], batch_first=True)
     context = torch.from_numpy(context)
     # Prediction variable (speed of each step)
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['speed_m_s']) for x in batch], batch_first=True)

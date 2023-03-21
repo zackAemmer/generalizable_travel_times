@@ -4,8 +4,9 @@ from torch import nn
 
 
 class BasicFeedForward(nn.Module):
-    def __init__(self, n_features, embed_dict, HIDDEN_SIZE):
+    def __init__(self, model_name, n_features, embed_dict, HIDDEN_SIZE):
         super(BasicFeedForward, self).__init__()
+        self.model_name = model_name
         self.loss_fn = torch.nn.MSELoss()
         self.embed_dict = embed_dict
         # Embeddings

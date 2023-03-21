@@ -5,7 +5,8 @@ from utils import data_utils
 
 
 class AvgHourlySpeedModel:
-    def __init__(self, config):
+    def __init__(self, model_name, config):
+        self.model_name = model_name
         self.config = config
         self.speed_lookup = {}
         return None

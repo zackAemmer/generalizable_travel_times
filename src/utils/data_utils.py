@@ -643,7 +643,7 @@ def format_deeptte_to_features(deeptte_data, resampled_deeptte_data):
     return df, times
 
 def extract_results(city, model_results):
-    # Extract fold losses for all models
+    # Extract metric results
     fold_results = [x['All Losses'] for x in model_results]
     cities = []
     models = []
@@ -669,67 +669,22 @@ def extract_results(city, model_results):
     })
     # Extract NN loss curves
     loss_df = []
-    fold_train_losses_ff = [x['FF Train Losses'] for x in model_results]
-    fold_test_losses_ff = [x['FF Valid Losses'] for x in model_results]
-    fold_train_losses_rnn_base = [x['RNN_BASE Train Losses'] for x in model_results]
-    fold_test_losses_rnn_base = [x['RNN_BASE Valid Losses'] for x in model_results]
-    fold_train_losses_rnn = [x['RNN Train Losses'] for x in model_results]
-    fold_test_losses_rnn = [x['RNN Valid Losses'] for x in model_results]
-    for fold_num in range(0,len(fold_train_losses_ff)):
-        df_train_ff = pd.DataFrame({
-            "City": city,
-            "Fold": fold_num,
-            "Model": "FF",
-            "Loss Set": "Train",
-            "Epoch": np.arange(len(fold_train_losses_ff[0])),
-            "Loss": fold_train_losses_ff[fold_num]
-        })
-        df_test_ff = pd.DataFrame({
-            "City": city,
-            "Fold": fold_num,
-            "Model": "FF",
-            "Loss Set": "Test",
-            "Epoch": np.arange(len(fold_test_losses_ff[0])),
-            "Loss": fold_test_losses_ff[fold_num]
-        })
-        df_train_rnn_base = pd.DataFrame({
-            "City": city,
-            "Fold": fold_num,
-            "Model": "RNN_BASE",
-            "Loss Set": "Train",
-            "Epoch": np.arange(len(fold_train_losses_rnn[0])),
-            "Loss": fold_train_losses_rnn_base[fold_num]
-        })
-        df_test_rnn_base = pd.DataFrame({
-            "City": city,
-            "Fold": fold_num,
-            "Model": "RNN_BASE",
-            "Loss Set": "Test",
-            "Epoch": np.arange(len(fold_test_losses_rnn[0])),
-            "Loss": fold_test_losses_rnn_base[fold_num]
-        })
-        df_train_rnn = pd.DataFrame({
-            "City": city,
-            "Fold": fold_num,
-            "Model": "RNN",
-            "Loss Set": "Train",
-            "Epoch": np.arange(len(fold_train_losses_rnn[0])),
-            "Loss": fold_train_losses_rnn[fold_num]
-        })
-        df_test_rnn = pd.DataFrame({
-            "City": city,
-            "Fold": fold_num,
-            "Model": "RNN",
-            "Loss Set": "Test",
-            "Epoch": np.arange(len(fold_test_losses_rnn[0])),
-            "Loss": fold_test_losses_rnn[fold_num]
-        })
-        loss_df.append(df_train_ff)
-        loss_df.append(df_test_ff)
-        loss_df.append(df_train_rnn_base)
-        loss_df.append(df_test_rnn_base)
-        loss_df.append(df_train_rnn)
-        loss_df.append(df_test_rnn)
+    # Iterate folds
+    for fold_results in model_results:
+        # Iterate models
+        for model in fold_results['Loss Curves']:
+            for mname, loss_curves in model.items():
+                # Iterate loss curves
+                for lname, loss in loss_curves.items():
+                    df = pd.DataFrame({
+                        "City": city,
+                        "Fold": fold_results['Fold'],
+                        "Model": mname,
+                        "Loss Set": lname,
+                        "Epoch": np.arange(len(loss)),
+                        "Loss": loss
+                    })
+                    loss_df.append(df)
     loss_df = pd.concat(loss_df)
     return result_df, loss_df
 
