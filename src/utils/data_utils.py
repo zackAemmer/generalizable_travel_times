@@ -370,6 +370,9 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
 
     groups = trace_data.groupby('shingle_id')
 
+    # Save grid with past n timesteps, all occurring before shingle start
+    grid, grid_features = shape_utils.get_grid_features(trace_data, n_prior=5)
+
     # Get necessary features as scalar or lists
     result = groups.agg({
         # Cumulative point time/dist

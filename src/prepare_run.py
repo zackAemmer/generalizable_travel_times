@@ -7,7 +7,7 @@ import shutil
 import numpy as np
 import torch
 
-from utils import data_utils
+from utils import data_utils, shape_utils
 
 
 def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder, timezone, given_names, train_dates, test_dates, n_folds):
@@ -101,6 +101,10 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     data_utils.write_pkl(train_traces, base_folder+"train_traces.pkl")
     data_utils.write_pkl(test_traces, base_folder+"test_traces.pkl")
 
+    # print(f"Saving grid features...")
+    # data_utils.write_pkl(train_grid, base_folder+"train_grid.pkl")
+    # data_utils.write_pkl(test_grid, base_folder+"test_grid.pkl")
+
     print("="*30)
     print(f"RUN PREPARATION COMPLETED '{run_name}/{network_name}'")
 
@@ -111,15 +115,15 @@ if __name__=="__main__":
     torch.manual_seed(0)
     prepare_run(
         overwrite=True,
-        run_name="small",
+        run_name="debug",
         network_name="kcm",
         gtfs_folder="./data/kcm_gtfs/2023_01_23/",
         raw_data_folder="./data/kcm_all/",
         timezone="America/Los_Angeles",
         # given_names=['tripid','file','locationtime','lat','lon','vehicleid'], # Use for older kcm collection
         given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
-        train_dates=data_utils.get_date_list("2023_02_14", 14),
-        test_dates=data_utils.get_date_list("2023_03_04", 3),
+        train_dates=data_utils.get_date_list("2023_02_14", 2),
+        test_dates=data_utils.get_date_list("2023_03_04", 1),
         n_folds=5
     )
     random.seed(0)
@@ -127,13 +131,13 @@ if __name__=="__main__":
     torch.manual_seed(0)
     prepare_run(
         overwrite=True,
-        run_name="small",
+        run_name="debug",
         network_name="atb",
         gtfs_folder="./data/atb_gtfs/2023_02_12/",
         raw_data_folder="./data/atb_all_new/",
         timezone="Europe/Oslo",
         given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
-        train_dates=data_utils.get_date_list("2023_02_14", 14), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
-        test_dates=data_utils.get_date_list("2023_03_04", 3),
+        train_dates=data_utils.get_date_list("2023_02_14", 2), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
+        test_dates=data_utils.get_date_list("2023_03_04", 1),
         n_folds=5
     )

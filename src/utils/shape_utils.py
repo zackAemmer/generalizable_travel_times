@@ -72,18 +72,27 @@ def decompose_vector(scalars, bearings, data_to_attach=None):
 
     return (x_pos, x_neg, y_pos, y_neg)
 
-def get_grid(traces, resolution=32, timestep=120, bbox=None):
+def get_grid_features(traces, resolution=32, timestep=120, bbox=None, n_prior=1):
     # Create grid
     point_obs = traces[['speed_m_s','bearing','lon','lat','locationtime']].values
     if bbox is not None:
         point_obs = apply_bbox(point_obs, bbox)
     point_obs = point_obs.astype('float32')
-    grid_features = create_grid_features(point_obs[:,0], point_obs[:,1], point_obs[:,2], point_obs[:,3], point_obs[:,4], timestep, resolution)
-    return grid_features
+    grid, tbins = decompose_and_rasterize(point_obs[:,0], point_obs[:,1], point_obs[:,2], point_obs[:,3], point_obs[:,4], timestep, resolution)
+    # Get tbins for each trace. No overlap between current trip and grid values.
+    # Grid assigned values: binedge[i-1] <= x < binedge[i]
+    # Trace values: binedge[i-1] < x <= binedge[i]
+    tbin_idxs = np.digitize(traces.locationtime, tbins, right=True) - 1
+    # Want all values up through the previous bin index (since that is guaranteed < x)
+    # [i-n_prior:i] will give give n_prior total values, including up to the bin before i
+    # For elements with less than n_prior, return what is available
+    grid_features = [grid[:,:,i-n_prior:i,:] if i-n_prior>=0 else grid[:i] for i in tbin_idxs]
+    return grid, grid_features
 
-def create_grid_features(features, bearings, lons, lats, times, timestep, resolution):
+def decompose_and_rasterize(features, bearings, lons, lats, times, timestep, resolution):
     # Get regularly spaced bins at given resolution/timestep across bbox for all collected points
     # Need to flip bins for latitude because it should decrease downward through array
+    # Add a bin to the upper end; all obs are assigned such that bin_edge[i-1] <= x < bin_edge[i]
     latbins = np.linspace(np.min(lats), np.max(lats), resolution)
     latbins = np.append(latbins, latbins[-1]+.0000001)
     lonbins = np.linspace(np.min(lons), np.max(lons), resolution)
@@ -107,7 +116,7 @@ def create_grid_features(features, bearings, lons, lats, times, timestep, resolu
         rast = np.flip(rast, axis=0)
         # Save binned values for each channel
         all_channel_rasts[:,:,:,i] = rast
-    return all_channel_rasts
+    return all_channel_rasts, tbins
 
 def save_grid_anim(data, file_name):
     # Plot all channels
