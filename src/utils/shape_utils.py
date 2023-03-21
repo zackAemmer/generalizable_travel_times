@@ -5,6 +5,8 @@ import warnings
 from random import sample
 
 import geopandas
+import matplotlib.animation as animation
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -70,6 +72,15 @@ def decompose_vector(scalars, bearings, data_to_attach=None):
 
     return (x_pos, x_neg, y_pos, y_neg)
 
+def get_grid(traces, resolution=32, timestep=120, bbox=None):
+    # Create grid
+    point_obs = traces[['speed_m_s','bearing','lon','lat','locationtime']].values
+    if bbox is not None:
+        point_obs = apply_bbox(point_obs, bbox)
+    point_obs = point_obs.astype('float32')
+    grid_features = create_grid_features(point_obs[:,0], point_obs[:,1], point_obs[:,2], point_obs[:,3], point_obs[:,4], timestep, resolution)
+    return grid_features
+
 def create_grid_features(features, bearings, lons, lats, times, timestep, resolution):
     # Get regularly spaced bins at given resolution/timestep across bbox for all collected points
     # Need to flip bins for latitude because it should decrease downward through array
@@ -77,7 +88,7 @@ def create_grid_features(features, bearings, lons, lats, times, timestep, resolu
     latbins = np.append(latbins, latbins[-1]+.0000001)
     lonbins = np.linspace(np.min(lons), np.max(lons), resolution)
     lonbins = np.append(lonbins, lonbins[-1]+.0000001)
-    tbins = np.arange(0,1440*60,timestep)
+    tbins = np.arange(np.min(times),np.max(times),timestep)
     tbins = np.append(tbins, tbins[-1]+.0000001)
     # Split features into quadrant channels
     channel_obs = decompose_vector(features, bearings, np.column_stack([lats, lons, times]))
@@ -97,6 +108,22 @@ def create_grid_features(features, bearings, lons, lats, times, timestep, resolu
         # Save binned values for each channel
         all_channel_rasts[:,:,:,i] = rast
     return all_channel_rasts
+
+def save_grid_anim(data, file_name):
+    # Plot all channels
+    fig, axes = plt.subplots(2,2)
+    axes = axes.reshape(-1)
+    fig.tight_layout()
+    # Define the update function that will be called for each frame of the animation
+    def update(frame):
+        fig.suptitle(f"Frame {frame}")
+        for i, ax in enumerate(axes):
+            ax.clear()
+            ax.imshow(data[:,:,frame,i], cmap='plasma', vmin=0.0, vmax=35.0)
+    # Create the animation object
+    ani = animation.FuncAnimation(fig, update, frames=data.shape[2])
+    # Save the animation object
+    ani.save(f"../plots/{file_name}", fps=10, dpi=300)
 
 def get_adjacent_points(df, shingle_id, t_buffer, dist):
     # Critical to not reset index on df or intermediate results

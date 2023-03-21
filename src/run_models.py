@@ -28,6 +28,7 @@ def run_models(run_folder, network_folder, hyperparameters):
     print(f"RUN MODEL: '{run_folder}'")
     print(f"NETWORK: '{network_folder}'")
 
+    # Select device to train on, and number workers if GPU
     if torch.cuda.is_available():
         device = torch.device("cuda")
         NUM_WORKERS = 10
@@ -196,6 +197,7 @@ def run_models(run_folder, network_folder, hyperparameters):
             BATCH_SIZE,
             embed_dict
         ).to(device)
+        print(f"Training {rnn_tt_nopack.model_name} model...")
         train_losses, test_losses = model_utils.fit_to_data(rnn_tt_nopack, train_dataloader_seq_tt, test_dataloader_seq_tt, LEARN_RATE, EPOCHS, config, device, sequential_flag=True)
         torch.save(rnn_tt_nopack.state_dict(), run_folder + network_folder + f"models/{rnn_tt_nopack.model_name}_{fold_num}.pt")
         labels, preds, avg_loss = model_utils.predict(rnn_tt_nopack, test_dataloader_seq_tt, device, sequential_flag=True)
@@ -218,6 +220,7 @@ def run_models(run_folder, network_folder, hyperparameters):
             BATCH_SIZE,
             embed_dict
         ).to(device)
+        print(f"Training {rnn_best.model_name} model...")
         train_losses, test_losses = model_utils.fit_to_data(rnn_best, train_dataloader_seq_tt, test_dataloader_seq_tt, LEARN_RATE, EPOCHS, config, device, sequential_flag=True)
         torch.save(rnn_best.state_dict(), run_folder + network_folder + f"models/{rnn_best.model_name}_{fold_num}.pt")
         labels, preds, avg_loss = model_utils.predict(rnn_best, test_dataloader_seq_tt, device, sequential_flag=True)
@@ -264,10 +267,10 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/debug/",
+        run_folder="./results/small/",
         network_folder="kcm/",
         hyperparameters={
-            "EPOCHS": 20,
+            "EPOCHS": 30,
             "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
@@ -277,10 +280,10 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/debug/",
+        run_folder="./results/small/",
         network_folder="atb/",
         hyperparameters={
-            "EPOCHS": 20,
+            "EPOCHS": 30,
             "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32

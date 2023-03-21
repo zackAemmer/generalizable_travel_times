@@ -118,8 +118,8 @@ if __name__=="__main__":
         timezone="America/Los_Angeles",
         # given_names=['tripid','file','locationtime','lat','lon','vehicleid'], # Use for older kcm collection
         given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
-        train_dates=data_utils.get_date_list("2023_02_14", 18),
-        test_dates=data_utils.get_date_list("2023_03_04", 5),
+        train_dates=data_utils.get_date_list("2023_02_14", 14),
+        test_dates=data_utils.get_date_list("2023_03_04", 3),
         n_folds=5
     )
     random.seed(0)
@@ -133,7 +133,7 @@ if __name__=="__main__":
         raw_data_folder="./data/atb_all_new/",
         timezone="Europe/Oslo",
         given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
-        train_dates=data_utils.get_date_list("2023_02_14", 18), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
-        test_dates=data_utils.get_date_list("2023_03_04", 5),
+        train_dates=data_utils.get_date_list("2023_02_14", 14), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
+        test_dates=data_utils.get_date_list("2023_03_04", 3),
         n_folds=5
     )
