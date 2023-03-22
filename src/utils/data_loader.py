@@ -103,6 +103,60 @@ def sequential_tt_collate(batch):
     y = y[sorted_indices,:].float()
     return [context, X, sorted_slens], y
 
+def sequential_tt_cumulative_collate(batch):
+    # Context variables to embed
+    context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID'], x['tripID']]) for x in batch], dtype='int32')
+    # Last dimension is number of sequence variables below
+    seq_lens = [len(x['lats']) for x in batch]
+    max_len = max(seq_lens)
+    X = torch.zeros((len(batch), max_len, 8))
+    # Sequence variables
+    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lats']) for x in batch], batch_first=True)
+    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lngs']) for x in batch], batch_first=True)
+    X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_gap']) for x in batch], batch_first=True)
+    X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
+    X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
+    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lat']) for x in batch], batch_first=True)
+    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lon']) for x in batch], batch_first=True)
+    X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
+    context = torch.from_numpy(context)
+    # Prediction variable (speed of each step)
+    y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
+    # Sort all by sequence length descending, for potential packing of each batch
+    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
+    sorted_slens = sorted_slens.int()
+    context = context[sorted_indices,:].int()
+    X = X[sorted_indices,:,:].float()
+    y = y[sorted_indices,:].float()
+    return [context, X, sorted_slens], y
+
+def sequential_all_cumulative_collate(batch):
+    # Context variables to embed
+    context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID'], x['tripID']]) for x in batch], dtype='int32')
+    # Last dimension is number of sequence variables below
+    seq_lens = [len(x['lats']) for x in batch]
+    max_len = max(seq_lens)
+    X = torch.zeros((len(batch), max_len, 8))
+    # Sequence variables
+    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lats']) for x in batch], batch_first=True)
+    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lngs']) for x in batch], batch_first=True)
+    X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_gap']) for x in batch], batch_first=True)
+    X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
+    X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
+    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lat']) for x in batch], batch_first=True)
+    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lon']) for x in batch], batch_first=True)
+    X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
+    context = torch.from_numpy(context)
+    # Prediction variable (speed of each step)
+    y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_gap']) for x in batch], batch_first=True)
+    # Sort all by sequence length descending, for potential packing of each batch
+    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
+    sorted_slens = sorted_slens.int()
+    context = context[sorted_indices,:].int()
+    X = X[sorted_indices,:,:].float()
+    y = y[sorted_indices,:].float()
+    return [context, X, sorted_slens], y
+
 def make_generic_dataloader(data, config, batch_size, task_type, num_workers):
     dataset = GenericDataset(data, config)
     if num_workers > 0:
@@ -111,10 +165,14 @@ def make_generic_dataloader(data, config, batch_size, task_type, num_workers):
         pin_memory=False
     if task_type == "basic":
         dataloader = DataLoader(dataset, collate_fn=basic_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
-    elif task_type == "sequential_spd":
-        dataloader = DataLoader(dataset, collate_fn=sequential_spd_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
     elif task_type == "sequential_tt":
         dataloader = DataLoader(dataset, collate_fn=sequential_tt_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
+    elif task_type == "sequential_spd":
+        dataloader = DataLoader(dataset, collate_fn=sequential_spd_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
+    elif task_type == "sequential_tt_cumulative":
+        dataloader = DataLoader(dataset, collate_fn=sequential_tt_cumulative_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
+    elif task_type == "sequential_all_cumulative":
+        dataloader = DataLoader(dataset, collate_fn=sequential_all_cumulative_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
     return dataloader
 
 def apply_normalization(sample, config):
@@ -122,6 +180,7 @@ def apply_normalization(sample, config):
         # DeepTTE is inconsistent with sample and config naming schema.
         # These variables are in the sample (as cumulatives), but not the config.
         # The same variable names are in the config, but refer to non-cumulative values.
+        # They have been added here to the config as time/dist cumulative.
         if var_name == "time_gap":
             sample[var_name] = data_utils.normalize(np.array(sample[var_name]), config[f"time_cumulative_s_mean"], config[f"time_cumulative_s_std"])
         elif var_name == "dist_gap":

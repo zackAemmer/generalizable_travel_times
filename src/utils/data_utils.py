@@ -819,7 +819,7 @@ def convert_speeds_to_tts(speeds, dataloader, mask, config):
     dists = X[:,:,2].numpy()
     dists = de_normalize(dists, config['dist_calc_km_mean'], config['dist_calc_km_std'])
     # Replace speeds near 0.0 with small number
-    speeds[speeds<=0.0] = 0.000001
+    speeds[speeds<=0.0001] = 0.0001
     travel_times = dists*1000.0 / speeds
     res = aggregate_tts(travel_times, mask)
     return res
@@ -834,6 +834,16 @@ def aggregate_tts(tts, mask, drop_first=True):
     masked_tts = (tts*mask)
     total_tts = np.sum(masked_tts, axis=1)
     return total_tts
+
+def aggregate_cumulative_tts(tts, mask):
+    """
+    Convert a sequence of cumulative predicted travel times to total travel time.
+    """
+    # Take the final unmasked point
+    max_idxs = np.apply_along_axis(lambda x: np.max(np.where(x)), 1, mask)
+    max_idxs = max_idxs.reshape(len(max_idxs),1)
+    res = np.take_along_axis(tts, max_idxs, axis=1)
+    return res
 
 def create_tensor_mask(seq_lens):
     """
