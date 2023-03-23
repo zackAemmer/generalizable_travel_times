@@ -26,7 +26,6 @@ class GRU_RNN_SPD(nn.Module):
             in_features=hidden_size + self.embed_total_dims,
             out_features=self.output_size
         )
-
     def forward(self, x, hidden_prev):
         x_em = x[0]
         x_ct = x[1][:,:,:8]

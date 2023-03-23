@@ -9,7 +9,7 @@ from sklearn import metrics
 from tabulate import tabulate
 from torch.utils.data import DataLoader
 
-from models import avg_speed, ff, persistent_speed, rnn, time_table
+from models import avg_speed, ff, persistent_speed, rnn, time_table, conv
 from utils import data_loader, data_utils, model_utils
 
 
@@ -244,6 +244,30 @@ def run_models(run_folder, network_folder, hyperparameters):
         curve_models.append(model.model_name)
         curves.append({"Train":train_losses, "Test":test_losses})
 
+        print("="*30)
+        model = conv.CONV(
+            "CONV1D_MTO",
+            8,
+            1,
+            HIDDEN_SIZE,
+            BATCH_SIZE,
+            embed_dict
+        ).to(device)
+        train_dataloader = train_dataloader_seq_mto
+        test_dataloader = test_dataloader_seq_mto
+        test_mask = test_mask_seq
+        print(f"Training {model.model_name} model...")
+        train_losses, test_losses = model_utils.fit_to_data(model, train_dataloader, test_dataloader, LEARN_RATE, EPOCHS, config, device, sequential_flag=True, mto_flag=True)
+        torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
+        labels, preds, avg_loss = model_utils.predict(model, test_dataloader, device, sequential_flag=True, mto_flag=True)
+        labels = data_utils.de_normalize(labels, config['time_mean'], config['time_std'])
+        preds = data_utils.de_normalize(preds, config['time_mean'], config['time_std'])
+        model_list.append(model)
+        model_labels.append(avg_labels)
+        model_preds.append(preds)
+        curve_models.append(model.model_name)
+        curves.append({"Train":train_losses, "Test":test_losses})
+
         #### CALCULATE METRICS ####
         print("="*30)
         print(f"Saving model metrics from fold {fold_num}...")
@@ -280,7 +304,7 @@ if __name__=="__main__":
         run_folder="./results/debug/",
         network_folder="kcm/",
         hyperparameters={
-            "EPOCHS": 30,
+            "EPOCHS": 3,
             "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
@@ -293,7 +317,7 @@ if __name__=="__main__":
         run_folder="./results/debug/",
         network_folder="atb/",
         hyperparameters={
-            "EPOCHS": 30,
+            "EPOCHS": 3,
             "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
