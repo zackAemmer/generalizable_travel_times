@@ -54,7 +54,7 @@ def run_models(run_folder, network_folder, hyperparameters):
     with open(data_folder + "config.json", "r") as f:
         config = json.load(f)
     # Load GTFS-RT samples
-    train_data_chunks, valid_data = data_utils.load_train_test_data(data_folder, config['n_folds']) # Validation data no longer used
+    train_data_chunks, valid_data, train_grid, test_grid = data_utils.load_train_test_data(data_folder, config['n_folds']) # Validation data no longer used
     # Load GTFS data
     print(f"Loading and merging GTFS files from '{config['gtfs_folder']}'...")
     gtfs_data = data_utils.merge_gtfs_files(config['gtfs_folder'])
@@ -76,25 +76,24 @@ def run_models(run_folder, network_folder, hyperparameters):
         train_dataloader_basic = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "basic", NUM_WORKERS)
         test_dataloader_basic = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "basic", NUM_WORKERS)
 
-        train_dataloader_seq = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "sequential_tt", NUM_WORKERS)
-        test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "sequential_tt", NUM_WORKERS)
-        _, _ = data_utils.get_seq_info(train_dataloader_seq)
-        _, test_mask_seq = data_utils.get_seq_info(test_dataloader_seq)
+        train_dataloader_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "basic_grid", NUM_WORKERS, grid=train_grid, n_prior=1)
+        test_dataloader_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "basic_grid", NUM_WORKERS, grid=test_grid, n_prior=1)
 
-        train_dataloader_seq_spd = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "sequential_spd", NUM_WORKERS)
-        test_dataloader_seq_spd = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "sequential_spd", NUM_WORKERS)
-        _, _ = data_utils.get_seq_info(train_dataloader_seq_spd)
-        _, test_mask_spd = data_utils.get_seq_info(test_dataloader_seq_spd)
+        # train_dataloader_seq = data_loader.make_generic_dataloader(train_data, train_grid, config, BATCH_SIZE, "sequential", NUM_WORKERS)
+        # test_dataloader_seq = data_loader.make_generic_dataloader(test_data, test_grid, config, BATCH_SIZE, "sequential", NUM_WORKERS)
+        # _, _ = data_utils.get_seq_info(train_dataloader_seq)
+        # _, test_mask_seq = data_utils.get_seq_info(test_dataloader_seq)
 
-        train_dataloader_seq_tt_cumulative = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "sequential_tt_cumulative", NUM_WORKERS)
-        test_dataloader_seq_tt_cumulative = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "sequential_tt_cumulative", NUM_WORKERS)
-        _, _ = data_utils.get_seq_info(train_dataloader_seq_tt_cumulative)
-        _, test_mask_tt_cumulative = data_utils.get_seq_info(test_dataloader_seq_tt_cumulative)
+        # train_dataloader_seq_spd = data_loader.make_generic_dataloader(train_data, train_grid, config, BATCH_SIZE, "sequential_spd", NUM_WORKERS)
+        # test_dataloader_seq_spd = data_loader.make_generic_dataloader(test_data, test_grid, config, BATCH_SIZE, "sequential_spd", NUM_WORKERS)
+        # _, _ = data_utils.get_seq_info(train_dataloader_seq_spd)
+        # _, test_mask_spd = data_utils.get_seq_info(test_dataloader_seq_spd)
 
-        train_dataloader_seq_all_cumulative = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "sequential_all_cumulative", NUM_WORKERS)
-        test_dataloader_seq_all_cumulative = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "sequential_all_cumulative", NUM_WORKERS)
-        _, _ = data_utils.get_seq_info(train_dataloader_seq_all_cumulative)
-        _, test_mask_all_cumulative = data_utils.get_seq_info(test_dataloader_seq_all_cumulative)
+        # train_dataloader_seq_grid = data_loader.make_generic_dataloader(train_data, train_grid, config, BATCH_SIZE, "sequential_grid", NUM_WORKERS)
+        # test_dataloader_seq_grid = data_loader.make_generic_dataloader(test_data, test_grid, config, BATCH_SIZE, "sequential_grid", NUM_WORKERS)
+        # _, _ = data_utils.get_seq_info(train_dataloader_seq_grid)
+        # _, test_mask_grid = data_utils.get_seq_info(test_dataloader_seq_grid)
+
         print(f"Successfully loaded {len(train_data)} training samples and {len(test_data)} testing samples.")
 
         # Define embedded variables for nn models
@@ -144,24 +143,47 @@ def run_models(run_folder, network_folder, hyperparameters):
         # model_labels.append(avg_labels)
         # model_preds.append(preds)
 
-        # print("="*30)
-        # model = basic_ff.BasicFeedForward(
-        #     "FF",
-        #     8,
-        #     embed_dict,
-        #     HIDDEN_SIZE
-        # ).to(device)
-        # print(f"Training {model.model_name} model...")
-        # train_losses, test_losses = model_utils.fit_to_data(model, train_dataloader_basic, test_dataloader_basic, LEARN_RATE, EPOCHS, config, device)
-        # torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
-        # labels, preds, avg_loss = model_utils.predict(model, test_dataloader_basic, device)
-        # labels = data_utils.de_normalize(labels, config['time_mean'], config['time_std'])
-        # preds = data_utils.de_normalize(preds, config['time_mean'], config['time_std'])
-        # model_list.append(model)
-        # model_labels.append(avg_labels)
-        # model_preds.append(preds)
-        # curve_models.append(model.model_name)
-        # curves.append({"Train":train_losses, "Test":test_losses})
+        print("="*30)
+        model = ff.FF(
+            "FF",
+            8,
+            embed_dict,
+            HIDDEN_SIZE
+        ).to(device)
+        train_dataloader = train_dataloader_basic
+        test_dataloader = test_dataloader_basic
+        print(f"Training {model.model_name} model...")
+        train_losses, test_losses = model_utils.fit_to_data(model, train_dataloader, test_dataloader, LEARN_RATE, EPOCHS, config, device)
+        torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
+        labels, preds, avg_loss = model_utils.predict(model, test_dataloader, device)
+        labels = data_utils.de_normalize(labels, config['time_mean'], config['time_std'])
+        preds = data_utils.de_normalize(preds, config['time_mean'], config['time_std'])
+        model_list.append(model)
+        model_labels.append(avg_labels)
+        model_preds.append(preds)
+        curve_models.append(model.model_name)
+        curves.append({"Train":train_losses, "Test":test_losses})
+
+        print("="*30)
+        model = ff.FF_GRID(
+            "FF_GRID",
+            8,
+            embed_dict,
+            HIDDEN_SIZE
+        ).to(device)
+        train_dataloader = train_dataloader_grid
+        test_dataloader = test_dataloader_grid
+        print(f"Training {model.model_name} model...")
+        train_losses, test_losses = model_utils.fit_to_data(model, train_dataloader, test_dataloader, LEARN_RATE, EPOCHS, config, device, grid_flag=True)
+        torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
+        labels, preds, avg_loss = model_utils.predict(model, test_dataloader, device, grid_flag=True)
+        labels = data_utils.de_normalize(labels, config['time_mean'], config['time_std'])
+        preds = data_utils.de_normalize(preds, config['time_mean'], config['time_std'])
+        model_list.append(model)
+        model_labels.append(avg_labels)
+        model_preds.append(preds)
+        curve_models.append(model.model_name)
+        curves.append({"Train":train_losses, "Test":test_losses})
 
         ### FORECAST TASK ####
         # print("="*30)
@@ -175,83 +197,57 @@ def run_models(run_folder, network_folder, hyperparameters):
         # model_labels.append(avg_labels)
         # model_preds.append(preds)
 
-        print("="*30)
-        model = rnn.GRU_RNN(
-            "GRU_RNN",
-            8,
-            1,
-            HIDDEN_SIZE,
-            BATCH_SIZE,
-            embed_dict
-        ).to(device)
-        train_dataloader = train_dataloader_seq
-        test_dataloader = test_dataloader_seq
-        test_mask = test_mask_seq
-        print(f"Training {model.model_name} model...")
-        train_losses, test_losses = model_utils.fit_to_data(model, train_dataloader, test_dataloader, LEARN_RATE, EPOCHS, config, device, sequential_flag=True)
-        torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
-        labels, preds, avg_loss = model_utils.predict(model, test_dataloader, device, sequential_flag=True)
-        labels = data_utils.de_normalize(labels, config['time_calc_s_mean'], config['time_calc_s_std'])
-        preds = data_utils.de_normalize(preds, config['time_calc_s_mean'], config['time_calc_s_std'])
-        preds = data_utils.aggregate_tts(preds, test_mask_seq)
-        labels = data_utils.aggregate_tts(labels, test_mask_seq)
-        model_list.append(model)
-        model_labels.append(avg_labels)
-        model_preds.append(preds)
-        curve_models.append(model.model_name)
-        curves.append({"Train":train_losses, "Test":test_losses})
+        # print("="*30)
+        # model = rnn.GRU_RNN(
+        #     "GRU_RNN",
+        #     8,
+        #     1,
+        #     HIDDEN_SIZE,
+        #     BATCH_SIZE,
+        #     embed_dict
+        # ).to(device)
+        # train_dataloader = train_dataloader_seq
+        # test_dataloader = test_dataloader_seq
+        # test_mask = test_mask_seq
+        # print(f"Training {model.model_name} model...")
+        # train_losses, test_losses = model_utils.fit_to_data(model, train_dataloader, test_dataloader, LEARN_RATE, EPOCHS, config, device, sequential_flag=True)
+        # torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
+        # labels, preds, avg_loss = model_utils.predict(model, test_dataloader, device, sequential_flag=True)
+        # labels = data_utils.de_normalize(labels, config['time_calc_s_mean'], config['time_calc_s_std'])
+        # preds = data_utils.de_normalize(preds, config['time_calc_s_mean'], config['time_calc_s_std'])
+        # preds = data_utils.aggregate_tts(preds, test_mask)
+        # labels = data_utils.aggregate_tts(labels, test_mask)
+        # model_list.append(model)
+        # model_labels.append(avg_labels)
+        # model_preds.append(preds)
+        # curve_models.append(model.model_name)
+        # curves.append({"Train":train_losses, "Test":test_losses})
 
-        print("="*30)
-        model = rnn.GRU_RNN(
-            "GRU_RNN_TT_CUMULATIVE",
-            8,
-            1,
-            HIDDEN_SIZE,
-            BATCH_SIZE,
-            embed_dict
-        ).to(device)
-        train_dataloader = train_dataloader_seq_tt_cumulative
-        test_dataloader = test_dataloader_seq_tt_cumulative
-        test_mask = test_mask_tt_cumulative
-        print(f"Training {model.model_name} model...")
-        train_losses, test_losses = model_utils.fit_to_data(model, train_dataloader, test_dataloader, LEARN_RATE, EPOCHS, config, device, sequential_flag=True)
-        torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
-        labels, preds, avg_loss = model_utils.predict(model, test_dataloader, device, sequential_flag=True)
-        labels = data_utils.de_normalize(labels, config['time_calc_s_mean'], config['time_calc_s_std'])
-        preds = data_utils.de_normalize(preds, config['time_calc_s_mean'], config['time_calc_s_std'])
-        preds = data_utils.aggregate_tts(preds, test_mask)
-        labels = data_utils.aggregate_tts(labels, test_mask)
-        model_list.append(model)
-        model_labels.append(avg_labels)
-        model_preds.append(preds)
-        curve_models.append(model.model_name)
-        curves.append({"Train":train_losses, "Test":test_losses})
-
-        print("="*30)
-        model = rnn.GRU_RNN(
-            "GRU_RNN_ALL_CUMULATIVE",
-            8,
-            1,
-            HIDDEN_SIZE,
-            BATCH_SIZE,
-            embed_dict
-        ).to(device)
-        train_dataloader = train_dataloader_seq_all_cumulative
-        test_dataloader = test_dataloader_seq_all_cumulative
-        test_mask = test_mask_all_cumulative
-        print(f"Training {model.model_name} model...")
-        train_losses, test_losses = model_utils.fit_to_data(model, train_dataloader, test_dataloader, LEARN_RATE, EPOCHS, config, device, sequential_flag=True)
-        torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
-        labels, preds, avg_loss = model_utils.predict(model, test_dataloader, device, sequential_flag=True)
-        labels = data_utils.de_normalize(labels, config['time_cumulative_s_mean'], config['time_cumulative_s_std'])
-        preds = data_utils.de_normalize(preds, config['time_cumulative_s_mean'], config['time_cumulative_s_std'])
-        preds = data_utils.aggregate_cumulative_tts(preds, test_mask)
-        labels = data_utils.aggregate_cumulative_tts(labels, test_mask)
-        model_list.append(model)
-        model_labels.append(avg_labels)
-        model_preds.append(preds)
-        curve_models.append(model.model_name)
-        curves.append({"Train":train_losses, "Test":test_losses})
+        # print("="*30)
+        # model = rnn.GRU_RNN_GRID(
+        #     "GRU_RNN_GRID",
+        #     8,
+        #     1,
+        #     HIDDEN_SIZE,
+        #     BATCH_SIZE,
+        #     embed_dict
+        # ).to(device)
+        # train_dataloader = train_dataloader_seq_grid
+        # test_dataloader = test_dataloader_seq_grid
+        # test_mask = test_mask_grid
+        # print(f"Training {model.model_name} model...")
+        # train_losses, test_losses = model_utils.fit_to_data(model, train_dataloader, test_dataloader, LEARN_RATE, EPOCHS, config, device, sequential_flag=True)
+        # torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
+        # labels, preds, avg_loss = model_utils.predict(model, test_dataloader, device, sequential_flag=True)
+        # labels = data_utils.de_normalize(labels, config['time_calc_s_mean'], config['time_calc_s_std'])
+        # preds = data_utils.de_normalize(preds, config['time_calc_s_mean'], config['time_calc_s_std'])
+        # preds = data_utils.aggregate_tts(preds, test_mask)
+        # labels = data_utils.aggregate_tts(labels, test_mask)
+        # model_list.append(model)
+        # model_labels.append(avg_labels)
+        # model_preds.append(preds)
+        # curve_models.append(model.model_name)
+        # curves.append({"Train":train_losses, "Test":test_losses})
 
         #### CALCULATE METRICS ####
         print("="*30)
@@ -286,10 +282,10 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/small/",
+        run_folder="./results/debug/",
         network_folder="kcm/",
         hyperparameters={
-            "EPOCHS": 30,
+            "EPOCHS": 3,
             "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
@@ -299,10 +295,10 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/small/",
+        run_folder="./results/debug/",
         network_folder="atb/",
         hyperparameters={
-            "EPOCHS": 30,
+            "EPOCHS": 3,
             "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32

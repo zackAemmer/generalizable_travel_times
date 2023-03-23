@@ -118,8 +118,9 @@ def load_train_test_data(data_folder, n_folds):
     Load files with training/testing samples that have been formatted into json.
     Files are train_00 - train_05, and test
     data_folder: location that contains the train/test files
-    Returns: list of trainning json samples, and list of test samples.
+    Returns: list of training json samples, and list of test samples.
     """
+    # Read in training data
     train_data_chunks = []
     for i in range(0, n_folds):
         train_data = []
@@ -130,7 +131,10 @@ def load_train_test_data(data_folder, n_folds):
     # Read in test data
     contents = open(data_folder + "test", "r").read()
     test_data = [json.loads(str(item)) for item in contents.strip().split('\n')]
-    return train_data_chunks, test_data
+    # Read in grid features
+    train_grid = load_pkl(f"{data_folder}../train_grid.pkl")
+    test_grid = load_pkl(f"{data_folder}../test_grid.pkl")
+    return train_data_chunks, test_data, train_grid, test_grid
 
 def load_run_input_data(run_folder, network_folder):
     train_traces = load_pkl(f"{run_folder}{network_folder}train_traces.pkl")
@@ -370,9 +374,6 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
 
     groups = trace_data.groupby('shingle_id')
 
-    # Save grid with past n timesteps, all occurring before shingle start
-    grid, grid_features = shape_utils.get_grid_features(trace_data, n_prior=5)
-
     # Get necessary features as scalar or lists
     result = groups.agg({
         # Cumulative point time/dist
@@ -407,6 +408,10 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
         'scheduled_time_s': lambda x: x.tolist(),
     })
 
+    # Save time index of grid occurring before shingle start
+    grid, tbin_idxs = shape_utils.get_grid_features(groups.first())
+    result['tbin_idx'] = tbin_idxs
+
     # Convert the DataFrame to a dictionary with the original format
     if is_test:
         print(f"Saving formatted data to '{deeptte_formatted_path}', across 1 testing file...")
@@ -420,7 +425,7 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
             df_json_string = df.to_json(orient='records', lines=True)
             with open(deeptte_formatted_path+"train_0"+str(i), mode='w+') as out_file:
                 out_file.write(df_json_string)
-    return trace_data
+    return trace_data, grid
 
 def get_summary_config(trace_data, n_unique_veh, n_unique_trip, gtfs_folder, n_folds):
     """
@@ -595,33 +600,6 @@ def full_dataset_summary(folder, given_names, timezone):
             dates.append(get_date_from_filename(file))
             data_summaries.append(calc_data_metrics(data, timezone))
     return dates, data_summaries
-
-def resample_deeptte_gps(deeptte_data, n_samples):
-    """
-    Resamples tracked gps points evenly to specified count.
-    deeptte_data: json loaded from a training/testing file formatted for DeepTTE
-    n_samples: the number of gps points to resample each record to
-    Returns: dataframe with lat, lon, dist, and time resampled. Each timestep is averaged or linearly interpolated.
-    """
-    all_res = []
-    for i in range(0, len(deeptte_data)):
-        time_gaps = deeptte_data[i]['time_gap']
-        lats = [float(x) for x in deeptte_data[i]['lats']]
-        lngs = [float(x) for x in deeptte_data[i]['lngs']]
-        dists = [float(x) for x in deeptte_data[i]['dist_gap']]
-        z = pd.DataFrame({"time_gaps":time_gaps, "lat":lats, "lng":lngs, "dist":dists})
-        z.index = pd.to_datetime(z['time_gaps'], unit='s')
-        first = z.index.min()
-        last = z.index.max()
-        secs = int((last-first).total_seconds())
-        secs_per_sample = secs // n_samples
-        periodsize = '{:f}S'.format(secs_per_sample)
-        result = z.resample(periodsize).mean()
-        result = result.interpolate(method='linear')
-        result = result.iloc[0:n_samples,:]
-        result['deeptte_index'] = i
-        all_res.append(result)
-    return pd.concat(all_res, axis=0)
 
 def format_deeptte_to_features(deeptte_data, resampled_deeptte_data):
     """

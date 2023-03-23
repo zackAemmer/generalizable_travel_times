@@ -18,16 +18,16 @@ from shapely.errors import ShapelyDeprecationWarning
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 
-def apply_bbox(point_obs, bbox):
+def apply_bbox(lats, lons, bbox):
     min_lat = bbox[0]
     min_lon = bbox[1]
     max_lat = bbox[2]
     max_lon = bbox[3]
-    point_obs = point_obs[point_obs[:,3]>=min_lat]
-    point_obs = point_obs[point_obs[:,3]<=max_lat]
-    point_obs = point_obs[point_obs[:,2]>=min_lon]
-    point_obs = point_obs[point_obs[:,2]<=max_lon]
-    return point_obs
+    a = [lats>=min_lat]
+    b = [lats>=min_lat]
+    c = [lons>=min_lon]
+    d = [lons>=min_lon]
+    return [a and b and c and d]
 
 def upscale(rast, scalar_dims):
     scalars = [np.ones((x,x), dtype=float) for x in scalar_dims]
@@ -66,28 +66,27 @@ def decompose_vector(scalars, bearings, data_to_attach=None):
     x_neg = x_all[x<=0.0]
     y_pos = y_all[y>=0.0]
     y_neg = y_all[y<=0.0]
-    
+
     x_neg[:,0] = np.abs(x_neg[:,0])
     y_neg[:,0] = np.abs(y_neg[:,0])
 
     return (x_pos, x_neg, y_pos, y_neg)
 
-def get_grid_features(traces, resolution=32, timestep=120, bbox=None, n_prior=1):
+def get_grid_features(traces, resolution=32, timestep=120, bbox=None):
     # Create grid
-    point_obs = traces[['speed_m_s','bearing','lon','lat','locationtime']].values
     if bbox is not None:
         point_obs = apply_bbox(point_obs, bbox)
-    point_obs = point_obs.astype('float32')
-    grid, tbins = decompose_and_rasterize(point_obs[:,0], point_obs[:,1], point_obs[:,2], point_obs[:,3], point_obs[:,4], timestep, resolution)
+    grid, tbins = decompose_and_rasterize(traces['speed_m_s'].values, traces['bearing'].values, traces['lon'].values, traces['lat'].values, traces['locationtime'].values, timestep, resolution)
     # Get tbins for each trace. No overlap between current trip and grid values.
     # Grid assigned values: binedge[i-1] <= x < binedge[i]
     # Trace values: binedge[i-1] < x <= binedge[i]
-    tbin_idxs = np.digitize(traces.locationtime, tbins, right=True) - 1
+    tbin_idxs = np.digitize(traces['locationtime'].values, tbins, right=True) - 1
+    tbin_idxs = np.maximum(0,tbin_idxs)
     # Want all values up through the previous bin index (since that is guaranteed < x)
     # [i-n_prior:i] will give give n_prior total values, including up to the bin before i
     # For elements with less than n_prior, return what is available
-    grid_features = [grid[:,:,i-n_prior:i,:] if i-n_prior>=0 else grid[:i] for i in tbin_idxs]
-    return grid, grid_features
+    # grid_features = [grid[:,:,i-n_prior:i,:] if i-n_prior>=0 else grid[:,:,:i,:] for i in tbin_idxs]
+    return grid, tbin_idxs
 
 def decompose_and_rasterize(features, bearings, lons, lats, times, timestep, resolution):
     # Get regularly spaced bins at given resolution/timestep across bbox for all collected points
@@ -98,11 +97,11 @@ def decompose_and_rasterize(features, bearings, lons, lats, times, timestep, res
     lonbins = np.linspace(np.min(lons), np.max(lons), resolution)
     lonbins = np.append(lonbins, lonbins[-1]+.0000001)
     tbins = np.arange(np.min(times),np.max(times),timestep)
-    tbins = np.append(tbins, tbins[-1]+.0000001)
+    tbins = np.append(tbins, tbins[-1]+1)
     # Split features into quadrant channels
     channel_obs = decompose_vector(features, bearings, np.column_stack([lats, lons, times]))
     # For each channel, aggregate by location and timestep bins
-    all_channel_rasts = np.zeros((len(latbins)-1, len(lonbins)-1, len(tbins)-1, len(channel_obs)), dtype='float16')
+    all_channel_rasts = np.zeros((len(tbins)-1, len(channel_obs), len(latbins)-1, len(lonbins)-1), dtype='float64')
     for i, channel in enumerate(channel_obs):
         # Get the average feature value in each bin
         count_hist, count_edges = np.histogramdd(channel[:,1:4], bins=[latbins, lonbins, tbins])
@@ -114,8 +113,13 @@ def decompose_and_rasterize(features, bearings, lons, lats, times, timestep, res
         # This would not need to be flipped for data below the equator
         # For longitudes, AtB may need to be flipped
         rast = np.flip(rast, axis=0)
+        # Put channel in front
+        # Swap lat and lon
+        rast = np.swapaxes(rast, 0, 1)
+        # Swap channel and lon: rast=CxLatxLon
+        rast = np.swapaxes(rast, 0, 2)
         # Save binned values for each channel
-        all_channel_rasts[:,:,:,i] = rast
+        all_channel_rasts[:,i,:,:] = rast
     return all_channel_rasts, tbins
 
 def save_grid_anim(data, file_name):
@@ -128,7 +132,7 @@ def save_grid_anim(data, file_name):
         fig.suptitle(f"Frame {frame}")
         for i, ax in enumerate(axes):
             ax.clear()
-            ax.imshow(data[:,:,frame,i], cmap='plasma', vmin=0.0, vmax=35.0)
+            ax.imshow(data[frame,i,:,:], cmap='plasma', vmin=0.0, vmax=35.0)
     # Create the animation object
     ani = animation.FuncAnimation(fig, update, frames=data.shape[2])
     # Save the animation object
@@ -149,67 +153,6 @@ def get_adjacent_points(df, shingle_id, t_buffer, dist):
     pt_indices = get_points_within_dist(points, query_points, dist)
     adjacent_data = adjacent_data.iloc[pt_indices].sort_values(['shingle_id','locationtime'])
     return (shingle_data, adjacent_data)
-
-def get_unique_line_geometries(shape_data):
-    """
-    Combine points into line segments, limit to only unique line segments, calculate their geometry.
-    shape_data: dataframe containing columns for point 1, and a shifted point 2.
-    Returns: geodataframe with unique segments, all having a line geometry
-    """
-    # Keep record of all unique segments
-    shape_segment_list = shape_data.drop_duplicates(['segment_id'])
-    # Get line geometries for each segment
-    # Each segment ID should have two rows; point 1 and point 2
-    shape_segment_list_copy = shape_segment_list.copy()
-    shape_segment_list = geopandas.GeoDataFrame(shape_segment_list, geometry=geopandas.points_from_xy(np.array(shape_segment_list.shape_pt_lon), np.array(shape_segment_list.shape_pt_lat)))
-    shape_segment_list_copy = geopandas.GeoDataFrame(shape_segment_list_copy, geometry=geopandas.points_from_xy(shape_segment_list_copy.shape_pt_lon_shift, shape_segment_list_copy.shape_pt_lat_shift))
-    segment_shapes = pd.concat([shape_segment_list, shape_segment_list_copy], axis=0).sort_values('segment_id')
-    # Join each point-set across the two segment-rows into a line
-    segment_shapes = segment_shapes.groupby(['segment_id'])['geometry'].apply(lambda x: shapely.geometry.LineString(x.tolist()))
-    segment_shapes = geopandas.GeoDataFrame(segment_shapes, geometry='geometry', crs="EPSG:4326")
-    segment_shapes.reset_index(inplace=True)
-    return segment_shapes
-
-def create_shape_segment_lookup(shape_data):
-    """
-    For each unique line segment in the route shapes, get a lookup for the shape_ids that use that segment.
-    shape_data: dataframe with 'segment_id' column with unique segment ids, 'shape_id' column with unique shape ids
-    Returns: a lookup table that maps each unique 'segment_id' to a list of corresponding shape_ids
-    """
-    route_segment_lookup = {}
-    for i, shape in shape_data.iterrows():
-        if shape.loc['segment_id'] not in route_segment_lookup.keys():
-            route_segment_lookup[shape.loc['segment_id']] = [shape.loc['shape_id']]
-        else:
-            route_segment_lookup[shape.loc['segment_id']].append(shape.loc['shape_id'])
-    return route_segment_lookup
-
-def get_consecutive_values(shape_data):
-    """
-    Break dataframe of consecutive points from GTFS shapes.txt into line segments.
-    shape_data: dataframe loaded from a GTFS shapes.txt file, points should be consecutively ordered
-    Returns: dataframe with each row having the current, and previous point lat/lon information
-    """
-    route_shape_data = shape_data.copy()
-    # Keep lat/lon as strings to use as id
-    route_shape_data['shape_pt_lat_str'] = route_shape_data['shape_pt_lat'].astype(str)
-    route_shape_data['shape_pt_lon_str'] = route_shape_data['shape_pt_lon'].astype(str)
-    route_shape_data['point_id'] = route_shape_data['shape_pt_lat_str'] + '_' + route_shape_data['shape_pt_lon_str']
-    # Get a segment id for each consecutive set of points
-    route_shape_data_shift = route_shape_data.shift(fill_value='blank').iloc[1:,:]
-    route_shape_data_shift.columns = [col+"_shift" for col in route_shape_data_shift.columns]
-    route_shape_data = pd.concat([route_shape_data[['shape_id','shape_pt_lat','shape_pt_lon','point_id']], route_shape_data_shift[['shape_id_shift','shape_pt_lat_shift','shape_pt_lon_shift','point_id_shift']]], axis=1).dropna()
-    route_shape_data = route_shape_data[route_shape_data['shape_id']==route_shape_data['shape_id_shift']]
-    # Unique id for each lat/lon -> lat/lon segment
-    route_shape_data['segment_id'] = route_shape_data['point_id'] + '_' + route_shape_data['point_id_shift']
-    return route_shape_data
-
-def map_to_network(traces, segments, n_sample):
-    # Sample from the traces, match to the network
-    traces_n = traces.sample(n_sample)
-    # There are duplicates when distance to segments is tied; just take first
-    traces_n = geopandas.sjoin_nearest(traces_n, segments, distance_col="join_dist").drop_duplicates(['tripid','locationtime'])
-    return traces_n
 
 def interpolate_trajectories(df, group_col):
     traj_bounds = df.groupby(group_col)['timeID_s'].agg(['min', 'max'])
