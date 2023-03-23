@@ -264,7 +264,7 @@ def parallel_clean_trace_df_w_timetables(args):
     data_chunk, gtfs_data = args
     return clean_trace_df_w_timetables(data_chunk, gtfs_data)
 
-def parallelize_clean_trace_df_w_timetables(data, gtfs_data, n_processes=4):
+def parallelize_clean_trace_df_w_timetables(data, gtfs_data, n_processes=10):
     with Pool(n_processes) as p:
         data_chunks = np.array_split(data, n_processes)
         args = [(chunk, gtfs_data) for chunk in data_chunks]

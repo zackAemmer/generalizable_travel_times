@@ -58,8 +58,8 @@ def make_generic_dataloader(data, config, batch_size, task_type, num_workers, gr
         dataloader = DataLoader(dataset, collate_fn=sequential_dist_cumulative_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
     elif task_type == "sequential_all_cumulative":
         dataloader = DataLoader(dataset, collate_fn=sequential_all_cumulative_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
-    elif task_type == "sequential_grid":
-        dataloader = DataLoader(dataset, collate_fn=sequential_grid_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
+    elif task_type == "sequential_mto":
+        dataloader = DataLoader(dataset, collate_fn=sequential_mto_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
     return dataloader
 
 def basic_collate(batch):
@@ -81,7 +81,6 @@ def basic_collate(batch):
         X[i,7] = batch[i]['dist']
     X = torch.from_numpy(X)
     context = torch.from_numpy(context)
-    # Prediction variable (travel time from first to last observation)
     y = torch.from_numpy(np.array([x['time'] for x in batch]))
     # Sort all dataloaders so that they are consistent in the results
     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
@@ -114,7 +113,6 @@ def basic_grid_collate(batch):
     X = torch.from_numpy(X)
     X_gr = torch.from_numpy(X_gr)
     context = torch.from_numpy(context)
-    # Prediction variable (travel time from first to last observation)
     y = torch.from_numpy(np.array([x['time'] for x in batch]))
     # Sort all dataloaders so that they are consistent in the results
     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
@@ -142,7 +140,6 @@ def sequential_collate(batch):
     X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lon']) for x in batch], batch_first=True)
     X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
     context = torch.from_numpy(context)
-    # Prediction variable (speed of each step)
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
     # Sort all by sequence length descending, for potential packing of each batch
     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
@@ -171,7 +168,6 @@ def sequential_spd_collate(batch):
     # Used for persistent model, do not use in RNN
     X[:,:,8] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['speed_m_s']) for x in batch], batch_first=True)
     context = torch.from_numpy(context)
-    # Prediction variable (speed of each step)
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['speed_m_s']) for x in batch], batch_first=True)
     # Sort all by sequence length descending, for potential packing of each batch
     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
@@ -198,7 +194,6 @@ def sequential_dist_cumulative_collate(batch):
     X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lon']) for x in batch], batch_first=True)
     X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
     context = torch.from_numpy(context)
-    # Prediction variable (speed of each step)
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
     # Sort all by sequence length descending, for potential packing of each batch
     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
@@ -225,7 +220,6 @@ def sequential_all_cumulative_collate(batch):
     X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lon']) for x in batch], batch_first=True)
     X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
     context = torch.from_numpy(context)
-    # Prediction variable (speed of each step)
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_gap']) for x in batch], batch_first=True)
     # Sort all by sequence length descending, for potential packing of each batch
     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
@@ -235,8 +229,7 @@ def sequential_all_cumulative_collate(batch):
     y = y[sorted_indices,:].float()
     return [context, X, sorted_slens], y
 
-def sequential_grid_collate(batch):
-    #TODO:
+def sequential_mto_collate(batch):
     # Context variables to embed
     context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID'], x['tripID']]) for x in batch], dtype='int32')
     # Last dimension is number of sequence variables below
@@ -253,12 +246,11 @@ def sequential_grid_collate(batch):
     X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lon']) for x in batch], batch_first=True)
     X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
     context = torch.from_numpy(context)
-    # Prediction variable (speed of each step)
-    y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
+    y = torch.from_numpy(np.array([x['time'] for x in batch]))
     # Sort all by sequence length descending, for potential packing of each batch
     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
     sorted_slens = sorted_slens.int()
     context = context[sorted_indices,:].int()
     X = X[sorted_indices,:,:].float()
-    y = y[sorted_indices,:].float()
+    y = y[sorted_indices].float()
     return [context, X, sorted_slens], y

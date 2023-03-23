@@ -21,7 +21,7 @@ class FF(nn.Module):
             nn.ReLU(),
             nn.Linear(HIDDEN_SIZE, HIDDEN_SIZE),
             nn.ReLU(),
-            nn.Dropout(p=0.25),
+            nn.Dropout(p=0.2),
             nn.Linear(HIDDEN_SIZE, 1),
         )
     def forward(self, x):
@@ -53,11 +53,11 @@ class FF_GRID(nn.Module):
         # Convolutional
         self.conv_stack = nn.Sequential(
             nn.Conv2d(4,1,3),
-            nn.ReLU(),
             nn.AvgPool2d(2),
+            nn.ReLU(),
             nn.Conv2d(1,1,3),
-            nn.ReLU(),
             nn.AvgPool2d(2),
+            nn.ReLU(),
             nn.Flatten()
         )
         # Feedforward

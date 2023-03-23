@@ -4,7 +4,7 @@ import torch
 from utils import data_utils
 
 
-def fit_to_data(model, train_dataloader, valid_dataloader, LEARN_RATE, EPOCHS, config, device, sequential_flag=False, grid_flag=False):
+def fit_to_data(model, train_dataloader, valid_dataloader, LEARN_RATE, EPOCHS, config, device, sequential_flag=False, mto_flag=False, grid_flag=False):
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARN_RATE)
     training_losses = []
     validation_losses = []
@@ -29,8 +29,11 @@ def fit_to_data(model, train_dataloader, valid_dataloader, LEARN_RATE, EPOCHS, c
                 hidden_prev = torch.zeros(1, len(data[1]), model.hidden_size).to(device)
                 preds, hidden_prev = model(inputs, hidden_prev)
                 hidden_prev = hidden_prev.detach()
-                mask = data_utils.create_tensor_mask(inputs[2]).to(device)
-                loss = model.loss_fn(preds, labels, mask)
+                if mto_flag:
+                    loss = model.loss_fn(preds, labels)
+                else:
+                    mask = data_utils.create_tensor_mask(inputs[2]).to(device)
+                    loss = model.loss_fn(preds, labels, mask)
             else:
                 if grid_flag:
                     inputs[:3] = [i.to(device) for i in inputs[:3]]
@@ -51,12 +54,12 @@ def fit_to_data(model, train_dataloader, valid_dataloader, LEARN_RATE, EPOCHS, c
         model.train(False)
 
         # Calculate the average batch validation loss
-        vlabels, vpreds, avg_batch_vloss = predict(model, valid_dataloader, device, sequential_flag=sequential_flag, grid_flag=grid_flag)
+        vlabels, vpreds, avg_batch_vloss = predict(model, valid_dataloader, device, sequential_flag=sequential_flag, mto_flag=mto_flag, grid_flag=grid_flag)
         validation_losses.append(avg_batch_vloss)
         print(f"LOSS: train {avg_batch_tloss} valid {avg_batch_vloss}")
     return training_losses, validation_losses
 
-def predict(model, dataloader, device, sequential_flag=False, grid_flag=False):
+def predict(model, dataloader, device, sequential_flag=False, mto_flag=False, grid_flag=False):
     labels = []
     preds = []
     avg_batch_loss = 0.0
@@ -71,8 +74,11 @@ def predict(model, dataloader, device, sequential_flag=False, grid_flag=False):
             hidden_prev = torch.zeros(1, len(vlabels), model.hidden_size).to(device)
             vpreds, hidden_prev = model(vinputs, hidden_prev)
             hidden_prev = hidden_prev.detach()
-            vmask = data_utils.create_tensor_mask(vinputs[2]).to(device)
-            loss = model.loss_fn(vpreds, vlabels, vmask)
+            if mto_flag:
+                loss = model.loss_fn(vpreds, vlabels)
+            else:
+                vmask = data_utils.create_tensor_mask(vinputs[2]).to(device)
+                loss = model.loss_fn(vpreds, vlabels, vmask)
         else:
             if grid_flag:
                 vinputs[:3] = [vi.to(device) for vi in vinputs[:3]]
@@ -86,7 +92,7 @@ def predict(model, dataloader, device, sequential_flag=False, grid_flag=False):
         # Save predictions and labels
         labels.append(vlabels)
         preds.append(vpreds)
-    if sequential_flag:
+    if sequential_flag and not mto_flag:
         labels = data_utils.pad_tensors(labels, 1).cpu().detach().numpy()
         preds = data_utils.pad_tensors(preds, 1).cpu().detach().numpy()
     else:
