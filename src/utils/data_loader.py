@@ -6,7 +6,7 @@ from utils import data_utils
 
 
 class GenericDataset(Dataset):
-    def __init__(self, data, config, grid, n_prior):
+    def __init__(self, data, config, grid=None, n_prior=None):
         self.content = data
         self.config = config
         self.grid = grid
@@ -40,7 +40,7 @@ def apply_normalization(sample, config):
             sample[var_name] = data_utils.normalize(np.array(sample[var_name]), config[f"{var_name}_mean"], config[f"{var_name}_std"])
     return sample
 
-def make_generic_dataloader(data, config, batch_size, task_type, num_workers, grid=None, n_prior=1):
+def make_generic_dataloader(data, config, batch_size, task_type, num_workers, grid=None, n_prior=None):
     dataset = GenericDataset(data, config, grid, n_prior)
     if num_workers > 0:
         pin_memory=True

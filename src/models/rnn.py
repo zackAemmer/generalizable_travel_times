@@ -2,19 +2,21 @@ import numpy as np
 import torch
 from torch import nn
 
+from utils import data_utils, model_utils
 from models import masked_loss
 
 
 class GRU_RNN(nn.Module):
-    def __init__(self, model_name, input_size, output_size, hidden_size, batch_size, embed_dict):
+    def __init__(self, model_name, input_size, output_size, hidden_size, batch_size, embed_dict, device):
         super(GRU_RNN, self).__init__()
         self.model_name = model_name
-        self.loss_fn = masked_loss.MaskedMSELoss()
         self.input_size = input_size
         self.output_size = output_size
         self.hidden_size = hidden_size
         self.batch_size = batch_size
         self.embed_dict = embed_dict
+        self.device = device
+        self.loss_fn = masked_loss.MaskedMSELoss()
         # Embeddings
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
         self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
@@ -53,17 +55,36 @@ class GRU_RNN(nn.Module):
         out = self.linear(out)
         out = out.squeeze(2)
         return out, hidden_prev
+    def batch_step(self, data):
+        inputs, labels = data
+        inputs[:2] = [i.to(self.device) for i in inputs[:2]]
+        labels = labels.to(self.device)
+        hidden_prev = torch.zeros(1, len(data[1]), self.hidden_size).to(self.device)
+        preds, hidden_prev = self(inputs, hidden_prev)
+        hidden_prev = hidden_prev.detach()
+        mask = data_utils.create_tensor_mask(inputs[2]).to(self.device)
+        loss = self.loss_fn(preds, labels, mask)
+        return labels, preds, loss
+    def fit_to_data(self, train_dataloader, test_dataloader, test_mask, config, learn_rate, epochs):
+        train_losses, test_losses = model_utils.train_model(self, train_dataloader, test_dataloader, learn_rate, epochs, sequential_flag=True)
+        labels, preds, avg_loss = model_utils.predict(self, test_dataloader, sequential_flag=True)
+        labels = data_utils.de_normalize(labels, config['time_calc_s_mean'], config['time_calc_s_std'])
+        preds = data_utils.de_normalize(preds, config['time_calc_s_mean'], config['time_calc_s_std'])
+        preds = data_utils.aggregate_tts(preds, test_mask)
+        labels = data_utils.aggregate_tts(labels, test_mask)
+        return train_losses, test_losses, labels, preds
 
 class GRU_RNN_MTO(nn.Module):
-    def __init__(self, model_name, input_size, output_size, hidden_size, batch_size, embed_dict):
+    def __init__(self, model_name, input_size, output_size, hidden_size, batch_size, embed_dict, device):
         super(GRU_RNN_MTO, self).__init__()
         self.model_name = model_name
-        self.loss_fn = nn.MSELoss()
         self.input_size = input_size
         self.output_size = output_size
         self.hidden_size = hidden_size
         self.batch_size = batch_size
         self.embed_dict = embed_dict
+        self.device = device
+        self.loss_fn = nn.MSELoss()
         # Embeddings
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
         self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
@@ -99,3 +120,18 @@ class GRU_RNN_MTO(nn.Module):
         out = torch.cat((out, embeddings), dim=1)
         out = self.linear(out).squeeze()
         return out, hidden_prev
+    def batch_step(self, data):
+        inputs, labels = data
+        inputs[:2] = [i.to(self.device) for i in inputs[:2]]
+        labels = labels.to(self.device)
+        hidden_prev = torch.zeros(1, len(data[1]), self.hidden_size).to(self.device)
+        preds, hidden_prev = self(inputs, hidden_prev)
+        hidden_prev = hidden_prev.detach()
+        loss = self.loss_fn(preds, labels)
+        return labels, preds, loss
+    def fit_to_data(self, train_dataloader, test_dataloader, config, learn_rate, epochs):
+        train_losses, test_losses = model_utils.train_model(self, train_dataloader, test_dataloader, learn_rate, epochs)
+        labels, preds, avg_loss = model_utils.predict(self, test_dataloader)
+        labels = data_utils.de_normalize(labels, config['time_mean'], config['time_std'])
+        preds = data_utils.de_normalize(preds, config['time_mean'], config['time_std'])
+        return train_losses, test_losses, labels, preds

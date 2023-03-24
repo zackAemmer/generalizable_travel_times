@@ -145,17 +145,13 @@ def run_models(run_folder, network_folder, hyperparameters):
         # model = ff.FF(
         #     "FF",
         #     8,
+        #     HIDDEN_SIZE,
         #     embed_dict,
-        #     HIDDEN_SIZE
+        #     device
         # ).to(device)
-        # train_dataloader = train_dataloader_basic
-        # test_dataloader = test_dataloader_basic
         # print(f"Training {model.model_name} model...")
-        # train_losses, test_losses = model_utils.fit_to_data(model, train_dataloader, test_dataloader, LEARN_RATE, EPOCHS, config, device)
+        # train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_basic, test_dataloader_basic, config, LEARN_RATE, EPOCHS)
         # torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
-        # labels, preds, avg_loss = model_utils.predict(model, test_dataloader, device)
-        # labels = data_utils.de_normalize(labels, config['time_mean'], config['time_std'])
-        # preds = data_utils.de_normalize(preds, config['time_mean'], config['time_std'])
         # model_list.append(model)
         # model_labels.append(avg_labels)
         # model_preds.append(preds)
@@ -166,24 +162,20 @@ def run_models(run_folder, network_folder, hyperparameters):
         # model = ff.FF_GRID(
         #     "FF_GRID",
         #     8,
+        #     HIDDEN_SIZE,
         #     embed_dict,
-        #     HIDDEN_SIZE
+        #     device
         # ).to(device)
-        # train_dataloader = train_dataloader_grid
-        # test_dataloader = test_dataloader_grid
         # print(f"Training {model.model_name} model...")
-        # train_losses, test_losses = model_utils.fit_to_data(model, train_dataloader, test_dataloader, LEARN_RATE, EPOCHS, config, device, grid_flag=True)
+        # train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_grid, test_dataloader_grid, config, LEARN_RATE, EPOCHS)
         # torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
-        # labels, preds, avg_loss = model_utils.predict(model, test_dataloader, device, grid_flag=True)
-        # labels = data_utils.de_normalize(labels, config['time_mean'], config['time_std'])
-        # preds = data_utils.de_normalize(preds, config['time_mean'], config['time_std'])
         # model_list.append(model)
         # model_labels.append(avg_labels)
         # model_preds.append(preds)
         # curve_models.append(model.model_name)
         # curves.append({"Train":train_losses, "Test":test_losses})
 
-        ### FORECAST TASK ####
+        #### FORECAST TASK ####
         # print("="*30)
         # model = persistent_speed.PersistentSpeedSeqModel("PER", config, 2.0)
         # print(f"Training {model.model_name} model...")
@@ -202,19 +194,12 @@ def run_models(run_folder, network_folder, hyperparameters):
             1,
             HIDDEN_SIZE,
             BATCH_SIZE,
-            embed_dict
+            embed_dict,
+            device
         ).to(device)
-        train_dataloader = train_dataloader_seq
-        test_dataloader = test_dataloader_seq
-        test_mask = test_mask_seq
         print(f"Training {model.model_name} model...")
-        train_losses, test_losses = model_utils.fit_to_data(model, train_dataloader, test_dataloader, LEARN_RATE, EPOCHS, config, device, sequential_flag=True)
+        train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_seq, test_dataloader_seq, test_mask_seq, config, LEARN_RATE, EPOCHS)
         torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
-        labels, preds, avg_loss = model_utils.predict(model, test_dataloader, device, sequential_flag=True)
-        labels = data_utils.de_normalize(labels, config['time_calc_s_mean'], config['time_calc_s_std'])
-        preds = data_utils.de_normalize(preds, config['time_calc_s_mean'], config['time_calc_s_std'])
-        preds = data_utils.aggregate_tts(preds, test_mask)
-        labels = data_utils.aggregate_tts(labels, test_mask)
         model_list.append(model)
         model_labels.append(avg_labels)
         model_preds.append(preds)
@@ -228,16 +213,12 @@ def run_models(run_folder, network_folder, hyperparameters):
             1,
             HIDDEN_SIZE,
             BATCH_SIZE,
-            embed_dict
+            embed_dict,
+            device
         ).to(device)
-        train_dataloader = train_dataloader_seq_mto
-        test_dataloader = test_dataloader_seq_mto
         print(f"Training {model.model_name} model...")
-        train_losses, test_losses = model_utils.fit_to_data(model, train_dataloader, test_dataloader, LEARN_RATE, EPOCHS, config, device, sequential_flag=True, mto_flag=True)
+        train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_seq_mto, test_dataloader_seq_mto, config, LEARN_RATE, EPOCHS)
         torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
-        labels, preds, avg_loss = model_utils.predict(model, test_dataloader, device, sequential_flag=True, mto_flag=True)
-        labels = data_utils.de_normalize(labels, config['time_mean'], config['time_std'])
-        preds = data_utils.de_normalize(preds, config['time_mean'], config['time_std'])
         model_list.append(model)
         model_labels.append(avg_labels)
         model_preds.append(preds)
@@ -246,22 +227,17 @@ def run_models(run_folder, network_folder, hyperparameters):
 
         print("="*30)
         model = conv.CONV(
-            "CONV1D_MTO",
+            "CONV1D_MTM",
             8,
             1,
             HIDDEN_SIZE,
             BATCH_SIZE,
-            embed_dict
+            embed_dict,
+            device
         ).to(device)
-        train_dataloader = train_dataloader_seq_mto
-        test_dataloader = test_dataloader_seq_mto
-        test_mask = test_mask_seq
         print(f"Training {model.model_name} model...")
-        train_losses, test_losses = model_utils.fit_to_data(model, train_dataloader, test_dataloader, LEARN_RATE, EPOCHS, config, device, sequential_flag=True, mto_flag=True)
+        train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_seq, test_dataloader_seq, test_mask_seq, config, LEARN_RATE, EPOCHS)
         torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
-        labels, preds, avg_loss = model_utils.predict(model, test_dataloader, device, sequential_flag=True, mto_flag=True)
-        labels = data_utils.de_normalize(labels, config['time_mean'], config['time_std'])
-        preds = data_utils.de_normalize(preds, config['time_mean'], config['time_std'])
         model_list.append(model)
         model_labels.append(avg_labels)
         model_preds.append(preds)
@@ -301,10 +277,10 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/debug/",
+        run_folder="./results/small/",
         network_folder="kcm/",
         hyperparameters={
-            "EPOCHS": 3,
+            "EPOCHS": 30,
             "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
@@ -314,10 +290,10 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/debug/",
+        run_folder="./results/small/",
         network_folder="atb/",
         hyperparameters={
-            "EPOCHS": 3,
+            "EPOCHS": 30,
             "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
