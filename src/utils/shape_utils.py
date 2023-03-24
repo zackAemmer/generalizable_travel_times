@@ -138,19 +138,22 @@ def save_grid_anim(data, file_name):
     # Save the animation object
     ani.save(f"../plots/{file_name}", fps=10, dpi=300)
 
-def get_adjacent_points(df, shingle_id, t_buffer, dist):
+def get_adjacent_points(df, shingle_id, dist_buffer, time_buffer):
+    # Convert meters to decimal degrees
+    dist_buffer = dist_buffer / 111111
     # Critical to not reset index on df or intermediate results
     shingle_data = df[df['shingle_id']==shingle_id]
     adjacent_data = df[df['shingle_id']!=shingle_id]
     # Filter on time
-    t_buffer = 120
-    t_min = np.min(shingle_data.locationtime) - t_buffer
-    t_max = np.max(shingle_data.locationtime)
+    t_min = np.min(shingle_data.locationtime) - time_buffer
+    t_max = np.min(shingle_data.locationtime)
     adjacent_data = adjacent_data[adjacent_data['locationtime'].between(t_min, t_max)]
     # Filter on distance
     points = np.array([adjacent_data['lon'], adjacent_data['lat']]).T.tolist()
     query_points = np.array([shingle_data['lon'], shingle_data['lat']]).T.tolist()
-    pt_indices = get_points_within_dist(points, query_points, dist)
+    if len(points)==0:
+        return (shingle_data, None)
+    pt_indices = get_points_within_dist(points, query_points, dist_buffer)
     adjacent_data = adjacent_data.iloc[pt_indices].sort_values(['shingle_id','locationtime'])
     return (shingle_data, adjacent_data)
 
@@ -336,4 +339,44 @@ def plot_traces_on_map(mapbox_token, plot_data):
     margin=dict(r=60, t=25, b=40, l=60)
     )
     # fig.write_html("../plots/adjacent_trip_traces.html")
+    fig.show()
+
+def fit_poly(x, y):
+    # Fit polynomial to the data
+    z = np.polyfit(x=x, y=y, deg=2)
+    # Get values for plotting the line of fit
+    x_val = np.arange(np.min(x),np.max(x),.1)
+    p = np.poly1d(z)
+    y_val = p(x_val)
+    # R2: variance explained by model / total variance
+    SSR = np.sum((y - p(x))**2)
+    SST = np.sum((y - np.mean(y))**2)
+    R2 = 1 - (SSR/SST)
+    return R2, x_val, y_val
+
+def plot_poly(x, y, R2, x_val, y_val):
+    plot_data = pd.concat([
+        pd.DataFrame({
+            "x": x,
+            "y": y,
+            "Type": "data"
+        }),
+        pd.DataFrame({
+            "x": x_val,
+            "y": y_val,
+            "Type": "pred"
+        })
+    ])
+    fig = px.scatter(
+        plot_data,
+        y="y",
+        color="Type",
+        x="x",
+        title=f"Mean Adjacent Speed D=2 Polynomial R-Squared: {np.round(R2,3)}",
+        labels={
+            "x": "Mean Speed of Adjacent Trips (m/s)",
+            "y": "Mean Speed of Target Trip (m/s)",
+        }
+    )
+    # fig.write_image("../plots/speed_reg.png")
     fig.show()
