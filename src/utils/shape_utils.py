@@ -134,7 +134,7 @@ def save_grid_anim(data, file_name):
             ax.clear()
             ax.imshow(data[frame,i,:,:], cmap='plasma', vmin=0.0, vmax=35.0)
     # Create the animation object
-    ani = animation.FuncAnimation(fig, update, frames=data.shape[2])
+    ani = animation.FuncAnimation(fig, update, frames=data.shape[0])
     # Save the animation object
     ani.save(f"../plots/{file_name}", fps=10, dpi=300)
 

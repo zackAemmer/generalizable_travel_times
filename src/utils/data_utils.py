@@ -136,20 +136,22 @@ def load_train_test_data(data_folder, n_folds):
     test_grid = load_pkl(f"{data_folder}../test_grid.pkl")
     return train_data_chunks, test_data, train_grid, test_grid
 
-def load_run_input_data(run_folder, network_folder):
+def load_all_inputs(run_folder, network_folder):
     train_traces = load_pkl(f"{run_folder}{network_folder}train_traces.pkl")
     test_traces = load_pkl(f"{run_folder}{network_folder}test_traces.pkl")
     with open(f"{run_folder}{network_folder}/deeptte_formatted/config.json") as f:
         config = json.load(f)
     gtfs_data = merge_gtfs_files(f".{config['gtfs_folder']}")
-    tte_train_chunks, tte_test = load_train_test_data(f"{run_folder}{network_folder}/deeptte_formatted/", config['n_folds'])
+    train_data_chunks, test_data, train_grid, test_grid = load_train_test_data(f"{run_folder}{network_folder}/deeptte_formatted/", config['n_folds'])
     return {
         "train_traces": train_traces,
         "test_traces": test_traces,
         "config": config,
         "gtfs_data": gtfs_data,
-        "tte_train_chunks": tte_train_chunks,
-        "tte_test": tte_test
+        "train_data_chunks": train_data_chunks,
+        "test_data": test_data,
+        "train_grid": train_grid,
+        "test_grid": test_grid
     }
 
 def combine_pkl_data(folder, file_list, given_names):
