@@ -6,23 +6,38 @@ from utils import data_utils
 
 
 class GenericDataset(Dataset):
-    def __init__(self, data, config, grid=None, n_prior=None):
+    def __init__(self, data, config, grid=None, n_prior=None, buffer=None):
         self.content = data
         self.config = config
         self.grid = grid
         self.n_prior = n_prior
-
+        self.buffer = buffer
     def __getitem__(self, index):
         sample = self.content[index]
         if self.grid is not None:
-            tbin_idx = sample['tbin_idx']
-            if tbin_idx - self.n_prior < 0:
-                sample['grid_features'] = np.zeros((self.n_prior, self.grid.shape[1], self.grid.shape[2], self.grid.shape[3]))
-            else:
-                sample['grid_features'] = self.grid[tbin_idx-self.n_prior:tbin_idx,:,:,:]
+            tbins = sample['tbin_idx']
+            tbin_start_idx = tbins[0]
+            xbins = sample['xbin_idx']
+            ybins = sample['ybin_idx']
+            grid_features = []
+            # Loop over each point in sample
+            for i in range(len(sample['tbin_idx'])):
+                # If the point occurs before start, or buffer would put off edge of grid, use 0s
+                if tbin_start_idx - self.n_prior < 0:
+                    feature = np.zeros((self.n_prior, self.grid.shape[1], 2*self.buffer+1, 2*self.buffer+1))
+                elif xbins[i]-self.buffer-1 < 0 or ybins[i]-self.buffer-1 < 0:
+                    feature = np.zeros((self.n_prior, self.grid.shape[1], 2*self.buffer+1, 2*self.buffer+1))
+                elif xbins[i]+self.buffer > self.grid.shape[2] or ybins[i]+self.buffer > self.grid.shape[3]:
+                    feature = np.zeros((self.n_prior, self.grid.shape[1], 2*self.buffer+1, 2*self.buffer+1))
+                else:
+                    # Filter grid based on shingle start time (pts<start), and adjacent squares to buffer (pts +/- buffer, including middle point)
+                    feature = self.grid[tbin_start_idx-self.n_prior:tbin_start_idx,:,xbins[i]-self.buffer-1:xbins[i]+self.buffer,ybins[i]-self.buffer-1:ybins[i]+self.buffer]
+                    if feature.shape != (1,4,11,11):
+                        print("DH")
+                grid_features.append(feature)
+            sample['grid_features'] = grid_features
         sample = apply_normalization(sample.copy(), self.config)
         return sample
-
     def __len__(self):
         return len(self.content)
 
@@ -40,8 +55,8 @@ def apply_normalization(sample, config):
             sample[var_name] = data_utils.normalize(np.array(sample[var_name]), config[f"{var_name}_mean"], config[f"{var_name}_std"])
     return sample
 
-def make_generic_dataloader(data, config, batch_size, task_type, num_workers, grid=None, n_prior=None):
-    dataset = GenericDataset(data, config, grid, n_prior)
+def make_generic_dataloader(data, config, batch_size, task_type, num_workers, grid=None, n_prior=None, buffer=None):
+    dataset = GenericDataset(data, config, grid, n_prior, buffer)
     if num_workers > 0:
         pin_memory=True
     else:
@@ -52,6 +67,8 @@ def make_generic_dataloader(data, config, batch_size, task_type, num_workers, gr
         dataloader = DataLoader(dataset, collate_fn=basic_grid_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
     elif task_type == "sequential":
         dataloader = DataLoader(dataset, collate_fn=sequential_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
+    elif task_type == "sequential_grid":
+        dataloader = DataLoader(dataset, collate_fn=sequential_grid_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
     elif task_type == "sequential_spd":
         dataloader = DataLoader(dataset, collate_fn=sequential_spd_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
     elif task_type == "sequential_dist_cumulative":
@@ -139,6 +156,40 @@ def sequential_collate(batch):
     X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lat']) for x in batch], batch_first=True)
     X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lon']) for x in batch], batch_first=True)
     X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
+    context = torch.from_numpy(context)
+    y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
+    # Sort all by sequence length descending, for potential packing of each batch
+    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
+    sorted_slens = sorted_slens.int()
+    context = context[sorted_indices,:].int()
+    X = X[sorted_indices,:,:].float()
+    y = y[sorted_indices,:].float()
+    return [context, X, sorted_slens], y
+
+def sequential_grid_collate(batch):
+    # Context variables to embed
+    context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID'], x['tripID']]) for x in batch], dtype='int32')
+    # Last dimension is number of sequence variables below
+    seq_lens = [len(x['lats']) for x in batch]
+    max_len = max(seq_lens)
+    X = torch.zeros((len(batch), max_len, 12))
+    X_gr = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['grid_features']) for x in batch], batch_first=True)
+    X_gr = torch.mean(X_gr, dim=(2,4,5))
+    # Sequence variables
+    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lats']) for x in batch], batch_first=True)
+    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lngs']) for x in batch], batch_first=True)
+    X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
+    X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
+    X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
+    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lat']) for x in batch], batch_first=True)
+    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lon']) for x in batch], batch_first=True)
+    X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
+    # Use the average channel speed as its own feature (no convolution)
+    X[:,:,8] = X_gr[:,:,0]
+    X[:,:,9] = X_gr[:,:,1]
+    X[:,:,10] = X_gr[:,:,2]
+    X[:,:,11] = X_gr[:,:,3]
+    # X_gr = torch.from_numpy(X_gr)
     context = torch.from_numpy(context)
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
     # Sort all by sequence length descending, for potential packing of each batch

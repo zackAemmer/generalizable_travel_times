@@ -72,21 +72,25 @@ def decompose_vector(scalars, bearings, data_to_attach=None):
 
     return (x_pos, x_neg, y_pos, y_neg)
 
-def get_grid_features(traces, resolution=32, timestep=120, bbox=None):
+def get_grid_features(traces, resolution=64, timestep=30, bbox=None):
     # Create grid
     if bbox is not None:
         point_obs = apply_bbox(point_obs, bbox)
-    grid, tbins = decompose_and_rasterize(traces['speed_m_s'].values, traces['bearing'].values, traces['lon'].values, traces['lat'].values, traces['locationtime'].values, timestep, resolution)
+    grid, tbins, xbins, ybins = decompose_and_rasterize(traces['speed_m_s'].values, traces['bearing'].values, traces['lon'].values, traces['lat'].values, traces['locationtime'].values, timestep, resolution)
     # Get tbins for each trace. No overlap between current trip and grid values.
     # Grid assigned values: binedge[i-1] <= x < binedge[i]
     # Trace values: binedge[i-1] < x <= binedge[i]
-    tbin_idxs = np.digitize(traces['locationtime'].values, tbins, right=True) - 1
-    tbin_idxs = np.maximum(0,tbin_idxs)
     # Want all values up through the previous bin index (since that is guaranteed < x)
     # [i-n_prior:i] will give give n_prior total values, including up to the bin before i
-    # For elements with less than n_prior, return what is available
-    # grid_features = [grid[:,:,i-n_prior:i,:] if i-n_prior>=0 else grid[:,:,:i,:] for i in tbin_idxs]
-    return grid, tbin_idxs
+    tbin_idxs = np.digitize(traces['locationtime'].values, tbins, right=True) - 1
+    tbin_idxs = np.maximum(0,tbin_idxs)
+    # Opposite is true for lat/lon: want the exact bin that the value falls in
+    # [i-buffer-1:i+buffer] will give 2*buffer+1 total values, with bin i in the middle
+    xbin_idxs = np.digitize(traces['lon'].values, xbins, right=False)
+    xbin_idxs = np.maximum(0,xbin_idxs)
+    ybin_idxs = np.digitize(traces['lat'].values, ybins, right=False)
+    ybin_idxs = np.maximum(0,ybin_idxs)
+    return grid, tbin_idxs, xbin_idxs, ybin_idxs
 
 def decompose_and_rasterize(features, bearings, lons, lats, times, timestep, resolution):
     # Get regularly spaced bins at given resolution/timestep across bbox for all collected points
@@ -120,7 +124,7 @@ def decompose_and_rasterize(features, bearings, lons, lats, times, timestep, res
         rast = np.swapaxes(rast, 0, 2)
         # Save binned values for each channel
         all_channel_rasts[:,i,:,:] = rast
-    return all_channel_rasts, tbins
+    return all_channel_rasts, tbins, lonbins, latbins
 
 def save_grid_anim(data, file_name):
     # Plot all channels

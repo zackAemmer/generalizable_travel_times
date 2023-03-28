@@ -374,6 +374,13 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
     trace_data['vehicleID'] = trace_data['vehicle_id_recode']
     trace_data['tripID'] = trace_data['trip_id_recode']
 
+    # Calculate and add grid features
+    grid, tbin_idxs, xbin_idxs, ybin_idxs = shape_utils.get_grid_features(trace_data, resolution=128, timestep=30, bbox=None)
+    trace_data['tbin_idx'] = tbin_idxs
+    trace_data['xbin_idx'] = xbin_idxs
+    trace_data['ybin_idx'] = ybin_idxs
+
+    # Gather by shingle
     groups = trace_data.groupby('shingle_id')
 
     # Get necessary features as scalar or lists
@@ -408,11 +415,11 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
         'stop_lon': lambda x: x.tolist(),
         'stop_dist_km': lambda x: x.tolist(),
         'scheduled_time_s': lambda x: x.tolist(),
+        # Grid
+        'tbin_idx': lambda x: x.tolist(),
+        'xbin_idx': lambda x: x.tolist(),
+        'ybin_idx': lambda x: x.tolist()
     })
-
-    # Save time index of grid occurring before shingle start
-    grid, tbin_idxs = shape_utils.get_grid_features(groups.first())
-    result['tbin_idx'] = tbin_idxs
 
     # Convert the DataFrame to a dictionary with the original format
     if is_test:
