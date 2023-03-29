@@ -15,6 +15,8 @@ import shapely.geometry
 from scipy.spatial import KDTree
 from shapely.errors import ShapelyDeprecationWarning
 
+from utils import data_utils
+
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 
@@ -66,11 +68,42 @@ def decompose_vector(scalars, bearings, data_to_attach=None):
     x_neg = x_all[x<=0.0]
     y_pos = y_all[y>=0.0]
     y_neg = y_all[y<=0.0]
-
     x_neg[:,0] = np.abs(x_neg[:,0])
     y_neg[:,0] = np.abs(y_neg[:,0])
-
     return (x_pos, x_neg, y_pos, y_neg)
+
+def extract_grid_features(grid, tbins, xbins, ybins, n_prior=1, buffer=20):
+    """
+    Given sequence of bins from a trip, reconstruct grid features.
+    Normalize the grid based on the starting point.
+    """
+    tbin_start_idx = tbins[0]
+    grid_features = []
+    for i in range(len(tbins)):
+        # If the point occurs before start, or buffer would put off edge of grid, use 0s
+        if tbin_start_idx - n_prior < 0:
+            feature = np.ones((n_prior, grid.shape[1], 2*buffer+1, 2*buffer+1))*-1
+        elif xbins[i]-buffer-1 < 0 or ybins[i]-buffer-1 < 0:
+            feature = np.ones((n_prior, grid.shape[1], 2*buffer+1, 2*buffer+1))*-1
+        elif xbins[i]+buffer > grid.shape[3] or ybins[i]+buffer > grid.shape[2]:
+            feature = np.ones((n_prior, grid.shape[1], 2*buffer+1, 2*buffer+1))*-1
+        else:
+            # Filter grid based on shingle start time (pts<start), and adjacent squares to buffer (pts +/- buffer, including middle point)
+            feature = grid[tbin_start_idx-n_prior:tbin_start_idx,:,xbins[i]-buffer-1:xbins[i]+buffer,ybins[i]-buffer-1:ybins[i]+buffer]
+        grid_features.append(feature)
+    grid_features = np.concatenate(grid_features)
+    # Normalize the grid to the information present when the trip starts=
+    if len(grid_features[grid_features!=-1])==0:
+        # The grid may be completely empty
+        grid_avg = 0.0
+        grid_std = 1.0
+    else:
+        grid_avg = np.mean(grid_features[grid_features!=-1])
+        grid_std = np.std(grid_features[grid_features!=-1])
+    # All unknown cells are given the average, all are then normalized
+    grid_features[grid_features==-1] = grid_avg
+    grid_features = data_utils.normalize(grid_features, grid_avg, grid_std)
+    return grid_features
 
 def get_grid_features(traces, resolution=64, timestep=30, bbox=None):
     # Create grid
@@ -105,14 +138,15 @@ def decompose_and_rasterize(features, bearings, lons, lats, times, timestep, res
     # Split features into quadrant channels
     channel_obs = decompose_vector(features, bearings, np.column_stack([lats, lons, times]))
     # For each channel, aggregate by location and timestep bins
-    all_channel_rasts = np.zeros((len(tbins)-1, len(channel_obs), len(latbins)-1, len(lonbins)-1), dtype='float64')
+    all_channel_rasts = np.ones((len(tbins)-1, len(channel_obs), len(latbins)-1, len(lonbins)-1), dtype='float64') * -1
     for i, channel in enumerate(channel_obs):
         # Get the average feature value in each bin
         count_hist, count_edges = np.histogramdd(channel[:,1:4], bins=[latbins, lonbins, tbins])
         sum_hist, edges = np.histogramdd(channel[:,1:4], weights=channel[:,0], bins=[latbins, lonbins, tbins])
         rast = sum_hist / np.maximum(1, count_hist)
-        # Fill zeros with very small value
-        rast[rast==0] = .0000001
+        # Mask cells with no information as -1
+        mask = count_hist!=0
+        rast[~mask] = -1
         # Invert latitude values (the bins must be increasing in hist dd, but in reality latitude decreases)
         # This would not need to be flipped for data below the equator
         # For longitudes, AtB may need to be flipped
@@ -126,7 +160,7 @@ def decompose_and_rasterize(features, bearings, lons, lats, times, timestep, res
         all_channel_rasts[:,i,:,:] = rast
     return all_channel_rasts, tbins, lonbins, latbins
 
-def save_grid_anim(data, file_name):
+def save_grid_anim(data, file_name, vmin, vmax):
     # Plot all channels
     fig, axes = plt.subplots(2,2)
     axes = axes.reshape(-1)
@@ -136,7 +170,7 @@ def save_grid_anim(data, file_name):
         fig.suptitle(f"Frame {frame}")
         for i, ax in enumerate(axes):
             ax.clear()
-            ax.imshow(data[frame,i,:,:], cmap='plasma', vmin=0.0, vmax=35.0)
+            ax.imshow(data[frame,i,:,:], cmap='plasma', vmin=vmin, vmax=vmax)
     # Create the animation object
     ani = animation.FuncAnimation(fig, update, frames=data.shape[0])
     # Save the animation object

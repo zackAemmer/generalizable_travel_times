@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from utils import data_utils
+from utils import data_utils, shape_utils
 
 
 class GenericDataset(Dataset):
@@ -19,22 +19,7 @@ class GenericDataset(Dataset):
             tbin_start_idx = tbins[0]
             xbins = sample['xbin_idx']
             ybins = sample['ybin_idx']
-            grid_features = []
-            # Loop over each point in sample
-            for i in range(len(sample['tbin_idx'])):
-                # If the point occurs before start, or buffer would put off edge of grid, use 0s
-                if tbin_start_idx - self.n_prior < 0:
-                    feature = np.zeros((self.n_prior, self.grid.shape[1], 2*self.buffer+1, 2*self.buffer+1))
-                elif xbins[i]-self.buffer-1 < 0 or ybins[i]-self.buffer-1 < 0:
-                    feature = np.zeros((self.n_prior, self.grid.shape[1], 2*self.buffer+1, 2*self.buffer+1))
-                elif xbins[i]+self.buffer > self.grid.shape[2] or ybins[i]+self.buffer > self.grid.shape[3]:
-                    feature = np.zeros((self.n_prior, self.grid.shape[1], 2*self.buffer+1, 2*self.buffer+1))
-                else:
-                    # Filter grid based on shingle start time (pts<start), and adjacent squares to buffer (pts +/- buffer, including middle point)
-                    feature = self.grid[tbin_start_idx-self.n_prior:tbin_start_idx,:,xbins[i]-self.buffer-1:xbins[i]+self.buffer,ybins[i]-self.buffer-1:ybins[i]+self.buffer]
-                    if feature.shape != (1,4,11,11):
-                        print("DH")
-                grid_features.append(feature)
+            grid_features = shape_utils.extract_grid_features(self.grid, sample['tbins'], sample['xbins'], sample['ybins'], self.n_prior, self.buffer)
             sample['grid_features'] = grid_features
         sample = apply_normalization(sample.copy(), self.config)
         return sample
