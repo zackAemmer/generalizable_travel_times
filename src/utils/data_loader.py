@@ -36,28 +36,13 @@ def apply_normalization(sample, config):
             sample[var_name] = data_utils.normalize(np.array(sample[var_name]), config[f"{var_name}_mean"], config[f"{var_name}_std"])
     return sample
 
-def make_generic_dataloader(data, config, batch_size, task_type, num_workers, grid=None, n_prior=None, buffer=None):
+def make_generic_dataloader(data, config, batch_size, collate_fn, num_workers, grid=None, n_prior=None, buffer=None):
     dataset = GenericDataset(data, config, grid, n_prior, buffer)
     if num_workers > 0:
         pin_memory=True
     else:
         pin_memory=False
-    if task_type == "basic":
-        dataloader = DataLoader(dataset, collate_fn=basic_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
-    elif task_type == "basic_grid":
-        dataloader = DataLoader(dataset, collate_fn=basic_grid_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
-    elif task_type == "sequential":
-        dataloader = DataLoader(dataset, collate_fn=sequential_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
-    elif task_type == "sequential_grid":
-        dataloader = DataLoader(dataset, collate_fn=sequential_grid_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
-    elif task_type == "sequential_spd":
-        dataloader = DataLoader(dataset, collate_fn=sequential_spd_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
-    elif task_type == "sequential_dist_cumulative":
-        dataloader = DataLoader(dataset, collate_fn=sequential_dist_cumulative_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
-    elif task_type == "sequential_all_cumulative":
-        dataloader = DataLoader(dataset, collate_fn=sequential_all_cumulative_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
-    elif task_type == "sequential_mto":
-        dataloader = DataLoader(dataset, collate_fn=sequential_mto_collate, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
+    dataloader = DataLoader(dataset, collate_fn=collate_fn, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
     return dataloader
 
 def basic_collate(batch):
@@ -181,6 +166,34 @@ def sequential_grid_collate(batch):
     X = X[sorted_indices,:,:].float()
     y = y[sorted_indices,:].float()
     return [context, X, sorted_slens], y
+
+def sequential_grid_conv_collate(batch):
+    # Context variables to embed
+    context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID'], x['tripID']]) for x in batch], dtype='int32')
+    # Last dimension is number of sequence variables below
+    seq_lens = [len(x['lats']) for x in batch]
+    max_len = max(seq_lens)
+    X = torch.zeros((len(batch), max_len, 8))
+    X_gr = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['grid_features']) for x in batch], batch_first=True)
+    # Sequence variables
+    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lats']) for x in batch], batch_first=True)
+    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lngs']) for x in batch], batch_first=True)
+    X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
+    X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
+    X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
+    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lat']) for x in batch], batch_first=True)
+    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lon']) for x in batch], batch_first=True)
+    X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
+    context = torch.from_numpy(context)
+    y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
+    # Sort all by sequence length descending, for potential packing of each batch
+    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
+    sorted_slens = sorted_slens.int()
+    context = context[sorted_indices,:].int()
+    X = X[sorted_indices,:,:].float()
+    X_gr = X_gr[sorted_indices,:,:].float()
+    y = y[sorted_indices,:].float()
+    return [context, X, sorted_slens, X_gr], y
 
 def sequential_spd_collate(batch):
     # Context variables to embed

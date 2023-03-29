@@ -57,7 +57,7 @@ class GRU_RNN(nn.Module):
         return out, hidden_prev
     def batch_step(self, data):
         inputs, labels = data
-        inputs[:2] = [i.to(self.device) for i in inputs[:2]]
+        inputs = [i.to(self.device) for i in inputs]
         labels = labels.to(self.device)
         hidden_prev = torch.zeros(1, len(data[1]), self.hidden_size).to(self.device)
         preds, hidden_prev = self(inputs, hidden_prev)
@@ -106,7 +106,6 @@ class GRU_RNN_GRID(nn.Module):
     def forward(self, x, hidden_prev):
         x_em = x[0]
         x_ct = x[1]
-        # x_gr = x[2]
         # Embed categorical variables
         timeID_embedded = self.timeID_em(x_em[:,0])
         weekID_embedded = self.weekID_em(x_em[:,1])
@@ -123,7 +122,88 @@ class GRU_RNN_GRID(nn.Module):
         return out, hidden_prev
     def batch_step(self, data):
         inputs, labels = data
-        inputs[:2] = [i.to(self.device) for i in inputs[:2]]
+        inputs = [i.to(self.device) for i in inputs]
+        labels = labels.to(self.device)
+        hidden_prev = torch.zeros(1, len(data[1]), self.hidden_size).to(self.device)
+        preds, hidden_prev = self(inputs, hidden_prev)
+        hidden_prev = hidden_prev.detach()
+        mask = data_utils.create_tensor_mask(inputs[2]).to(self.device)
+        loss = self.loss_fn(preds, labels, mask)
+        return labels, preds, loss
+    def fit_to_data(self, train_dataloader, test_dataloader, test_mask, config, learn_rate, epochs):
+        train_losses, test_losses = model_utils.train_model(self, train_dataloader, test_dataloader, learn_rate, epochs, sequential_flag=True)
+        labels, preds, avg_loss = model_utils.predict(self, test_dataloader, sequential_flag=True)
+        labels = data_utils.de_normalize(labels, config['time_calc_s_mean'], config['time_calc_s_std'])
+        preds = data_utils.de_normalize(preds, config['time_calc_s_mean'], config['time_calc_s_std'])
+        preds = data_utils.aggregate_tts(preds, test_mask)
+        labels = data_utils.aggregate_tts(labels, test_mask)
+        return train_losses, test_losses, labels, preds
+
+class GRU_RNN_GRID_CONV(nn.Module):
+    def __init__(self, model_name, input_size, output_size, grid_pt_size, hidden_size, batch_size, embed_dict, device):
+        super(GRU_RNN_GRID_CONV, self).__init__()
+        self.model_name = model_name
+        self.input_size = input_size
+        self.output_size = output_size
+        self.grid_pt_size = grid_pt_size
+        self.hidden_size = hidden_size
+        self.batch_size = batch_size
+        self.embed_dict = embed_dict
+        self.device = device
+        self.loss_fn = masked_loss.MaskedMSELoss()
+        # Embeddings
+        self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
+        self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
+        self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
+        self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
+        self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
+        # Recurrent layer
+        self.rnn = nn.GRU(
+            input_size=self.input_size,
+            hidden_size=self.hidden_size,
+            num_layers=1,
+            batch_first=True
+        )
+        # Convolution layer
+        self.conv = nn.Sequential(
+            nn.Conv3d(
+                in_channels=4,
+                out_channels=self.hidden_size,
+                kernel_size=3,
+                padding=1
+            )
+        )
+        # Linear compression layer
+        self.linear = nn.Linear(
+            in_features=hidden_size + self.grid_pt_size**2 * self.hidden_size + self.embed_total_dims,
+            out_features=self.output_size
+        )
+    def forward(self, x, hidden_prev):
+        x_em = x[0]
+        x_ct = x[1]
+        x_gr = x[3]
+        x_gr = torch.swapaxes(x_gr, 1, 2)
+        # Embed categorical variables
+        timeID_embedded = self.timeID_em(x_em[:,0])
+        weekID_embedded = self.weekID_em(x_em[:,1])
+        driverID_embedded = self.driverID_em(x_em[:,2])
+        tripID_embedded = self.tripID_em(x_em[:,3])
+        # Get recurrent pred
+        rnn_out, hidden_prev = self.rnn(x_ct, hidden_prev)
+        # Get conv pred
+        conv_out = self.conv(x_gr)
+        conv_out = torch.swapaxes(conv_out, 1, 2)
+        conv_out = conv_out.flatten(start_dim=2)
+        # Add context, combine in linear layer
+        embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
+        embeddings = embeddings.repeat(1,rnn_out.shape[1],1)
+        out = torch.cat((rnn_out, conv_out, embeddings), dim=2)
+        out = self.linear(out)
+        out = out.squeeze(2)
+        return out, hidden_prev
+    def batch_step(self, data):
+        inputs, labels = data
+        inputs = [i.to(self.device) for i in inputs]
         labels = labels.to(self.device)
         hidden_prev = torch.zeros(1, len(data[1]), self.hidden_size).to(self.device)
         preds, hidden_prev = self(inputs, hidden_prev)
@@ -251,7 +331,7 @@ class LSTM_RNN(nn.Module):
         return out, prev_state
     def batch_step(self, data):
         inputs, labels = data
-        inputs[:2] = [i.to(self.device) for i in inputs[:2]]
+        inputs = [i.to(self.device) for i in inputs]
         labels = labels.to(self.device)
         h_0 = torch.zeros(1, len(data[1]), self.hidden_size).to(self.device)
         c_0 = torch.zeros(1, len(data[1]), self.hidden_size).to(self.device)

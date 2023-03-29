@@ -73,29 +73,34 @@ def run_models(run_folder, network_folder, hyperparameters):
         train_data = list(itertools.chain.from_iterable(train_data))
 
         # Construct dataloaders for Pytorch models
-        train_dataloader_basic = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "basic", NUM_WORKERS)
-        test_dataloader_basic = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "basic", NUM_WORKERS)
+        train_dataloader_basic = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
+        test_dataloader_basic = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
 
-        train_dataloader_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "basic_grid", NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
-        test_dataloader_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "basic_grid", NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
+        train_dataloader_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
+        test_dataloader_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
 
-        train_dataloader_seq = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "sequential", NUM_WORKERS)
-        test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "sequential", NUM_WORKERS)
+        train_dataloader_seq = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
+        test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
         _, _ = data_utils.get_seq_info(train_dataloader_seq)
         _, test_mask_seq = data_utils.get_seq_info(test_dataloader_seq)
 
-        train_dataloader_seq_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "sequential_grid", NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
-        test_dataloader_seq_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "sequential_grid", NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
+        train_dataloader_seq_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
+        test_dataloader_seq_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
         _, _ = data_utils.get_seq_info(train_dataloader_seq_grid)
         _, test_mask_seq_grid = data_utils.get_seq_info(test_dataloader_seq_grid)
 
-        train_dataloader_seq_spd = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "sequential_spd", NUM_WORKERS)
-        test_dataloader_seq_spd = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "sequential_spd", NUM_WORKERS)
+        train_dataloader_seq_grid_conv = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_grid_conv_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
+        test_dataloader_seq_grid_conv = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_grid_conv_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
+        _, _ = data_utils.get_seq_info(train_dataloader_seq_grid_conv)
+        _, test_mask_seq_grid_conv = data_utils.get_seq_info(test_dataloader_seq_grid_conv)
+
+        train_dataloader_seq_spd = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_spd_collate, NUM_WORKERS)
+        test_dataloader_seq_spd = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_spd_collate, NUM_WORKERS)
         _, _ = data_utils.get_seq_info(train_dataloader_seq_spd)
         _, test_mask_spd = data_utils.get_seq_info(test_dataloader_seq_spd)
 
-        train_dataloader_seq_mto = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, "sequential_mto", NUM_WORKERS)
-        test_dataloader_seq_mto = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, "sequential_mto", NUM_WORKERS)
+        train_dataloader_seq_mto = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
+        test_dataloader_seq_mto = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
 
         print(f"Successfully loaded {len(train_data)} training samples and {len(test_data)} testing samples.")
 
@@ -211,18 +216,38 @@ def run_models(run_folder, network_folder, hyperparameters):
         # curve_models.append(model.model_name)
         # curves.append({"Train":train_losses, "Test":test_losses})
 
+        # print("="*30)
+        # model = rnn.GRU_RNN_GRID(
+        #     "GRU_RNN_GRID",
+        #     12,
+        #     1,
+        #     HIDDEN_SIZE,
+        #     BATCH_SIZE,
+        #     embed_dict,
+        #     device
+        # ).to(device)
+        # print(f"Training {model.model_name} model...")
+        # train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_seq_grid, test_dataloader_seq_grid, test_mask_seq_grid, config, LEARN_RATE, EPOCHS)
+        # torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
+        # model_list.append(model)
+        # model_labels.append(avg_labels)
+        # model_preds.append(preds)
+        # curve_models.append(model.model_name)
+        # curves.append({"Train":train_losses, "Test":test_losses})
+
         print("="*30)
-        model = rnn.GRU_RNN_GRID(
-            "GRU_RNN_GRID",
-            12,
+        model = rnn.GRU_RNN_GRID_CONV(
+            "GRU_RNN_GRID_CONV",
+            8,
             1,
-            HIDDEN_SIZE,
+            11,
+            HIDDEN_SIZE/4,
             BATCH_SIZE,
             embed_dict,
             device
         ).to(device)
         print(f"Training {model.model_name} model...")
-        train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_seq_grid, test_dataloader_seq_grid, test_mask_seq_grid, config, LEARN_RATE, EPOCHS)
+        train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_seq_grid_conv, test_dataloader_seq_grid_conv, test_mask_seq_grid_conv, config, LEARN_RATE, EPOCHS)
         torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
         model_list.append(model)
         model_labels.append(avg_labels)
