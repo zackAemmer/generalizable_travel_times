@@ -43,6 +43,11 @@ def normalize(ary, mean, std):
     """
     Z = (x - u) / sigma
     """
+    ary[ary==0] = 1e-6
+    if mean==0:
+        mean = 1e-6
+    if std==0:
+        std = 1e-6
     return (ary - mean) / std
 
 def de_normalize(ary, mean, std):

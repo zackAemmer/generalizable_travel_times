@@ -15,11 +15,7 @@ class GenericDataset(Dataset):
     def __getitem__(self, index):
         sample = self.content[index]
         if self.grid is not None:
-            tbins = sample['tbin_idx']
-            tbin_start_idx = tbins[0]
-            xbins = sample['xbin_idx']
-            ybins = sample['ybin_idx']
-            grid_features = shape_utils.extract_grid_features(self.grid, sample['tbins'], sample['xbins'], sample['ybins'], self.n_prior, self.buffer)
+            grid_features = shape_utils.extract_grid_features(self.grid, sample['tbin_idx'], sample['xbin_idx'], sample['ybin_idx'], self.n_prior, self.buffer)
             sample['grid_features'] = grid_features
         sample = apply_normalization(sample.copy(), self.config)
         return sample
@@ -159,7 +155,8 @@ def sequential_grid_collate(batch):
     max_len = max(seq_lens)
     X = torch.zeros((len(batch), max_len, 12))
     X_gr = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['grid_features']) for x in batch], batch_first=True)
-    X_gr = torch.mean(X_gr, dim=(2,4,5))
+    # Average across the full grid
+    X_gr = torch.mean(X_gr, dim=(3,4))
     # Sequence variables
     X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lats']) for x in batch], batch_first=True)
     X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lngs']) for x in batch], batch_first=True)
