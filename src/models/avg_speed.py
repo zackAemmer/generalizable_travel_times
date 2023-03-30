@@ -19,13 +19,6 @@ class AvgHourlySpeedModel:
         # Calculate average speed grouped by time of day
         self.speed_lookup = pd.DataFrame({"hour":hours, "speed":speeds}).groupby("hour").mean().to_dict()
         return None
-        # data, labels = dataloader.dataset.tensors
-        # speeds = np.array([x[0][6].numpy() for x in data])
-        # speeds = data_utils.de_normalize(speeds, self.config['speed_m_s_mean'], self.config['speed_m_s_std'])
-        # hours = np.array([x[1][0].numpy() for x in data]) // 60
-        # # Calculate average speed grouped by time of day
-        # self.speed_lookup = pd.DataFrame({"hour":hours, "speed":speeds}).groupby("hour").mean().to_dict()
-        # return None
 
     def predict(self, dataloader):
         context, X, y = data_utils.extract_all_dataloader(dataloader)

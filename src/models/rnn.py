@@ -23,18 +23,12 @@ class GRU_RNN(nn.Module):
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
         self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
         self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
+        # Activation layer
+        self.activation = nn.ReLU()
         # Recurrent layer
-        self.rnn = nn.GRU(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=1,
-            batch_first=True
-        )
+        self.rnn = nn.GRU(input_size=input_size, hidden_size=self.hidden_size, num_layers=1, batch_first=True)
         # Linear compression layer
-        self.linear = nn.Linear(
-            in_features=hidden_size + self.embed_total_dims,
-            out_features=self.output_size
-        )
+        self.linear = nn.Linear(in_features=self.hidden_size + self.embed_total_dims, out_features=self.output_size)
     def forward(self, x, hidden_prev):
         x_em = x[0]
         x_ct = x[1]
@@ -44,15 +38,16 @@ class GRU_RNN(nn.Module):
         driverID_embedded = self.driverID_em(x_em[:,2])
         tripID_embedded = self.tripID_em(x_em[:,3])
         # Get recurrent pred
-        out, hidden_prev = self.rnn(x_ct, hidden_prev)
+        rnn_out, hidden_prev = self.rnn(x_ct, hidden_prev)
+        rnn_out = self.activation(rnn_out)
         # x_ct_packed = torch.nn.utils.rnn.pack_padded_sequence(x_ct, x[2], batch_first=True)
         # out_packed, hidden_prev = self.rnn(x_ct_packed, hidden_prev)
         # out, _ = torch.nn.utils.rnn.pad_packed_sequence(out_packed, batch_first=True)
         # Add context, combine in linear layer
         embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
-        embeddings = embeddings.repeat(1,out.shape[1],1)
-        out = torch.cat((out, embeddings), dim=2)
-        out = self.linear(out)
+        embeddings = embeddings.repeat(1,rnn_out.shape[1],1)
+        out = torch.cat((rnn_out, embeddings), dim=2)
+        out = self.activation(self.linear(out))
         out = out.squeeze(2)
         return out, hidden_prev
     def batch_step(self, data):
@@ -91,18 +86,12 @@ class GRU_RNN_GRID(nn.Module):
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
         self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
         self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
+        # Activation layer
+        self.activation = nn.ReLU()
         # Recurrent layer
-        self.rnn = nn.GRU(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=1,
-            batch_first=True
-        )
+        self.rnn = nn.GRU(input_size=input_size, hidden_size=self.hidden_size, num_layers=1, batch_first=True)
         # Linear compression layer
-        self.linear = nn.Linear(
-            in_features=hidden_size + self.embed_total_dims,
-            out_features=self.output_size
-        )
+        self.linear = nn.Linear(in_features=self.hidden_size + self.embed_total_dims, out_features=self.output_size)
     def forward(self, x, hidden_prev):
         x_em = x[0]
         x_ct = x[1]
@@ -112,12 +101,13 @@ class GRU_RNN_GRID(nn.Module):
         driverID_embedded = self.driverID_em(x_em[:,2])
         tripID_embedded = self.tripID_em(x_em[:,3])
         # Get recurrent pred
-        out, hidden_prev = self.rnn(x_ct, hidden_prev)
+        rnn_out, hidden_prev = self.rnn(x_ct, hidden_prev)
+        rnn_out = self.activation(rnn_out)
         # Add context, combine in linear layer
         embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
-        embeddings = embeddings.repeat(1,out.shape[1],1)
-        out = torch.cat((out, embeddings), dim=2)
-        out = self.linear(out)
+        embeddings = embeddings.repeat(1,rnn_out.shape[1],1)
+        out = torch.cat((rnn_out, embeddings), dim=2)
+        out = self.activation(self.linear(out))
         out = out.squeeze(2)
         return out, hidden_prev
     def batch_step(self, data):
@@ -157,32 +147,21 @@ class GRU_RNN_GRID_CONV(nn.Module):
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
         self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
         self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
+        # Activation layer
+        self.activation = nn.ReLU()
         # Recurrent layer
-        self.rnn = nn.GRU(
-            input_size=self.input_size,
-            hidden_size=self.hidden_size,
-            num_layers=1,
-            batch_first=True
-        )
+        self.rnn = nn.GRU(input_size=input_size, hidden_size=hidden_size, num_layers=1, batch_first=True)
         # Convolution layer
-        self.conv = nn.Sequential(
-            nn.Conv3d(
-                in_channels=4,
-                out_channels=self.hidden_size,
-                kernel_size=3,
-                padding=1
-            )
-        )
+        self.conv = nn.Conv2d(in_channels=4, out_channels=self.hidden_size, kernel_size=3, padding=1)
+        # Pooling layer
+        self.pool = nn.AvgPool3d(kernel_size=4)
+        self.flatten = nn.Flatten(start_dim=1)
         # Linear compression layer
-        self.linear = nn.Linear(
-            in_features=hidden_size + self.grid_pt_size**2 * self.hidden_size + self.embed_total_dims,
-            out_features=self.output_size
-        )
+        self.linear = nn.Linear(in_features=self.hidden_size + self.hidden_size + self.embed_total_dims, out_features=self.output_size)
     def forward(self, x, hidden_prev):
         x_em = x[0]
         x_ct = x[1]
         x_gr = x[3]
-        x_gr = torch.swapaxes(x_gr, 1, 2)
         # Embed categorical variables
         timeID_embedded = self.timeID_em(x_em[:,0])
         weekID_embedded = self.weekID_em(x_em[:,1])
@@ -190,15 +169,18 @@ class GRU_RNN_GRID_CONV(nn.Module):
         tripID_embedded = self.tripID_em(x_em[:,3])
         # Get recurrent pred
         rnn_out, hidden_prev = self.rnn(x_ct, hidden_prev)
+        rnn_out = self.activation(rnn_out)
         # Get conv pred
-        conv_out = self.conv(x_gr)
-        conv_out = torch.swapaxes(conv_out, 1, 2)
-        conv_out = conv_out.flatten(start_dim=2)
+        conv_out = torch.reshape(x_gr, (x_gr.shape[0]*x_gr.shape[1], x_gr.shape[2], x_gr.shape[3], x_gr.shape[4]))
+        conv_out = self.conv(conv_out)
+        conv_out = self.activation(self.pool(conv_out))
+        conv_out = self.flatten(conv_out)
+        conv_out = torch.reshape(conv_out, (x_gr.shape[0], x_gr.shape[1], 32))
         # Add context, combine in linear layer
         embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
         embeddings = embeddings.repeat(1,rnn_out.shape[1],1)
         out = torch.cat((rnn_out, conv_out, embeddings), dim=2)
-        out = self.linear(out)
+        out = self.activation(self.linear(out))
         out = out.squeeze(2)
         return out, hidden_prev
     def batch_step(self, data):
@@ -237,18 +219,12 @@ class GRU_RNN_MTO(nn.Module):
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
         self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
         self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
+        # Activation layer
+        self.activation = nn.ReLU()
         # Recurrent layer
-        self.rnn = nn.GRU(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=1,
-            batch_first=True
-        )
+        self.rnn = nn.GRU(input_size=input_size, hidden_size=self.hidden_size, num_layers=1, batch_first=True)
         # Linear compression layer
-        self.linear = nn.Linear(
-            in_features=hidden_size + self.embed_total_dims,
-            out_features=self.output_size
-        )
+        self.linear = nn.Linear(in_features=self.hidden_size + self.embed_total_dims, out_features=self.output_size)
     def forward(self, x, hidden_prev):
         x_em = x[0]
         x_ct = x[1]
@@ -258,13 +234,14 @@ class GRU_RNN_MTO(nn.Module):
         driverID_embedded = self.driverID_em(x_em[:,2])
         tripID_embedded = self.tripID_em(x_em[:,3])
         # Get recurrent pred
-        out, hidden_prev = self.rnn(x_ct, hidden_prev)
+        rnn_out, hidden_prev = self.rnn(x_ct, hidden_prev)
         # Add context, combine in linear layer
         embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1)
         # Use only last element
-        out = out[:,-1,:]
-        out = torch.cat((out, embeddings), dim=1)
-        out = self.linear(out).squeeze()
+        rnn_out = rnn_out[:,-1,:]
+        out = torch.cat((rnn_out, embeddings), dim=1)
+        out = self.activation(self.linear(out))
+        out = out.squeeze()
         return out, hidden_prev
     def batch_step(self, data):
         inputs, labels = data
@@ -299,18 +276,12 @@ class LSTM_RNN(nn.Module):
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
         self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
         self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
+        # Activation layer
+        self.activation = nn.ReLU()
         # Recurrent layer
-        self.rnn = nn.LSTM(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=1,
-            batch_first=True
-        )
+        self.rnn = nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=1, batch_first=True)
         # Linear compression layer
-        self.linear = nn.Linear(
-            in_features=hidden_size + self.embed_total_dims,
-            out_features=self.output_size
-        )
+        self.linear = nn.Linear(in_features=self.hidden_size + self.embed_total_dims, out_features=self.output_size)
     def forward(self, x, initial_state):
         x_em = x[0]
         x_ct = x[1]
@@ -321,12 +292,13 @@ class LSTM_RNN(nn.Module):
         driverID_embedded = self.driverID_em(x_em[:,2])
         tripID_embedded = self.tripID_em(x_em[:,3])
         # Get recurrent pred
-        out, prev_state = self.rnn(x_ct, (h_0, c_0))
+        rnn_out, prev_state = self.rnn(x_ct, (h_0, c_0))
+        rnn_out = self.activation(rnn_out)
         # Add context, combine in linear layer
         embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
-        embeddings = embeddings.repeat(1,out.shape[1],1)
-        out = torch.cat((out, embeddings), dim=2)
-        out = self.linear(out)
+        embeddings = embeddings.repeat(1,rnn_out.shape[1],1)
+        out = torch.cat((rnn_out, embeddings), dim=2)
+        out = self.activation(self.linear(out))
         out = out.squeeze(2)
         return out, prev_state
     def batch_step(self, data):

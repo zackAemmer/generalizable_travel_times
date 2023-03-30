@@ -120,7 +120,6 @@ if __name__=="__main__":
         gtfs_folder="./data/kcm_gtfs/2023_01_23/",
         raw_data_folder="./data/kcm_all/",
         timezone="America/Los_Angeles",
-        # given_names=['tripid','file','locationtime','lat','lon','vehicleid'], # Use for older kcm collection
         given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
         train_dates=data_utils.get_date_list("2023_02_14", 2),
         test_dates=data_utils.get_date_list("2023_03_04", 1),
@@ -151,7 +150,6 @@ if __name__=="__main__":
     #     gtfs_folder="./data/kcm_gtfs/2023_01_23/",
     #     raw_data_folder="./data/kcm_all/",
     #     timezone="America/Los_Angeles",
-    #     # given_names=['tripid','file','locationtime','lat','lon','vehicleid'], # Use for older kcm collection
     #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
     #     train_dates=data_utils.get_date_list("2023_02_14", 18),
     #     test_dates=data_utils.get_date_list("2023_03_04", 3),

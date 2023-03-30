@@ -92,7 +92,7 @@ def basic_grid_collate(batch):
         X[i,5] = batch[i]['stop_dist_km'][-1]
         X[i,6] = batch[i]['speed_m_s'][0]
         X[i,7] = batch[i]['dist']
-        X_gr[i,:,:,:] = batch[i]['grid_features']
+        X_gr[i,:,:,:] = np.mean(batch[i]['grid_features'], axis=0)
     X = torch.from_numpy(X)
     X_gr = torch.from_numpy(X_gr)
     context = torch.from_numpy(context)

@@ -241,7 +241,7 @@ def run_models(run_folder, network_folder, hyperparameters):
             8,
             1,
             11,
-            HIDDEN_SIZE/4,
+            HIDDEN_SIZE,
             BATCH_SIZE,
             embed_dict,
             device

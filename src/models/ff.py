@@ -73,17 +73,17 @@ class FF_GRID(nn.Module):
         self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
         # Convolutional
         self.conv_stack = nn.Sequential(
-            nn.Conv2d(4,1,3),
+            nn.Conv2d(4,1,3, padding=1),
             nn.AvgPool2d(2),
             nn.ReLU(),
-            nn.Conv2d(1,1,3),
+            nn.Conv2d(1,1,3, padding=1),
             nn.AvgPool2d(2),
             nn.ReLU(),
             nn.Flatten()
         )
         # Feedforward
         self.linear_relu_stack = nn.Sequential(
-            nn.Linear(n_features + 36 + self.embed_total_dims, self.hidden_size),
+            nn.Linear(self.n_features + 4 + self.embed_total_dims, self.hidden_size),
             nn.ReLU(),
             nn.Linear(self.hidden_size, self.hidden_size),
             nn.ReLU(),

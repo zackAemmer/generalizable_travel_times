@@ -175,24 +175,13 @@ def combine_pkl_data(folder, file_list, given_names):
             data = load_pkl(folder + "/" + file)
             data['file'] = file
             # Get unified column names, data types
-            data = data[given_names]            
+            data = data[given_names]
             data.columns = FEATURE_LOOKUP.keys()
-            # Fix locationtimes that were read as floats during data download
-            try:
-                data = data.astype(FEATURE_LOOKUP)
-            except ValueError:
-                data['locationtime'] = data['locationtime'].astype(float)
-                data = data.astype(FEATURE_LOOKUP)
+            data = data.astype(FEATURE_LOOKUP)
             data_list.append(data)
         except FileNotFoundError:
             no_data_list.append(file)
     data = pd.concat(data_list, axis=0)
-    # Fix IDs that were read as 0s by numpy during data download
-    try:
-        data['trip_id'] = [str(int(x)) for x in data['trip_id'].values]
-    except:
-        x = 1
-        print("This should not print unless processing AtB data")
     # Critical to ensure data frame is sorted by date, then trip_id, then locationtime
     data = data.sort_values(['file','trip_id','locationtime'], ascending=True)
     return data, no_data_list
@@ -209,6 +198,8 @@ def calculate_trace_df(data, timezone, remove_stopped_pts=True):
     # Some points with collection issues
     data = data[data['lat']!=0]
     data = data[data['lon']!=0]
+    # TODO: Shift from lat/lon to a projected coordinate system
+    
     # Calculate feature values between consecutive points, assign to the latter point
     data['speed_m_s'], data['dist_calc_m'], data['time_calc_s'], data['bearing'] = calculate_trip_speeds(data)
     # Remove first point of every trip (not shingle), since its features are based on a different trip
