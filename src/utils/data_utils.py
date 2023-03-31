@@ -146,7 +146,7 @@ def load_all_inputs(run_folder, network_folder):
     test_traces = load_pkl(f"{run_folder}{network_folder}test_traces.pkl")
     with open(f"{run_folder}{network_folder}/deeptte_formatted/config.json") as f:
         config = json.load(f)
-    gtfs_data = merge_gtfs_files(f".{config['gtfs_folder']}")
+    gtfs_data = merge_gtfs_files(f".{config['gtfs_folder']}", config['epsg'])
     train_data_chunks, test_data, train_grid, test_grid = load_train_test_data(f"{run_folder}{network_folder}/deeptte_formatted/", config['n_folds'])
     return {
         "train_traces": train_traces,
@@ -437,7 +437,7 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
                 out_file.write(df_json_string)
     return trace_data, grid
 
-def get_summary_config(trace_data, n_unique_veh, n_unique_trip, gtfs_folder, n_folds):
+def get_summary_config(trace_data, n_unique_veh, n_unique_trip, gtfs_folder, n_folds, epsg):
     """
     Get a dict of means and sds which are used to normalize data by DeepTTE.
     trace_data: pandas dataframe with unified columns and calculated distances
@@ -493,6 +493,7 @@ def get_summary_config(trace_data, n_unique_veh, n_unique_trip, gtfs_folder, n_f
         "n_unique_trip": n_unique_trip,
         "gtfs_folder": gtfs_folder,
         "n_folds": n_folds,
+        "epsg": epsg,
         "train_set": ["train_0"+str(x) for x in range(0,n_folds)],
         "eval_set": ["test"]
     }

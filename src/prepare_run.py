@@ -87,7 +87,7 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     deeptte_formatted_path = base_folder + "deeptte_formatted/"
     train_traces, train_grid = data_utils.map_to_deeptte(train_traces, deeptte_formatted_path, n_folds)
     test_traces, test_grid = data_utils.map_to_deeptte(test_traces, deeptte_formatted_path, n_folds, is_test=True)
-    summary_config = data_utils.get_summary_config(train_traces, n_unique_veh, n_unique_trip, gtfs_folder, n_folds)
+    summary_config = data_utils.get_summary_config(train_traces, n_unique_veh, n_unique_trip, gtfs_folder, n_folds, epsg)
 
     print(f"Saving config file...")
     with open(deeptte_formatted_path+"config.json", mode="a") as out_file:

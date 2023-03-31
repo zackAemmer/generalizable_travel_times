@@ -57,7 +57,7 @@ def run_models(run_folder, network_folder, hyperparameters):
     train_data_chunks, valid_data, train_grid, valid_grid = data_utils.load_train_test_data(data_folder, config['n_folds'])
     # Load GTFS data
     print(f"Loading and merging GTFS files from '{config['gtfs_folder']}'...")
-    gtfs_data = data_utils.merge_gtfs_files(config['gtfs_folder'])
+    gtfs_data = data_utils.merge_gtfs_files(config['gtfs_folder'], config['epsg'])
 
     ### Run full training process for each model during each validation fold
     run_results = []

@@ -257,7 +257,7 @@ def fill_trajectories(df, min_timeID, max_timeID, group_id):
     fill['timeID_s'] = fill['timeID_s'].astype(int)
     return fill
 
-def plot_gtfsrt_trip(ax, trace_df):
+def plot_gtfsrt_trip(ax, trace_df, epsg):
     """
     Plot a single real-time bus trajectory on a map.
     ax: where to plot
@@ -265,21 +265,20 @@ def plot_gtfsrt_trip(ax, trace_df):
     Returns: None.
     """
     to_plot = trace_df.copy()
-    to_plot = geopandas.GeoDataFrame(to_plot, geometry=geopandas.points_from_xy(to_plot.lon, to_plot.lat), crs="EPSG:4326")
+    to_plot = geopandas.GeoDataFrame(to_plot, geometry=geopandas.points_from_xy(to_plot.x, to_plot.y), crs=f"EPSG:{epsg}")
     to_plot_stop = trace_df.iloc[-1:,:]
-    to_plot_stop = geopandas.GeoDataFrame(to_plot_stop, geometry=geopandas.points_from_xy(to_plot_stop.stop_lon, to_plot_stop.stop_lat), crs="EPSG:4326")
+    to_plot_stop = geopandas.GeoDataFrame(to_plot_stop, geometry=geopandas.points_from_xy(to_plot_stop.stop_x, to_plot_stop.stop_y), crs=f"EPSG:{epsg}")
     # Plot all points
     to_plot.plot(ax=ax, marker='.', color='purple', markersize=20)
     # Plot first/last points
     to_plot.iloc[0:1,:].plot(ax=ax, marker='*', color='green', markersize=40)
     to_plot.iloc[-1:,:].plot(ax=ax, marker='*', color='red', markersize=40)
-    # to_plot.apply(lambda x: ax.annotate(text=x['bearing'], xy=x.geometry.centroid.coords[0], ha='center', size=2), axis=1)
     # Also plot closest stop to final point
     to_plot_stop.plot(ax=ax, marker='x', color='blue', markersize=20)
 
     return None
 
-def plot_gtfs_trip(ax, trip_id, gtfs_data):
+def plot_gtfs_trip(ax, trip_id, gtfs_data, epsg):
     """
     Plot scheduled stops for a single bus trip on a map.
     ax: where to plot
@@ -289,7 +288,7 @@ def plot_gtfs_trip(ax, trip_id, gtfs_data):
     """
     to_plot = gtfs_data.copy()
     to_plot = to_plot[to_plot['trip_id']==trip_id]
-    to_plot = geopandas.GeoDataFrame(to_plot, geometry=geopandas.points_from_xy(to_plot.stop_lon, to_plot.stop_lat), crs="EPSG:4326")
+    to_plot = geopandas.GeoDataFrame(to_plot, geometry=geopandas.points_from_xy(to_plot.stop_x, to_plot.stop_y), crs=f"EPSG:{epsg}")
     to_plot.plot(ax=ax, marker='x', color='lightgreen', markersize=10)
     return None
 
