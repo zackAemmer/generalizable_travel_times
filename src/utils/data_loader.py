@@ -51,7 +51,7 @@ def basic_collate(batch):
     # Last dimension is number of sequence variables below
     seq_lens = [len(x['lats']) for x in batch]
     max_len = max(seq_lens)
-    X = np.zeros((len(batch), 8))
+    X = np.zeros((len(batch), 11))
     # Sequence variables
     for i in range(len(batch)):
         X[i,0] = batch[i]['x'][0]
@@ -60,8 +60,11 @@ def basic_collate(batch):
         X[i,3] = batch[i]['y'][-1]
         X[i,4] = batch[i]['scheduled_time_s'][-1]
         X[i,5] = batch[i]['stop_dist_km'][-1]
-        X[i,6] = batch[i]['speed_m_s'][0]
-        X[i,7] = batch[i]['dist']
+        X[i,6] = batch[i]['stop_x'][-1]
+        X[i,7] = batch[i]['stop_y'][-1]
+        X[i,8] = batch[i]['speed_m_s'][0]
+        X[i,9] = batch[i]['bearing'][0]
+        X[i,10] = batch[i]['dist']
     X = torch.from_numpy(X)
     context = torch.from_numpy(context)
     y = torch.from_numpy(np.array([x['time'] for x in batch]))
@@ -159,7 +162,6 @@ def sequential_grid_collate(batch):
     X[:,:,9] = X_gr[:,:,1]
     X[:,:,10] = X_gr[:,:,2]
     X[:,:,11] = X_gr[:,:,3]
-    # X_gr = torch.from_numpy(X_gr)
     context = torch.from_numpy(context)
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
     # Sort all by sequence length descending, for potential packing of each batch

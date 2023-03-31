@@ -67,7 +67,7 @@ def extract_grid_features(grid, tbins, xbins, ybins, n_prior=1, buffer=20):
             feature = np.ones((n_prior, grid.shape[1], 2*buffer+1, 2*buffer+1))*-1
         else:
             # Filter grid based on shingle start time (pts<start), and adjacent squares to buffer (pts +/- buffer, including middle point)
-            feature = grid[tbin_start_idx-n_prior:tbin_start_idx,:,xbins[i]-buffer-1:xbins[i]+buffer,ybins[i]-buffer-1:ybins[i]+buffer]
+            feature = grid[tbin_start_idx-n_prior:tbin_start_idx,:,ybins[i]-buffer-1:ybins[i]+buffer,xbins[i]-buffer-1:xbins[i]+buffer]
         grid_features.append(feature)
     grid_features = np.concatenate(grid_features)
     # Normalize the grid to the information present when the trip starts=
@@ -161,7 +161,7 @@ def save_grid_anim(data, file_name, vmin, vmax):
         fig.suptitle(f"Frame {frame}")
         for i, ax in enumerate(axes):
             ax.clear()
-            ax.imshow(data[frame,i,:,:], cmap='plasma', vmin=vmin, vmax=vmax)
+            ax.imshow(data[frame,i,:,:], cmap='plasma', vmin=vmin, vmax=vmax, origin="lower")
     # Create the animation object
     ani = animation.FuncAnimation(fig, update, frames=data.shape[0])
     # Save the animation object
