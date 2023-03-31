@@ -66,29 +66,29 @@ def recode_nums(ary):
     new_codes = np.arange(0,len(old_codes))
     return dict(zip(old_codes, new_codes))
 
-def calculate_gps_dist(end_lons, end_lats, start_lons, start_lats):
+def calculate_gps_dist(end_x, end_y, start_x, start_y):
     """
-    Calculate the spherical distance between a series of points.
-    lons1/lats1: arrays of coordinates for the end points
-    lons2/lats2: arrays of coordinates for the start points
+    Calculate the euclidean distance between a series of points.
     Returns: array of distances in meters.
     """
-    geodesic = pyproj.Geod(ellps='WGS84')
-    f_azis, b_azis, dists = geodesic.inv(start_lons, start_lats, end_lons, end_lats)
-    return dists, f_azis
+    x_diff = (end_x - start_x)
+    y_diff = (end_y - start_y)
+    dists = np.sqrt(x_diff**2 + y_diff**2)
+    # Measured in degrees from the positive x axis, + is 1/4 quadrants, - is 2/3 quadrants
+    bearings = np.arctan2(y_diff, x_diff)*180/np.pi
+    return dists, bearings
 
 def calculate_trip_speeds(data):
     """
     Calculate speeds between consecutive trip locations.
-    data: pandas dataframe of bus data with unified columns
     Returns: array of speeds, dist_diff, time_diff between consecutive points.
     Nan for first point of a trip.
     """
-    x = data[['shingle_id','lat','lon','locationtime']]
-    y = data[['shingle_id','lat','lon','locationtime']].shift()
+    x = data[['shingle_id','x','y','locationtime']]
+    y = data[['shingle_id','x','y','locationtime']].shift()
     y.columns = [colname+"_shift" for colname in y.columns]
     z = pd.concat([x,y], axis=1)
-    z['dist_diff'], z['bearing'] = calculate_gps_dist(z['lon'].values, z['lat'].values, z['lon_shift'].values, z['lat_shift'].values)
+    z['dist_diff'], z['bearing'] = calculate_gps_dist(z['x'].values, z['y'].values, z['x_shift'].values, z['y_shift'].values)
     z['time_diff'] = z['locationtime'] - z['locationtime_shift']
     z['speed_m_s'] = z['dist_diff'] / z['time_diff']
     return z['speed_m_s'].values, z['dist_diff'].values, z['time_diff'].values, z['bearing'].values
@@ -186,7 +186,7 @@ def combine_pkl_data(folder, file_list, given_names):
     data = data.sort_values(['file','trip_id','locationtime'], ascending=True)
     return data, no_data_list
 
-def calculate_trace_df(data, timezone, remove_stopped_pts=True):
+def calculate_trace_df(data, timezone, epsg, remove_stopped_pts=True):
     """
     Calculate difference in metrics between two consecutive trip points.
     This is the only place where points are filtered rather than entire shingles.
@@ -198,8 +198,11 @@ def calculate_trace_df(data, timezone, remove_stopped_pts=True):
     # Some points with collection issues
     data = data[data['lat']!=0]
     data = data[data['lon']!=0]
-    # TODO: Shift from lat/lon to a projected coordinate system
-    
+    # Project to local coordinate system
+    default_crs = pyproj.CRS.from_epsg(4326)
+    proj_crs = pyproj.CRS.from_epsg(epsg)
+    transformer = pyproj.Transformer.from_crs(default_crs, proj_crs, always_xy=True)
+    data['x'], data['y'] = transformer.transform(data['lon'], data['lat'])
     # Calculate feature values between consecutive points, assign to the latter point
     data['speed_m_s'], data['dist_calc_m'], data['time_calc_s'], data['bearing'] = calculate_trip_speeds(data)
     # Remove first point of every trip (not shingle), since its features are based on a different trip
@@ -287,14 +290,14 @@ def clean_trace_df_w_timetables(data, gtfs_data):
     first_points.columns = ['shingle_id','trip_start_timeID_s']
     closest_stops = get_scheduled_arrival(
         data['trip_id'].values,
-        data['lon'].values,
-        data['lat'].values,
+        data['x'].values,
+        data['y'].values,
         gtfs_data
     )
-    data = data.assign(stop_dist_km=closest_stops[0])
+    data = data.assign(stop_dist_km=closest_stops[0]/1000)
     data = data.assign(stop_arrival_s=closest_stops[1])
-    data = data.assign(stop_lon=closest_stops[2])
-    data = data.assign(stop_lat=closest_stops[3])
+    data = data.assign(stop_x=closest_stops[2])
+    data = data.assign(stop_y=closest_stops[3])
     # Filter out shingles with stops that are too far away
     valid_trips = data.groupby('shingle_id').filter(lambda x: x['stop_dist_km'].max() <= 1.0)['shingle_id'].unique()
     data = data[data['shingle_id'].isin(valid_trips)]
@@ -308,7 +311,7 @@ def clean_trace_df_w_timetables(data, gtfs_data):
     data = data[data['shingle_id'].isin(valid_trips)]
     return data
 
-def get_scheduled_arrival(trip_ids, lons, lats, gtfs_data):
+def get_scheduled_arrival(trip_ids, x, y, gtfs_data):
     """
     Find the nearest stop to a set of trip-coordinates, and return the scheduled arrival time.
     trip_ids: list of trip_ids
@@ -316,8 +319,8 @@ def get_scheduled_arrival(trip_ids, lons, lats, gtfs_data):
     gtfs_data: merged GTFS files
     Returns: (distance to closest stop in km, scheduled arrival time at that stop).
     """
-    data = np.column_stack([lons, lats, trip_ids])
-    gtfs_data_ary = gtfs_data[['stop_lon','stop_lat','trip_id','arrival_s']].values
+    data = np.column_stack([x, y, trip_ids])
+    gtfs_data_ary = gtfs_data[['stop_x','stop_y','trip_id','arrival_s']].values
 
     # Create dictionary mapping trip_ids to lists of points in gtfs
     id_to_points = {}
@@ -332,7 +335,7 @@ def get_scheduled_arrival(trip_ids, lons, lats, gtfs_data):
         # Find closest point and add to results
         closest_point_dist, closest_point_idx = shape_utils.get_closest_point(corresponding_points[:,0:2], point[:,0:2])
         closest_point = corresponding_points[closest_point_idx]
-        closest_point = np.append(closest_point, closest_point_dist * 111)
+        closest_point = np.append(closest_point, closest_point_dist)
         results[i,:] = closest_point
     return results[:,4], results[:,3], results[:,0], results[:,1]
 
@@ -371,7 +374,7 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
     trace_data['tripID'] = trace_data['trip_id_recode']
 
     # Calculate and add grid features
-    grid, tbin_idxs, xbin_idxs, ybin_idxs = shape_utils.get_grid_features(trace_data, resolution=128, timestep=30, bbox=None)
+    grid, tbin_idxs, xbin_idxs, ybin_idxs = shape_utils.get_grid_features(trace_data, resolution=128, timestep=30)
     trace_data['tbin_idx'] = tbin_idxs
     trace_data['xbin_idx'] = xbin_idxs
     trace_data['ybin_idx'] = ybin_idxs
@@ -398,6 +401,8 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
         # Individual point time/dist
         'lats': lambda x: x.tolist(),
         'lngs': lambda x: x.tolist(),
+        'x': lambda x: x.tolist(),
+        'y': lambda y: y.tolist(),
         'speed_m_s': lambda x: x.tolist(),
         'time_calc_s': lambda x: x.tolist(),
         'dist_calc_km': lambda x: x.tolist(),
@@ -407,8 +412,8 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
         # Trip ongoing time
         'timeID_s': lambda x: x.tolist(),
         # Nearest stop
-        'stop_lat': lambda x: x.tolist(),
-        'stop_lon': lambda x: x.tolist(),
+        'stop_x': lambda x: x.tolist(),
+        'stop_y': lambda x: x.tolist(),
         'stop_dist_km': lambda x: x.tolist(),
         'scheduled_time_s': lambda x: x.tolist(),
         # Grid
@@ -457,6 +462,10 @@ def get_summary_config(trace_data, n_unique_veh, n_unique_trip, gtfs_folder, n_f
         'lats_mean': np.mean(trace_data['lat']),
         "lats_std": np.std(trace_data['lat']),
         # Other variables:
+        "x_mean": np.mean(trace_data['x']),
+        "x_std": np.std(trace_data['x']),
+        "y_mean": np.mean(trace_data['y']),
+        "y_std": np.std(trace_data['y']),
         "speed_m_s_mean": np.mean(trace_data['speed_m_s']),
         "speed_m_s_std": np.std(trace_data['speed_m_s']),
         "bearing_mean": np.mean(trace_data['bearing']),
@@ -471,14 +480,14 @@ def get_summary_config(trace_data, n_unique_veh, n_unique_trip, gtfs_folder, n_f
         "time_calc_s_mean": np.mean(trace_data['time_calc_s']),
         "time_calc_s_std": np.std(trace_data['time_calc_s']),
         # Nearest stop
+        "stop_x_mean": np.mean(trace_data['stop_x']),
+        "stop_x_std": np.std(trace_data['stop_x']),
+        "stop_y_mean": np.mean(trace_data['stop_y']),
+        "stop_y_std": np.std(trace_data['stop_y']),
         "stop_dist_km_mean": np.mean(trace_data['stop_dist_km']),
         "stop_dist_km_std": np.std(trace_data['stop_dist_km']),
         "scheduled_time_s_mean": np.mean(grouped.max()[['scheduled_time_s']].values.flatten()),
         "scheduled_time_s_std": np.std(grouped.max()[['scheduled_time_s']].values.flatten()),
-        "stop_lng_mean": np.mean(trace_data['stop_lon']),
-        "stop_lng_std": np.std(trace_data['stop_lon']),
-        "stop_lat_mean": np.mean(trace_data['stop_lat']),
-        "stop_lat_std": np.std(trace_data['stop_lat']),
         # Not variables
         "n_unique_veh": n_unique_veh,
         "n_unique_trip": n_unique_trip,
@@ -520,10 +529,9 @@ def extract_operator_gtfs(old_folder, new_folder, source_col, op_name):
             z.to_csv(f"{new_folder}{file}/trips.txt")
             st.to_csv(f"{new_folder}{file}/stop_times.txt")
 
-def merge_gtfs_files(gtfs_folder):
+def merge_gtfs_files(gtfs_folder, epsg):
     """
     Join a set of GTFS files into a single dataframe. Each row is a trip + arrival time.
-    gtfs_folder: location to search for GTFS files
     Returns: pandas dataframe with merged GTFS data.
     """
     z = pd.read_csv(gtfs_folder+"trips.txt", low_memory=False, dtype=GTFS_LOOKUP)
@@ -531,9 +539,14 @@ def merge_gtfs_files(gtfs_folder):
     sl = pd.read_csv(gtfs_folder+"stops.txt", low_memory=False, dtype=GTFS_LOOKUP)
     z = pd.merge(z,st,on="trip_id")
     z = pd.merge(z,sl,on="stop_id")
-
+    # Calculate stop arrival from midnight
     gtfs_data = z.sort_values(['trip_id','stop_sequence'])
     gtfs_data['arrival_s'] = [int(x[0])*60*60 + int(x[1])*60 + int(x[2]) for x in gtfs_data['arrival_time'].str.split(":")]
+    # Project stop locations to local coordinate system
+    default_crs = pyproj.CRS.from_epsg(4326)
+    proj_crs = pyproj.CRS.from_epsg(epsg)
+    transformer = pyproj.Transformer.from_crs(default_crs, proj_crs, always_xy=True)
+    gtfs_data['stop_x'], gtfs_data['stop_y'] = transformer.transform(gtfs_data['stop_lon'], gtfs_data['stop_lat'])
     return gtfs_data
 
 def get_date_from_filename(filename):

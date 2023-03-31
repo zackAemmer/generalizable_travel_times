@@ -50,28 +50,6 @@ def get_closest_point(points, query_points):
     dists, idxs = tree.query(query_points)
     return dists, idxs
 
-def decompose_vector(scalars, bearings, data_to_attach=None):
-    """
-    Break speed vector into its x and y components.
-    scalars: array of speeds
-    bearings: azimuth from north, negative for westward movement, positive for east
-    data_to_attach: additional columns to keep with the lat/lon/decomposed values
-    Returns: array of x +/-, y +/- scalar components.
-    """
-    # Use bearing to break value into 
-    x = np.round(np.sin(bearings * np.pi/180) * scalars, 1)
-    y = np.round(np.cos(bearings * np.pi/180) * scalars, 1)
-    x_all = np.column_stack([x, data_to_attach])
-    y_all = np.column_stack([y, data_to_attach])
-    # Include 0.0 observations in both channels
-    x_pos = x_all[x>=0.0]
-    x_neg = x_all[x<=0.0]
-    y_pos = y_all[y>=0.0]
-    y_neg = y_all[y<=0.0]
-    x_neg[:,0] = np.abs(x_neg[:,0])
-    y_neg[:,0] = np.abs(y_neg[:,0])
-    return (x_pos, x_neg, y_pos, y_neg)
-
 def extract_grid_features(grid, tbins, xbins, ybins, n_prior=1, buffer=20):
     """
     Given sequence of bins from a trip, reconstruct grid features.
@@ -105,11 +83,9 @@ def extract_grid_features(grid, tbins, xbins, ybins, n_prior=1, buffer=20):
     grid_features = data_utils.normalize(grid_features, grid_avg, grid_std)
     return grid_features
 
-def get_grid_features(traces, resolution=64, timestep=30, bbox=None):
+def get_grid_features(traces, resolution=64, timestep=30):
     # Create grid
-    if bbox is not None:
-        point_obs = apply_bbox(point_obs, bbox)
-    grid, tbins, xbins, ybins = decompose_and_rasterize(traces['speed_m_s'].values, traces['bearing'].values, traces['lon'].values, traces['lat'].values, traces['locationtime'].values, timestep, resolution)
+    grid, tbins, xbins, ybins = decompose_and_rasterize(traces['speed_m_s'].values, traces['bearing'].values, traces['x'].values, traces['y'].values, traces['locationtime'].values, timestep, resolution)
     # Get tbins for each trace. No overlap between current trip and grid values.
     # Grid assigned values: binedge[i-1] <= x < binedge[i]
     # Trace values: binedge[i-1] < x <= binedge[i]
@@ -119,30 +95,30 @@ def get_grid_features(traces, resolution=64, timestep=30, bbox=None):
     tbin_idxs = np.maximum(0,tbin_idxs)
     # Opposite is true for lat/lon: want the exact bin that the value falls in
     # [i-buffer-1:i+buffer] will give 2*buffer+1 total values, with bin i in the middle
-    xbin_idxs = np.digitize(traces['lon'].values, xbins, right=False)
+    xbin_idxs = np.digitize(traces['x'].values, xbins, right=False)
     xbin_idxs = np.maximum(0,xbin_idxs)
-    ybin_idxs = np.digitize(traces['lat'].values, ybins, right=False)
+    ybin_idxs = np.digitize(traces['y'].values, ybins, right=False)
     ybin_idxs = np.maximum(0,ybin_idxs)
     return grid, tbin_idxs, xbin_idxs, ybin_idxs
 
-def decompose_and_rasterize(features, bearings, lons, lats, times, timestep, resolution):
+def decompose_and_rasterize(features, bearings, x, y, times, timestep, resolution):
     # Get regularly spaced bins at given resolution/timestep across bbox for all collected points
     # Need to flip bins for latitude because it should decrease downward through array
     # Add a bin to the upper end; all obs are assigned such that bin_edge[i-1] <= x < bin_edge[i]
-    latbins = np.linspace(np.min(lats), np.max(lats), resolution)
-    latbins = np.append(latbins, latbins[-1]+.0000001)
-    lonbins = np.linspace(np.min(lons), np.max(lons), resolution)
-    lonbins = np.append(lonbins, lonbins[-1]+.0000001)
+    ybins = np.linspace(np.min(y), np.max(y), resolution)
+    ybins = np.append(ybins, ybins[-1]+.0000001)
+    xbins = np.linspace(np.min(x), np.max(x), resolution)
+    xbins = np.append(xbins, xbins[-1]+.0000001)
     tbins = np.arange(np.min(times),np.max(times),timestep)
     tbins = np.append(tbins, tbins[-1]+1)
     # Split features into quadrant channels
-    channel_obs = decompose_vector(features, bearings, np.column_stack([lats, lons, times]))
+    channel_obs = decompose_vector(features, bearings, np.column_stack([x, y, times]))
     # For each channel, aggregate by location and timestep bins
-    all_channel_rasts = np.ones((len(tbins)-1, len(channel_obs), len(latbins)-1, len(lonbins)-1), dtype='float64') * -1
+    all_channel_rasts = np.ones((len(tbins)-1, len(channel_obs), len(xbins)-1, len(ybins)-1), dtype='float64') * -1
     for i, channel in enumerate(channel_obs):
         # Get the average feature value in each bin
-        count_hist, count_edges = np.histogramdd(channel[:,1:4], bins=[latbins, lonbins, tbins])
-        sum_hist, edges = np.histogramdd(channel[:,1:4], weights=channel[:,0], bins=[latbins, lonbins, tbins])
+        count_hist, count_edges = np.histogramdd(channel[:,1:4], bins=[xbins, ybins, tbins])
+        sum_hist, edges = np.histogramdd(channel[:,1:4], weights=channel[:,0], bins=[xbins, ybins, tbins])
         rast = sum_hist / np.maximum(1, count_hist)
         # Mask cells with no information as -1
         mask = count_hist!=0
@@ -150,15 +126,38 @@ def decompose_and_rasterize(features, bearings, lons, lats, times, timestep, res
         # Invert latitude values (the bins must be increasing in hist dd, but in reality latitude decreases)
         # This would not need to be flipped for data below the equator
         # For longitudes, AtB may need to be flipped
-        rast = np.flip(rast, axis=0)
-        # Put channel in front
+        # rast = np.flip(rast, axis=0)
+        # Put time in front
         # Swap lat and lon
         rast = np.swapaxes(rast, 0, 1)
         # Swap channel and lon: rast=CxLatxLon
         rast = np.swapaxes(rast, 0, 2)
         # Save binned values for each channel
         all_channel_rasts[:,i,:,:] = rast
-    return all_channel_rasts, tbins, lonbins, latbins
+    return all_channel_rasts, tbins, xbins, ybins
+
+def decompose_vector(scalars, bearings, data_to_attach=None):
+    """
+    Break speed vector into its x and y components.
+    scalars: array of speeds
+    data_to_attach: additional columns to keep with the decomposed values
+    Returns: array of x +/-, y +/- scalar components.
+    """
+    # Decompose each scalar into its x/y components
+    x = np.round(np.cos(bearings * np.pi/180) * scalars, 1)
+    y = np.round(np.sin(bearings * np.pi/180) * scalars, 1)
+    # Attach additional variables
+    x_all = np.column_stack([x, data_to_attach])
+    y_all = np.column_stack([y, data_to_attach])
+    # Include 0.0 observations in both channels
+    x_pos = x_all[x>=0.0]
+    x_neg = x_all[x<=0.0]
+    y_pos = y_all[y>=0.0]
+    y_neg = y_all[y<=0.0]
+    # Get absolute value of negative-direction observations
+    x_neg[:,0] = np.abs(x_neg[:,0])
+    y_neg[:,0] = np.abs(y_neg[:,0])
+    return (x_pos, x_neg, y_pos, y_neg)
 
 def save_grid_anim(data, file_name, vmin, vmax):
     # Plot all channels

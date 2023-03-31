@@ -54,10 +54,10 @@ def basic_collate(batch):
     X = np.zeros((len(batch), 8))
     # Sequence variables
     for i in range(len(batch)):
-        X[i,0] = batch[i]['lats'][0]
-        X[i,1] = batch[i]['lngs'][0]
-        X[i,2] = batch[i]['lats'][-1]
-        X[i,3] = batch[i]['lngs'][-1]
+        X[i,0] = batch[i]['x'][0]
+        X[i,1] = batch[i]['y'][0]
+        X[i,2] = batch[i]['x'][-1]
+        X[i,3] = batch[i]['y'][-1]
         X[i,4] = batch[i]['scheduled_time_s'][-1]
         X[i,5] = batch[i]['stop_dist_km'][-1]
         X[i,6] = batch[i]['speed_m_s'][0]
@@ -79,19 +79,22 @@ def basic_grid_collate(batch):
     # Last dimension is number of sequence variables below
     seq_lens = [len(x['lats']) for x in batch]
     max_len = max(seq_lens)
-    X = np.zeros((len(batch), 8))
+    X = np.zeros((len(batch), 11))
     grid_shape = batch[0]['grid_features'].shape
     X_gr = np.zeros((len(batch), grid_shape[1], grid_shape[2], grid_shape[3]))
     # Sequence variables
     for i in range(len(batch)):
-        X[i,0] = batch[i]['lats'][0]
-        X[i,1] = batch[i]['lngs'][0]
-        X[i,2] = batch[i]['lats'][-1]
-        X[i,3] = batch[i]['lngs'][-1]
+        X[i,0] = batch[i]['x'][0]
+        X[i,1] = batch[i]['y'][0]
+        X[i,2] = batch[i]['x'][-1]
+        X[i,3] = batch[i]['y'][-1]
         X[i,4] = batch[i]['scheduled_time_s'][-1]
         X[i,5] = batch[i]['stop_dist_km'][-1]
-        X[i,6] = batch[i]['speed_m_s'][0]
-        X[i,7] = batch[i]['dist']
+        X[i,6] = batch[i]['stop_x'][-1]
+        X[i,7] = batch[i]['stop_y'][-1]
+        X[i,8] = batch[i]['speed_m_s'][0]
+        X[i,9] = batch[i]['bearing'][0]
+        X[i,10] = batch[i]['dist']
         X_gr[i,:,:,:] = np.mean(batch[i]['grid_features'], axis=0)
     X = torch.from_numpy(X)
     X_gr = torch.from_numpy(X_gr)
@@ -114,13 +117,13 @@ def sequential_collate(batch):
     max_len = max(seq_lens)
     X = torch.zeros((len(batch), max_len, 8))
     # Sequence variables
-    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lats']) for x in batch], batch_first=True)
-    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lngs']) for x in batch], batch_first=True)
+    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
+    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
     X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
     X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
     X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
-    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lat']) for x in batch], batch_first=True)
-    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lon']) for x in batch], batch_first=True)
+    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
+    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
     X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
     context = torch.from_numpy(context)
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
@@ -143,13 +146,13 @@ def sequential_grid_collate(batch):
     # Average across the full grid
     X_gr = torch.mean(X_gr, dim=(3,4))
     # Sequence variables
-    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lats']) for x in batch], batch_first=True)
-    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lngs']) for x in batch], batch_first=True)
+    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
+    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
     X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
     X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
     X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
-    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lat']) for x in batch], batch_first=True)
-    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lon']) for x in batch], batch_first=True)
+    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
+    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
     X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
     # Use the average channel speed as its own feature (no convolution)
     X[:,:,8] = X_gr[:,:,0]
@@ -176,13 +179,13 @@ def sequential_grid_conv_collate(batch):
     X = torch.zeros((len(batch), max_len, 8))
     X_gr = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['grid_features']) for x in batch], batch_first=True)
     # Sequence variables
-    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lats']) for x in batch], batch_first=True)
-    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lngs']) for x in batch], batch_first=True)
+    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
+    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
     X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
     X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
     X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
-    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lat']) for x in batch], batch_first=True)
-    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lon']) for x in batch], batch_first=True)
+    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
+    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
     X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
     context = torch.from_numpy(context)
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
@@ -203,13 +206,13 @@ def sequential_spd_collate(batch):
     max_len = max(seq_lens)
     X = torch.zeros((len(batch), max_len, 9))
     # Sequence variables
-    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lats']) for x in batch], batch_first=True)
-    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lngs']) for x in batch], batch_first=True)
+    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
+    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
     X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
     X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
     X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
-    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lat']) for x in batch], batch_first=True)
-    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lon']) for x in batch], batch_first=True)
+    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
+    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
     X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
     # Used for persistent model, do not use in RNN
     X[:,:,8] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['speed_m_s']) for x in batch], batch_first=True)
@@ -231,13 +234,13 @@ def sequential_dist_cumulative_collate(batch):
     max_len = max(seq_lens)
     X = torch.zeros((len(batch), max_len, 8))
     # Sequence variables
-    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lats']) for x in batch], batch_first=True)
-    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lngs']) for x in batch], batch_first=True)
+    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
+    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
     X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_gap']) for x in batch], batch_first=True)
     X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
     X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
-    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lat']) for x in batch], batch_first=True)
-    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lon']) for x in batch], batch_first=True)
+    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
+    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
     X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
     context = torch.from_numpy(context)
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
@@ -262,8 +265,8 @@ def sequential_all_cumulative_collate(batch):
     X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_gap']) for x in batch], batch_first=True)
     X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
     X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
-    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lat']) for x in batch], batch_first=True)
-    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lon']) for x in batch], batch_first=True)
+    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
+    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
     X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
     context = torch.from_numpy(context)
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_gap']) for x in batch], batch_first=True)
@@ -283,13 +286,13 @@ def sequential_mto_collate(batch):
     max_len = max(seq_lens)
     X = torch.zeros((len(batch), max_len, 8))
     # Sequence variables
-    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lats']) for x in batch], batch_first=True)
-    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['lngs']) for x in batch], batch_first=True)
+    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
+    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
     X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
     X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
     X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
-    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lat']) for x in batch], batch_first=True)
-    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_lon']) for x in batch], batch_first=True)
+    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
+    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
     X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
     context = torch.from_numpy(context)
     y = torch.from_numpy(np.array([x['time'] for x in batch]))
