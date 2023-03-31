@@ -114,24 +114,16 @@ def decompose_and_rasterize(features, bearings, x, y, times, timestep, resolutio
     # Split features into quadrant channels
     channel_obs = decompose_vector(features, bearings, np.column_stack([x, y, times]))
     # For each channel, aggregate by location and timestep bins
-    all_channel_rasts = np.ones((len(tbins)-1, len(channel_obs), len(xbins)-1, len(ybins)-1), dtype='float64') * -1
+    # T x C x H x W
+    all_channel_rasts = np.ones((len(tbins)-1, len(channel_obs), len(ybins)-1, len(xbins)-1), dtype='float64') * -1
     for i, channel in enumerate(channel_obs):
         # Get the average feature value in each bin
-        count_hist, count_edges = np.histogramdd(channel[:,1:4], bins=[xbins, ybins, tbins])
-        sum_hist, edges = np.histogramdd(channel[:,1:4], weights=channel[:,0], bins=[xbins, ybins, tbins])
+        count_hist, count_edges = np.histogramdd(np.column_stack([channel[:,3], channel[:,2], channel[:,1]]), bins=[tbins, ybins, xbins])
+        sum_hist, edges = np.histogramdd(np.column_stack([channel[:,3], channel[:,2], channel[:,1]]), weights=channel[:,0], bins=[tbins, ybins, xbins])
         rast = sum_hist / np.maximum(1, count_hist)
         # Mask cells with no information as -1
-        mask = count_hist!=0
-        rast[~mask] = -1
-        # Invert latitude values (the bins must be increasing in hist dd, but in reality latitude decreases)
-        # This would not need to be flipped for data below the equator
-        # For longitudes, AtB may need to be flipped
-        # rast = np.flip(rast, axis=0)
-        # Put time in front
-        # Swap lat and lon
-        rast = np.swapaxes(rast, 0, 1)
-        # Swap channel and lon: rast=CxLatxLon
-        rast = np.swapaxes(rast, 0, 2)
+        mask = count_hist==0
+        rast[mask] = -1
         # Save binned values for each channel
         all_channel_rasts[:,i,:,:] = rast
     return all_channel_rasts, tbins, xbins, ybins
@@ -194,68 +186,68 @@ def get_adjacent_points(df, shingle_id, dist_buffer, time_buffer):
     adjacent_data = adjacent_data.iloc[pt_indices].sort_values(['shingle_id','locationtime'])
     return (shingle_data, adjacent_data)
 
-def interpolate_trajectories(df, group_col):
-    traj_bounds = df.groupby(group_col)['timeID_s'].agg(['min', 'max'])
-    ary_len = np.sum(traj_bounds['max']+1 - traj_bounds['min'])
-    interp_lon = np.empty((ary_len,), dtype=float)
-    interp_lat = np.empty((ary_len,), dtype=float)
-    interp_t = np.empty((ary_len,), dtype=int)
-    interp_id = np.empty((ary_len,), dtype=object)
-    i = 0
-    for traj_id, (traj_min, traj_max) in traj_bounds.iterrows():
-        time_steps = np.arange(traj_min, traj_max+1)
-        num_steps = len(time_steps)
-        traj_data = df[df[group_col] == traj_id][['lon', 'lat', 'timeID_s']].values
-        lonint = np.interp(time_steps, traj_data[:,2], traj_data[:,0])
-        latint = np.interp(time_steps, traj_data[:,2], traj_data[:,1])
-        interp_lon[i:i+num_steps] = lonint
-        interp_lat[i:i+num_steps] = latint
-        interp_t[i:i+num_steps] = time_steps
-        interp_id[i:i+num_steps] = np.full((num_steps,), traj_id)
-        i += num_steps
-    # Put in dataframe and format
-    interp = pd.DataFrame({
-        'lon':interp_lon,
-        'lat': interp_lat,
-        'timeID_s': interp_t,
-        group_col: interp_id
-    })
-    return interp
+# def interpolate_trajectories(df, group_col):
+#     traj_bounds = df.groupby(group_col)['timeID_s'].agg(['min', 'max'])
+#     ary_len = np.sum(traj_bounds['max']+1 - traj_bounds['min'])
+#     interp_lon = np.empty((ary_len,), dtype=float)
+#     interp_lat = np.empty((ary_len,), dtype=float)
+#     interp_t = np.empty((ary_len,), dtype=int)
+#     interp_id = np.empty((ary_len,), dtype=object)
+#     i = 0
+#     for traj_id, (traj_min, traj_max) in traj_bounds.iterrows():
+#         time_steps = np.arange(traj_min, traj_max+1)
+#         num_steps = len(time_steps)
+#         traj_data = df[df[group_col] == traj_id][['lon', 'lat', 'timeID_s']].values
+#         lonint = np.interp(time_steps, traj_data[:,2], traj_data[:,0])
+#         latint = np.interp(time_steps, traj_data[:,2], traj_data[:,1])
+#         interp_lon[i:i+num_steps] = lonint
+#         interp_lat[i:i+num_steps] = latint
+#         interp_t[i:i+num_steps] = time_steps
+#         interp_id[i:i+num_steps] = np.full((num_steps,), traj_id)
+#         i += num_steps
+#     # Put in dataframe and format
+#     interp = pd.DataFrame({
+#         'lon':interp_lon,
+#         'lat': interp_lat,
+#         'timeID_s': interp_t,
+#         group_col: interp_id
+#     })
+#     return interp
 
-def fill_trajectories(df, min_timeID, max_timeID, group_id):
-    traj_bounds = df.groupby(group_id)['timeID_s'].agg(['min', 'max'])
-    time_steps = np.arange(min_timeID, max_timeID + 1)
-    # Create an array to hold the filled trajectories
-    num_trajectories = len(traj_bounds)
-    num_steps = len(time_steps)
-    fill_arr = np.empty((num_trajectories * num_steps, 4), dtype=object)
-    # Loop over each trajectory and fill in the positions at each time step
-    i = 0
-    for traj_id, (traj_min, traj_max) in traj_bounds.iterrows():
-        traj_data = df[df[group_id] == traj_id][['lat', 'lon', 'timeID_s']].values
-        for j, t in enumerate(time_steps):
-            if t < traj_min:
-                # Use the first observation for this trajectory before the trajectory start time
-                fill_arr[i+j] = [traj_data[0,1], traj_data[0,0], t, traj_id]
-            elif t > traj_max:
-                # Use the last observation for this trajectory after the trajectory end time
-                fill_arr[i+j] = [traj_data[-1,1], traj_data[-1,0], t, traj_id]
-            else:
-                # Use the most recent observation for this trajectory at the current time step
-                mask = traj_data[:,2].astype(int) <= t
-                if np.any(mask):
-                    fill_arr[i+j] = [traj_data[mask][-1,1], traj_data[mask][-1,0], t, traj_id]
-                else:
-                    # There are no observations for this trajectory at or before the current time step
-                    fill_arr[i+j] = [np.nan, np.nan, t, traj_id]
-        i += num_steps
-    # Put in dataframe and format
-    fill = pd.DataFrame(fill_arr)
-    fill.columns = ['lon','lat','timeID_s',group_id]
-    fill['lon'] = fill['lon'].astype(float)
-    fill['lat'] = fill['lat'].astype(float)
-    fill['timeID_s'] = fill['timeID_s'].astype(int)
-    return fill
+# def fill_trajectories(df, min_timeID, max_timeID, group_id):
+#     traj_bounds = df.groupby(group_id)['timeID_s'].agg(['min', 'max'])
+#     time_steps = np.arange(min_timeID, max_timeID + 1)
+#     # Create an array to hold the filled trajectories
+#     num_trajectories = len(traj_bounds)
+#     num_steps = len(time_steps)
+#     fill_arr = np.empty((num_trajectories * num_steps, 4), dtype=object)
+#     # Loop over each trajectory and fill in the positions at each time step
+#     i = 0
+#     for traj_id, (traj_min, traj_max) in traj_bounds.iterrows():
+#         traj_data = df[df[group_id] == traj_id][['lat', 'lon', 'timeID_s']].values
+#         for j, t in enumerate(time_steps):
+#             if t < traj_min:
+#                 # Use the first observation for this trajectory before the trajectory start time
+#                 fill_arr[i+j] = [traj_data[0,1], traj_data[0,0], t, traj_id]
+#             elif t > traj_max:
+#                 # Use the last observation for this trajectory after the trajectory end time
+#                 fill_arr[i+j] = [traj_data[-1,1], traj_data[-1,0], t, traj_id]
+#             else:
+#                 # Use the most recent observation for this trajectory at the current time step
+#                 mask = traj_data[:,2].astype(int) <= t
+#                 if np.any(mask):
+#                     fill_arr[i+j] = [traj_data[mask][-1,1], traj_data[mask][-1,0], t, traj_id]
+#                 else:
+#                     # There are no observations for this trajectory at or before the current time step
+#                     fill_arr[i+j] = [np.nan, np.nan, t, traj_id]
+#         i += num_steps
+#     # Put in dataframe and format
+#     fill = pd.DataFrame(fill_arr)
+#     fill.columns = ['lon','lat','timeID_s',group_id]
+#     fill['lon'] = fill['lon'].astype(float)
+#     fill['lat'] = fill['lat'].astype(float)
+#     fill['timeID_s'] = fill['timeID_s'].astype(int)
+#     return fill
 
 def plot_gtfsrt_trip(ax, trace_df, epsg):
     """
