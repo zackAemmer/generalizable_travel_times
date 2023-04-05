@@ -167,24 +167,19 @@ def save_grid_anim(data, file_name, vmin, vmax):
     # Save the animation object
     ani.save(f"../plots/{file_name}", fps=10, dpi=300)
 
-def get_adjacent_points(df, shingle_id, dist_buffer, time_buffer):
-    # Convert meters to decimal degrees
-    dist_buffer = dist_buffer / 111111
-    # Critical to not reset index on df or intermediate results
-    shingle_data = df[df['shingle_id']==shingle_id]
-    adjacent_data = df[df['shingle_id']!=shingle_id]
-    # Filter on time
-    t_min = np.min(shingle_data.locationtime) - time_buffer
-    t_max = np.min(shingle_data.locationtime)
-    adjacent_data = adjacent_data[adjacent_data['locationtime'].between(t_min, t_max)]
-    # Filter on distance
-    points = np.array([adjacent_data['lon'], adjacent_data['lat']]).T.tolist()
-    query_points = np.array([shingle_data['lon'], shingle_data['lat']]).T.tolist()
-    if len(points)==0:
-        return (shingle_data, None)
-    pt_indices = get_points_within_dist(points, query_points, dist_buffer)
-    adjacent_data = adjacent_data.iloc[pt_indices].sort_values(['shingle_id','locationtime'])
-    return (shingle_data, adjacent_data)
+# def get_adjacent_points(shingle_data, adj_data, dist_buffer, time_buffer):
+#     # Filter on time
+#     t_min = np.min(shingle_data.locationtime) - time_buffer
+#     t_max = np.min(shingle_data.locationtime)
+#     adjacent_data = adj_data[adj_data['locationtime'].between(t_min, t_max)]
+#     # Filter on distance
+#     points = adjacent_data[['x','y']].values
+#     query_points = shingle_data[['x','y']].values
+#     if len(points)==0:
+#         return (shingle_data, None)
+#     pt_indices = get_points_within_dist(points, query_points, dist_buffer)
+#     adjacent_data = adjacent_data.iloc[pt_indices].sort_values(['shingle_id','locationtime'])
+#     return (shingle_data, adjacent_data)
 
 def interpolate_trajectories(df, group_col):
     traj_bounds = df.groupby(group_col)['timeID_s'].agg(['min', 'max'])
