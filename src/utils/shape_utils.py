@@ -167,7 +167,7 @@ def save_grid_anim(data, file_name, vmin, vmax):
     # Save the animation object
     ani.save(f"../plots/{file_name}", fps=10, dpi=300)
 
-def get_adjacent_metric(shingle_group, adj_traces, d_buffer, t_buffer):
+def get_adjacent_metric(shingle_group, adj_traces, d_buffer, t_buffer, b_buffer=None):
     """
     Calculate adjacent metric for each shingle from all other shingles in adj_traces.
     """
@@ -182,12 +182,19 @@ def get_adjacent_metric(shingle_group, adj_traces, d_buffer, t_buffer):
     # Get the indices of adj_traces which fit time buffer
     t_idxs = (adj_traces[:,2] <= t_end) & (adj_traces[:,2] >= t_start)
     t_idxs = set(np.where(t_idxs)[0])
-    # Get indices in both filters
-    idxs = d_idxs & t_idxs
+    # Get the indices of adj_traces which fit heading buffer
+    if b_buffer is not None:
+        h_end = np.mean(shingle_group[['bearing']].values) + b_buffer
+        h_start = np.mean(shingle_group[['bearing']].values) - b_buffer
+        h_idxs = (adj_traces[:,3] <= h_end) & (adj_traces[:,3] >= h_start)
+        h_idxs = set(np.where(h_idxs)[0])
+        idxs = d_idxs & t_idxs & h_idxs
+    else:
+        idxs = d_idxs & t_idxs
     # Get the average speed of the trace and the relevant adj_traces
     target = np.mean(shingle_group[['speed_m_s']].values)
     if len(idxs) != 0:
-        pred = np.mean(np.take(adj_traces[:,3], list(idxs), axis=0))
+        pred = np.mean(np.take(adj_traces[:,4], list(idxs), axis=0))
     else:
         pred = np.nan
     return (target, pred)
