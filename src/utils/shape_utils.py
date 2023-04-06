@@ -167,19 +167,30 @@ def save_grid_anim(data, file_name, vmin, vmax):
     # Save the animation object
     ani.save(f"../plots/{file_name}", fps=10, dpi=300)
 
-# def get_adjacent_points(shingle_data, adj_data, dist_buffer, time_buffer):
-#     # Filter on time
-#     t_min = np.min(shingle_data.locationtime) - time_buffer
-#     t_max = np.min(shingle_data.locationtime)
-#     adjacent_data = adj_data[adj_data['locationtime'].between(t_min, t_max)]
-#     # Filter on distance
-#     points = adjacent_data[['x','y']].values
-#     query_points = shingle_data[['x','y']].values
-#     if len(points)==0:
-#         return (shingle_data, None)
-#     pt_indices = get_points_within_dist(points, query_points, dist_buffer)
-#     adjacent_data = adjacent_data.iloc[pt_indices].sort_values(['shingle_id','locationtime'])
-#     return (shingle_data, adjacent_data)
+def get_adjacent_metric(shingle_group, adj_traces, d_buffer, t_buffer):
+    """
+    Calculate adjacent metric for each shingle from all other shingles in adj_traces.
+    """
+    # Set up spatial index for the traces
+    tree = KDTree(adj_traces[:,:2])
+    # Get time filter for the traces
+    t_end = np.min(shingle_group[['locationtime']].values)
+    t_start = t_end - t_buffer
+    # Get the indices of adj_traces which fit dist buffer
+    d_idxs = tree.query_ball_point(shingle_group[['x','y']].values, d_buffer)
+    d_idxs = set([item for sublist in d_idxs for item in sublist])
+    # Get the indices of adj_traces which fit time buffer
+    t_idxs = (adj_traces[:,2] <= t_end) & (adj_traces[:,2] >= t_start)
+    t_idxs = set(np.where(t_idxs)[0])
+    # Get indices in both filters
+    idxs = d_idxs & t_idxs
+    # Get the average speed of the trace and the relevant adj_traces
+    target = np.mean(shingle_group[['speed_m_s']].values)
+    if len(idxs) != 0:
+        pred = np.mean(np.take(adj_traces[:,3], list(idxs), axis=0))
+    else:
+        pred = np.nan
+    return (target, pred)
 
 def interpolate_trajectories(df, group_col):
     traj_bounds = df.groupby(group_col)['timeID_s'].agg(['min', 'max'])
