@@ -7,10 +7,9 @@ import numpy as np
 import torch
 from sklearn import metrics
 from tabulate import tabulate
-from torch.utils.data import DataLoader
 
 from models import avg_speed, ff, persistent_speed, rnn, time_table, conv
-from utils import data_loader, data_utils, model_utils
+from utils import data_loader, data_utils
 
 
 def run_models(run_folder, network_folder, hyperparameters):

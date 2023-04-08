@@ -7,7 +7,7 @@ import shutil
 import numpy as np
 import torch
 
-from utils import data_utils, shape_utils
+from utils import data_utils
 
 
 def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder, timezone, epsg, given_names, train_dates, test_dates, n_folds):
@@ -122,8 +122,8 @@ if __name__=="__main__":
         timezone="America/Los_Angeles",
         epsg="32148",
         given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
-        train_dates=data_utils.get_date_list("2023_02_14", 2),
-        test_dates=data_utils.get_date_list("2023_03_04", 1),
+        train_dates=data_utils.get_date_list("2023_03_10", 2),
+        test_dates=data_utils.get_date_list("2023_03_13", 1),
         n_folds=5
     )
     random.seed(0)
@@ -138,8 +138,8 @@ if __name__=="__main__":
         timezone="Europe/Oslo",
         epsg="32632",
         given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
-        train_dates=data_utils.get_date_list("2023_02_14", 2), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
-        test_dates=data_utils.get_date_list("2023_03_04", 1),
+        train_dates=data_utils.get_date_list("2023_03_10", 2), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
+        test_dates=data_utils.get_date_list("2023_03_13", 1),
         n_folds=5
     )
     # random.seed(0)

@@ -174,9 +174,12 @@ def combine_pkl_data(folder, file_list, given_names):
         try:
             data = load_pkl(folder + "/" + file)
             data['file'] = file
-            # Get unified column names, data types
+            # Get unified column names
             data = data[given_names]
             data.columns = FEATURE_LOOKUP.keys()
+            # Nwy locationtimes are downloaded as floats and have a decimal point; must go from object through float again to get int
+            data['locationtime'] = data['locationtime'].astype(float)
+            # Get unified data types
             data = data.astype(FEATURE_LOOKUP)
             data_list.append(data)
         except FileNotFoundError:
