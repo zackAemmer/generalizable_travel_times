@@ -87,7 +87,7 @@ class FF_GRID(nn.Module):
             nn.ReLU(),
             nn.Linear(self.hidden_size, self.hidden_size),
             nn.ReLU(),
-            nn.Dropout(p=0.25),
+            nn.Dropout(p=0.2),
             nn.Linear(self.hidden_size, 1),
         )
     def forward(self, x):

@@ -154,7 +154,7 @@ class GRU_RNN_GRID_CONV(nn.Module):
         # Convolution layer
         self.conv = nn.Conv2d(in_channels=4, out_channels=self.hidden_size, kernel_size=3, padding=1)
         # Pooling layer
-        self.pool = nn.AvgPool3d(kernel_size=4)
+        self.pool = nn.AvgPool2d(kernel_size=4)
         self.flatten = nn.Flatten(start_dim=1)
         # Linear compression layer
         self.linear = nn.Linear(in_features=self.hidden_size + self.hidden_size + self.embed_total_dims, out_features=self.output_size)
@@ -175,7 +175,7 @@ class GRU_RNN_GRID_CONV(nn.Module):
         conv_out = self.conv(conv_out)
         conv_out = self.activation(self.pool(conv_out))
         conv_out = self.flatten(conv_out)
-        conv_out = torch.reshape(conv_out, (x_gr.shape[0], x_gr.shape[1], 32))
+        conv_out = torch.reshape(conv_out, (x_gr.shape[0], x_gr.shape[1], conv_out.shape[-1]))
         # Add context, combine in linear layer
         embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
         embeddings = embeddings.repeat(1,rnn_out.shape[1],1)

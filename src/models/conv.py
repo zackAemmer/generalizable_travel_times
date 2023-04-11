@@ -33,6 +33,7 @@ class CONV(nn.Module):
             in_features=self.hidden_size + self.embed_total_dims,
             out_features=self.output_size
         )
+        self.activation = nn.ReLU()
     def forward(self, x):
         x_em = x[0]
         x_ct = x[1]
@@ -50,7 +51,7 @@ class CONV(nn.Module):
         embeddings = embeddings.repeat(1,1,out.shape[2])
         out = torch.cat((out, embeddings), dim=1)
         out = torch.swapaxes(out, 1, 2)
-        out = self.linear(out)
+        out = self.activation(self.linear(out))
         out = out.squeeze()
         return out
     def batch_step(self, data):
