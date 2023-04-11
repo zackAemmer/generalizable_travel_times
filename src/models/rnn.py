@@ -157,7 +157,7 @@ class GRU_RNN_GRID_CONV(nn.Module):
         self.pool = nn.AvgPool2d(kernel_size=4)
         self.flatten = nn.Flatten(start_dim=1)
         # Linear compression layer
-        self.linear = nn.Linear(in_features=self.hidden_size + self.hidden_size + self.embed_total_dims, out_features=self.output_size)
+        self.linear = nn.Linear(in_features=self.hidden_size + 128 + self.embed_total_dims, out_features=self.output_size)
     def forward(self, x, hidden_prev):
         x_em = x[0]
         x_ct = x[1]
