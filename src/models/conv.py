@@ -21,8 +21,8 @@ class CONV(nn.Module):
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
         self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
-        self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
-        self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
+        # self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
+        # self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
         # Conv1d layer
         self.conv1d = nn.Sequential(
             nn.Conv1d(self.input_size, self.hidden_size, 3, padding=1),
@@ -41,12 +41,13 @@ class CONV(nn.Module):
         # Embed categorical variables
         timeID_embedded = self.timeID_em(x_em[:,0])
         weekID_embedded = self.weekID_em(x_em[:,1])
-        driverID_embedded = self.driverID_em(x_em[:,2])
-        tripID_embedded = self.tripID_em(x_em[:,3])
+        # driverID_embedded = self.driverID_em(x_em[:,2])
+        # tripID_embedded = self.tripID_em(x_em[:,3])
         # Get conv pred
         out = self.conv1d(x_ct)
         # Add context, combine in linear layer
-        embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
+        # embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
+        embeddings = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
         embeddings = torch.swapaxes(embeddings, 1, 2)
         embeddings = embeddings.repeat(1,1,out.shape[2])
         out = torch.cat((out, embeddings), dim=1)

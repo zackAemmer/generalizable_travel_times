@@ -122,6 +122,16 @@ def run_models(run_folder, network_folder, hyperparameters):
                 'embed_dims': 20
             }
         }
+        embed_dict = {
+            'timeID': {
+                'vocab_size': 1440,
+                'embed_dims': 24
+            },
+            'weekID': {
+                'vocab_size': 7,
+                'embed_dims': 4
+            }
+        }
 
         # Keep track of all models trained during this run
         model_list = []

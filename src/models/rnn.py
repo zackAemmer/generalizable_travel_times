@@ -21,8 +21,8 @@ class GRU_RNN(nn.Module):
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
         self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
-        self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
-        self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
+        # self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
+        # self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
         # Activation layer
         self.activation = nn.ReLU()
         # Recurrent layer
@@ -35,8 +35,8 @@ class GRU_RNN(nn.Module):
         # Embed categorical variables
         timeID_embedded = self.timeID_em(x_em[:,0])
         weekID_embedded = self.weekID_em(x_em[:,1])
-        driverID_embedded = self.driverID_em(x_em[:,2])
-        tripID_embedded = self.tripID_em(x_em[:,3])
+        # driverID_embedded = self.driverID_em(x_em[:,2])
+        # tripID_embedded = self.tripID_em(x_em[:,3])
         # Get recurrent pred
         rnn_out, hidden_prev = self.rnn(x_ct, hidden_prev)
         rnn_out = self.activation(rnn_out)
@@ -44,7 +44,8 @@ class GRU_RNN(nn.Module):
         # out_packed, hidden_prev = self.rnn(x_ct_packed, hidden_prev)
         # out, _ = torch.nn.utils.rnn.pad_packed_sequence(out_packed, batch_first=True)
         # Add context, combine in linear layer
-        embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
+        # embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
+        embeddings = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
         embeddings = embeddings.repeat(1,rnn_out.shape[1],1)
         out = torch.cat((rnn_out, embeddings), dim=2)
         out = self.activation(self.linear(out))
@@ -84,8 +85,8 @@ class GRU_RNN_GRID(nn.Module):
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
         self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
-        self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
-        self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
+        # self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
+        # self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
         # Activation layer
         self.activation = nn.ReLU()
         # Recurrent layer
@@ -98,13 +99,14 @@ class GRU_RNN_GRID(nn.Module):
         # Embed categorical variables
         timeID_embedded = self.timeID_em(x_em[:,0])
         weekID_embedded = self.weekID_em(x_em[:,1])
-        driverID_embedded = self.driverID_em(x_em[:,2])
-        tripID_embedded = self.tripID_em(x_em[:,3])
+        # driverID_embedded = self.driverID_em(x_em[:,2])
+        # tripID_embedded = self.tripID_em(x_em[:,3])
         # Get recurrent pred
         rnn_out, hidden_prev = self.rnn(x_ct, hidden_prev)
         rnn_out = self.activation(rnn_out)
         # Add context, combine in linear layer
-        embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
+        # embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
+        embeddings = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
         embeddings = embeddings.repeat(1,rnn_out.shape[1],1)
         out = torch.cat((rnn_out, embeddings), dim=2)
         out = self.activation(self.linear(out))
@@ -145,8 +147,8 @@ class GRU_RNN_GRID_CONV(nn.Module):
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
         self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
-        self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
-        self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
+        # self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
+        # self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
         # Activation layer
         self.activation = nn.ReLU()
         # Recurrent layer
@@ -165,8 +167,8 @@ class GRU_RNN_GRID_CONV(nn.Module):
         # Embed categorical variables
         timeID_embedded = self.timeID_em(x_em[:,0])
         weekID_embedded = self.weekID_em(x_em[:,1])
-        driverID_embedded = self.driverID_em(x_em[:,2])
-        tripID_embedded = self.tripID_em(x_em[:,3])
+        # driverID_embedded = self.driverID_em(x_em[:,2])
+        # tripID_embedded = self.tripID_em(x_em[:,3])
         # Get recurrent pred
         rnn_out, hidden_prev = self.rnn(x_ct, hidden_prev)
         rnn_out = self.activation(rnn_out)
@@ -177,7 +179,8 @@ class GRU_RNN_GRID_CONV(nn.Module):
         conv_out = self.flatten(conv_out)
         conv_out = torch.reshape(conv_out, (x_gr.shape[0], x_gr.shape[1], conv_out.shape[-1]))
         # Add context, combine in linear layer
-        embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
+        # embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
+        embeddings = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
         embeddings = embeddings.repeat(1,rnn_out.shape[1],1)
         out = torch.cat((rnn_out, conv_out, embeddings), dim=2)
         out = self.activation(self.linear(out))
@@ -217,8 +220,8 @@ class GRU_RNN_MTO(nn.Module):
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
         self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
-        self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
-        self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
+        # self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
+        # self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
         # Activation layer
         self.activation = nn.ReLU()
         # Recurrent layer
@@ -231,12 +234,13 @@ class GRU_RNN_MTO(nn.Module):
         # Embed categorical variables
         timeID_embedded = self.timeID_em(x_em[:,0])
         weekID_embedded = self.weekID_em(x_em[:,1])
-        driverID_embedded = self.driverID_em(x_em[:,2])
-        tripID_embedded = self.tripID_em(x_em[:,3])
+        # driverID_embedded = self.driverID_em(x_em[:,2])
+        # tripID_embedded = self.tripID_em(x_em[:,3])
         # Get recurrent pred
         rnn_out, hidden_prev = self.rnn(x_ct, hidden_prev)
         # Add context, combine in linear layer
-        embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1)
+        # embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1)
+        embeddings = torch.cat((timeID_embedded,weekID_embedded), dim=1)
         # Use only last element
         rnn_out = rnn_out[:,-1,:]
         out = torch.cat((rnn_out, embeddings), dim=1)
@@ -274,8 +278,8 @@ class LSTM_RNN(nn.Module):
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
         self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
-        self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
-        self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
+        # self.driverID_em = nn.Embedding(embed_dict['driverID']['vocab_size'], embed_dict['driverID']['embed_dims'])
+        # self.tripID_em = nn.Embedding(embed_dict['tripID']['vocab_size'], embed_dict['tripID']['embed_dims'])
         # Activation layer
         self.activation = nn.ReLU()
         # Recurrent layer
@@ -289,13 +293,14 @@ class LSTM_RNN(nn.Module):
         # Embed categorical variables
         timeID_embedded = self.timeID_em(x_em[:,0])
         weekID_embedded = self.weekID_em(x_em[:,1])
-        driverID_embedded = self.driverID_em(x_em[:,2])
-        tripID_embedded = self.tripID_em(x_em[:,3])
+        # driverID_embedded = self.driverID_em(x_em[:,2])
+        # tripID_embedded = self.tripID_em(x_em[:,3])
         # Get recurrent pred
         rnn_out, prev_state = self.rnn(x_ct, (h_0, c_0))
         rnn_out = self.activation(rnn_out)
         # Add context, combine in linear layer
-        embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
+        # embeddings = torch.cat((timeID_embedded,weekID_embedded,driverID_embedded,tripID_embedded), dim=1).unsqueeze(1)
+        embeddings = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
         embeddings = embeddings.repeat(1,rnn_out.shape[1],1)
         out = torch.cat((rnn_out, embeddings), dim=2)
         out = self.activation(self.linear(out))
