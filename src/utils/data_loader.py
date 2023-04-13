@@ -296,6 +296,8 @@ def sequential_mto_collate(batch):
     X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
     X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
     X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
+    X[:,:,8] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['timeID']) for x in batch], batch_first=True)
+    X[:,:,9] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['weekID']) for x in batch], batch_first=True)
     context = torch.from_numpy(context)
     y = torch.from_numpy(np.array([x['time'] for x in batch]))
     # Sort all by sequence length descending, for potential packing of each batch
@@ -304,4 +306,30 @@ def sequential_mto_collate(batch):
     context = context[sorted_indices,:].int()
     X = X[sorted_indices,:,:].float()
     y = y[sorted_indices].float()
+    return [context, X, sorted_slens], y
+
+def transformer_collate(batch):
+    # Context variables to embed
+    context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID'], x['tripID']]) for x in batch], dtype='int32')
+    # Last dimension is number of sequence variables below
+    seq_lens = [len(x['lats']) for x in batch]
+    max_len = max(seq_lens)
+    X = torch.zeros((len(batch), max_len, 8))
+    # Sequence variables
+    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
+    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
+    X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
+    X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
+    X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
+    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
+    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
+    X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
+    context = torch.from_numpy(context)
+    y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
+    # Sort all by sequence length descending, for potential packing of each batch
+    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
+    sorted_slens = sorted_slens.int()
+    context = context[sorted_indices,:].int()
+    X = X[sorted_indices,:,:].float()
+    y = y[sorted_indices,:].float()
     return [context, X, sorted_slens], y
