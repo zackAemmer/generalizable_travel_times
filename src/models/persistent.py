@@ -9,7 +9,6 @@ class PersistentSpeedSeqModel:
         self.config = config
         self.min_speed = min_speed
         return None
-
     def predict(self, dataloader):
         context, X, y, seq_lens = data_utils.extract_all_dataloader(dataloader, sequential_flag=True)
         max_len = max(seq_lens)
@@ -21,7 +20,23 @@ class PersistentSpeedSeqModel:
         labels = y.numpy()
         labels = data_utils.de_normalize(labels, self.config['speed_m_s_mean'], self.config['speed_m_s_std'])
         return labels, preds
+    def save_to(self, path):
+        data_utils.write_pkl(self, path)
+        return None
 
+class PersistentTimeSeqModel:
+    def __init__(self, model_name, config):
+        self.model_name = model_name
+        self.config = config
+        return None
+    def predict(self, dataloader):
+        context, X, y, seq_lens = data_utils.extract_all_dataloader(dataloader, sequential_flag=True)
+        max_len = max(seq_lens)
+        # Predict 30 seconds for all sequence points
+        preds = np.ones((y.shape)) * 30.0
+        labels = y.numpy()
+        labels = data_utils.de_normalize(labels, self.config['time_gap_mean'], self.config['time_gap_std'])
+        return labels, preds
     def save_to(self, path):
         data_utils.write_pkl(self, path)
         return None

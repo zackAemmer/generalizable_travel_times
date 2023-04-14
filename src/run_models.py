@@ -8,7 +8,7 @@ import torch
 from sklearn import metrics
 from tabulate import tabulate
 
-from models import avg_speed, conv, ff, persistent_speed, rnn, time_table, transformer
+from models import avg_speed, conv, ff, persistent, rnn, time_table, transformer
 from utils import data_loader, data_utils
 
 
@@ -201,7 +201,7 @@ def run_models(run_folder, network_folder, hyperparameters):
 
         # #### FORECAST TASK ####
         # print("="*30)
-        # model = persistent_speed.PersistentSpeedSeqModel("PER", config, 2.0)
+        # model = persistent.PersistentSpeedSeqModel("PER_SPD", config, 2.0)
         # print(f"Training {model.model_name} model...")
         # model.save_to(f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pkl")
         # labels, preds = model.predict(test_dataloader_seq_spd)
@@ -210,6 +210,17 @@ def run_models(run_folder, network_folder, hyperparameters):
         # model_list.append(model)
         # model_labels.append(avg_labels)
         # model_preds.append(preds)
+
+        print("="*30)
+        model = persistent.PersistentTimeSeqModel("PER_TIM", config)
+        print(f"Training {model.model_name} model...")
+        model.save_to(f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pkl")
+        labels, preds = model.predict(test_dataloader_seq)
+        preds = data_utils.aggregate_cumulative_tts(preds, test_mask_seq)
+        labels = data_utils.aggregate_cumulative_tts(labels, test_mask_seq)
+        model_list.append(model)
+        model_labels.append(avg_labels)
+        model_preds.append(preds)
 
         # print("="*30)
         # model = rnn.GRU_RNN(
@@ -328,7 +339,7 @@ def run_models(run_folder, network_folder, hyperparameters):
 
         print("="*30)
         model = transformer.TRANSFORMER(
-            "TRSF",
+            "TRSF_ENC",
             8,
             1,
             HIDDEN_SIZE,

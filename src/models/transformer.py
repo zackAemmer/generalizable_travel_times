@@ -26,7 +26,7 @@ class TRANSFORMER(nn.Module):
         # Activation layer
         self.activation = nn.ReLU()
         # Positional encoding layer
-        self.pos_encoder = PositionalEncoding(self.input_size + self.embed_total_dims)
+        self.pos_encoder = PositionalEncoding(self.input_size+self.embed_total_dims)
         # Encoder layer
         encoder_layer = nn.TransformerEncoderLayer(d_model=self.input_size+self.embed_total_dims, nhead=2, dim_feedforward=self.hidden_size, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
