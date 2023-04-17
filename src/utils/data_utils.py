@@ -189,7 +189,7 @@ def combine_pkl_data(folder, file_list, given_names):
     data = data.sort_values(['file','trip_id','locationtime'], ascending=True)
     return data, no_data_list
 
-def calculate_trace_df(data, timezone, epsg, remove_stopped_pts=True):
+def calculate_trace_df(data, timezone, epsg, data_dropout=.10, remove_stopped_pts=True):
     """
     Calculate difference in metrics between two consecutive trip points.
     This is the only place where points are filtered rather than entire shingles.
@@ -201,6 +201,10 @@ def calculate_trace_df(data, timezone, epsg, remove_stopped_pts=True):
     # Some points with collection issues
     data = data[data['lat']!=0]
     data = data[data['lon']!=0]
+    # Drop out random points from all shingles
+    data = data.reset_index()
+    drop_indices = np.random.choice(data.index, int(data_dropout*len(data)), replace=False)
+    data = data[~data.index.isin(drop_indices)].reset_index()
     # Project to local coordinate system
     default_crs = pyproj.CRS.from_epsg(4326)
     proj_crs = pyproj.CRS.from_epsg(epsg)
@@ -212,9 +216,9 @@ def calculate_trace_df(data, timezone, epsg, remove_stopped_pts=True):
     data = data.groupby(['file','trip_id'], as_index=False).apply(lambda group: group.iloc[1:,:])
     # Remove any points which seem to be erroneous or repeated
     data = data[data['dist_calc_m']>=0.0]
-    data = data[data['dist_calc_m']<5000.0]
+    data = data[data['dist_calc_m']<np.quantile(data.dist_calc_m, .95)]
     data = data[data['time_calc_s']>0.0]
-    data = data[data['time_calc_s']<120.0]
+    data = data[data['time_calc_s']<np.quantile(data.time_calc_s, .95)]
     data = data[data['speed_m_s']>=0.0]
     data = data[data['speed_m_s']<35.0]
     if remove_stopped_pts:
@@ -228,9 +232,9 @@ def calculate_trace_df(data, timezone, epsg, remove_stopped_pts=True):
     # Remove (shingles this time) based on final calculation of speeds, distances, times
     invalid_shingles = []
     invalid_shingles.append(data[data['dist_calc_m']<0.0].shingle_id)
-    invalid_shingles.append(data[data['dist_calc_m']>5000.0].shingle_id)
+    # invalid_shingles.append(data[data['dist_calc_m']>np.quantile(data.dist_calc_m, .95)].shingle_id)
     invalid_shingles.append(data[data['time_calc_s']<=0.0].shingle_id)
-    invalid_shingles.append(data[data['time_calc_s']>120.0].shingle_id)
+    # invalid_shingles.append(data[data['time_calc_s']>np.quantile(data.time_calc_s, .95)].shingle_id)
     invalid_shingles.append(data[data['speed_m_s']<0.0].shingle_id)
     invalid_shingles.append(data[data['speed_m_s']>35.0].shingle_id)
     if remove_stopped_pts:
