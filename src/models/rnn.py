@@ -48,7 +48,7 @@ class GRU_RNN(nn.Module):
         embeddings = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
         embeddings = embeddings.repeat(1,rnn_out.shape[1],1)
         out = torch.cat((rnn_out, embeddings), dim=2)
-        out = self.activation(self.linear(out))
+        out = self.linear(self.activation(out))
         out = out.squeeze(2)
         return out, hidden_prev
     def batch_step(self, data):
@@ -109,7 +109,7 @@ class GRU_RNN_GRID(nn.Module):
         embeddings = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
         embeddings = embeddings.repeat(1,rnn_out.shape[1],1)
         out = torch.cat((rnn_out, embeddings), dim=2)
-        out = self.activation(self.linear(out))
+        out = self.linear(self.activation(out))
         out = out.squeeze(2)
         return out, hidden_prev
     def batch_step(self, data):
@@ -183,7 +183,7 @@ class GRU_RNN_GRID_CONV(nn.Module):
         embeddings = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
         embeddings = embeddings.repeat(1,rnn_out.shape[1],1)
         out = torch.cat((rnn_out, conv_out, embeddings), dim=2)
-        out = self.activation(self.linear(out))
+        out = self.linear(self.activation(out))
         out = out.squeeze(2)
         return out, hidden_prev
     def batch_step(self, data):
@@ -244,7 +244,7 @@ class GRU_RNN_MTO(nn.Module):
         # Use only last element
         rnn_out = rnn_out[:,-1,:]
         out = torch.cat((rnn_out, embeddings), dim=1)
-        out = self.activation(self.linear(out))
+        out = self.linear(self.activation(out))
         out = out.squeeze()
         return out, hidden_prev
     def batch_step(self, data):
@@ -303,7 +303,7 @@ class LSTM_RNN(nn.Module):
         embeddings = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
         embeddings = embeddings.repeat(1,rnn_out.shape[1],1)
         out = torch.cat((rnn_out, embeddings), dim=2)
-        out = self.activation(self.linear(out))
+        out = self.linear(self.activation(out))
         out = out.squeeze(2)
         return out, prev_state
     def batch_step(self, data):

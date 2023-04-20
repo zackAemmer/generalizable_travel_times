@@ -52,7 +52,7 @@ class CONV(nn.Module):
         embeddings = embeddings.repeat(1,1,out.shape[2])
         out = torch.cat((out, embeddings), dim=1)
         out = torch.swapaxes(out, 1, 2)
-        out = self.activation(self.linear(out))
+        out = self.linear(self.activation(out))
         out = out.squeeze()
         return out
     def batch_step(self, data):

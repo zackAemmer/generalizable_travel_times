@@ -28,7 +28,7 @@ class TRANSFORMER(nn.Module):
         # Positional encoding layer
         self.pos_encoder = PositionalEncoding(self.input_size+self.embed_total_dims)
         # Encoder layer
-        encoder_layer = nn.TransformerEncoderLayer(d_model=self.input_size+self.embed_total_dims, nhead=2, dim_feedforward=self.hidden_size, batch_first=True)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=self.input_size+self.embed_total_dims, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
         # Linear compression layer
         self.linear = nn.Linear(self.input_size + self.embed_total_dims, self.output_size)
@@ -43,7 +43,7 @@ class TRANSFORMER(nn.Module):
         # Get transformer prediction
         out = self.pos_encoder(x)
         out = self.transformer_encoder(out)
-        out = self.activation(self.linear(out)).squeeze(2)
+        out = self.linear(self.activation(out)).squeeze(2)
         return out
     def batch_step(self, data):
         inputs, labels = data
