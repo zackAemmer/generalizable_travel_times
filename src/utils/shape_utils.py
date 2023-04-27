@@ -340,41 +340,41 @@ def plot_closest_stop_anim(shingle_data):
     fig.show()
     return None
 
-def plot_adjacent_trips(test_traces):
-    shingle_id = 5885
-    dist = .002
-    t_buffer = 60
-    shingle_data, adjacent_data = get_adjacent_points(test_traces, shingle_id, t_buffer, dist)
+# def plot_adjacent_trips(test_traces):
+#     shingle_id = 5885
+#     dist = .002
+#     t_buffer = 60
+#     shingle_data, adjacent_data = get_adjacent_points(test_traces, shingle_id, t_buffer, dist)
 
-    # Join and interpolate each trajectory
-    plot_shingle_data = interpolate_trajectories(shingle_data, 'shingle_id')
-    plot_shingle_data['Type'] = 'Trajectory'
-    plot_adjacent_data = interpolate_trajectories(adjacent_data, 'shingle_id')
-    plot_adjacent_data['Type'] = 'Adjacent Trip'
-    # For some reason Plotly needs data to be sorted by the animation frame
-    plot_data = pd.concat([plot_shingle_data, plot_adjacent_data], axis=0).sort_values(['timeID_s','shingle_id'])
+#     # Join and interpolate each trajectory
+#     plot_shingle_data = interpolate_trajectories(shingle_data, 'shingle_id')
+#     plot_shingle_data['Type'] = 'Trajectory'
+#     plot_adjacent_data = interpolate_trajectories(adjacent_data, 'shingle_id')
+#     plot_adjacent_data['Type'] = 'Adjacent Trip'
+#     # For some reason Plotly needs data to be sorted by the animation frame
+#     plot_data = pd.concat([plot_shingle_data, plot_adjacent_data], axis=0).sort_values(['timeID_s','shingle_id'])
 
-    # Plot adjacent shingles
-    fig = px.scatter(
-        plot_data,
-        title=f"Active Shingles Within {dist*111*1000}m and {t_buffer}s of Target",
-        x="lon",
-        y="lat",
-        range_x=[np.min(plot_data['lon'])-.01, np.max(plot_data['lon'])+.01],
-        range_y=[np.min(plot_data['lat'])-.01, np.max(plot_data['lat'])+.01],
-        animation_frame="timeID_s",
-        animation_group="shingle_id",
-        # color="Type", # For some reason this breaks the animation order
-        text="Type"
-    )
-    fig.update_layout(
-    template='plotly_dark',
-    margin=dict(r=60, t=25, b=40, l=60)
-    )
-    fig.layout.updatemenus[0].buttons[0].args[1]['frame']['duration'] = 30
-    fig.layout.updatemenus[0].buttons[0].args[1]['transition']['duration'] = 5
-    # fig.write_html("../plots/adjacent_trips.html")
-    fig.show()
+#     # Plot adjacent shingles
+#     fig = px.scatter(
+#         plot_data,
+#         title=f"Active Shingles Within {dist*111*1000}m and {t_buffer}s of Target",
+#         x="lon",
+#         y="lat",
+#         range_x=[np.min(plot_data['lon'])-.01, np.max(plot_data['lon'])+.01],
+#         range_y=[np.min(plot_data['lat'])-.01, np.max(plot_data['lat'])+.01],
+#         animation_frame="timeID_s",
+#         animation_group="shingle_id",
+#         # color="Type", # For some reason this breaks the animation order
+#         text="Type"
+#     )
+#     fig.update_layout(
+#     template='plotly_dark',
+#     margin=dict(r=60, t=25, b=40, l=60)
+#     )
+#     fig.layout.updatemenus[0].buttons[0].args[1]['frame']['duration'] = 30
+#     fig.layout.updatemenus[0].buttons[0].args[1]['transition']['duration'] = 5
+#     # fig.write_html("../plots/adjacent_trips.html")
+#     fig.show()
 
 def plot_traces_on_map(mapbox_token, plot_data):
     # Show overview of trace and adjacent on a map

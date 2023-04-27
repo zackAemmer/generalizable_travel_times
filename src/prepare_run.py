@@ -47,7 +47,7 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     print(f"Lost dates train: {train_fail_dates}, {len(train_data)} samples kept.")
     print(f"Lost dates test: {test_fail_dates}, {len(test_data)} samples kept.")
 
-    # Load the GTFS
+    ### Load the GTFS
     print(f"Loading and merging GTFS files from '{gtfs_folder}'...")
     gtfs_data = data_utils.merge_gtfs_files(gtfs_folder, epsg)
 
@@ -85,8 +85,8 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     print("="*30)
     print(f"Mapping trace data to DeepTTE format...")
     deeptte_formatted_path = base_folder + "deeptte_formatted/"
-    train_traces, train_grid = data_utils.map_to_deeptte(train_traces, deeptte_formatted_path, n_folds)
-    test_traces, test_grid = data_utils.map_to_deeptte(test_traces, deeptte_formatted_path, n_folds, is_test=True)
+    train_traces, train_grid, train_grid_ffill = data_utils.map_to_deeptte(train_traces, deeptte_formatted_path, n_folds, grid_res=128, grid_time=10*60)
+    test_traces, test_grid, test_grid_ffill = data_utils.map_to_deeptte(test_traces, deeptte_formatted_path, n_folds, is_test=True, grid_res=128, grid_time=10*60)
     summary_config = data_utils.get_summary_config(train_traces, n_unique_veh, n_unique_trip, gtfs_folder, n_folds, epsg)
 
     print(f"Saving config file...")
@@ -104,6 +104,8 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     print(f"Saving grid features...")
     data_utils.write_pkl(train_grid, base_folder+"train_grid.pkl")
     data_utils.write_pkl(test_grid, base_folder+"test_grid.pkl")
+    data_utils.write_pkl(train_grid_ffill, base_folder+"train_grid_ffill.pkl")
+    data_utils.write_pkl(test_grid_ffill, base_folder+"test_grid_ffill.pkl")
 
     print("="*30)
     print(f"RUN PREPARATION COMPLETED '{run_name}/{network_name}'")

@@ -139,7 +139,9 @@ def load_train_test_data(data_folder, n_folds):
     # Read in grid features
     train_grid = load_pkl(f"{data_folder}../train_grid.pkl")
     test_grid = load_pkl(f"{data_folder}../test_grid.pkl")
-    return train_data_chunks, test_data, train_grid, test_grid
+    train_grid_ffill = load_pkl(f"{data_folder}../train_grid_ffill.pkl")
+    test_grid_ffill = load_pkl(f"{data_folder}../test_grid_ffill.pkl")
+    return train_data_chunks, test_data, train_grid, test_grid, train_grid_ffill, test_grid_ffill
 
 def load_all_inputs(run_folder, network_folder):
     train_traces = load_pkl(f"{run_folder}{network_folder}train_traces.pkl")
@@ -147,7 +149,7 @@ def load_all_inputs(run_folder, network_folder):
     with open(f"{run_folder}{network_folder}/deeptte_formatted/config.json") as f:
         config = json.load(f)
     gtfs_data = merge_gtfs_files(f".{config['gtfs_folder']}", config['epsg'])
-    train_data_chunks, test_data, train_grid, test_grid = load_train_test_data(f"{run_folder}{network_folder}/deeptte_formatted/", config['n_folds'])
+    train_data_chunks, test_data, train_grid, test_grid, train_grid_ffill, test_grid_ffill = load_train_test_data(f"{run_folder}{network_folder}/deeptte_formatted/", config['n_folds'])
     return {
         "train_traces": train_traces,
         "test_traces": test_traces,
@@ -156,7 +158,9 @@ def load_all_inputs(run_folder, network_folder):
         "train_data_chunks": train_data_chunks,
         "test_data": test_data,
         "train_grid": train_grid,
-        "test_grid": test_grid
+        "test_grid": test_grid,
+        "train_grid_ffill": train_grid_ffill,
+        "test_grid_ffill": test_grid_ffill
     }
 
 def combine_pkl_data(folder, file_list, given_names):
@@ -361,7 +365,39 @@ def remap_ids(df_list, id_col):
         df[f"{id_col}_recode"] = recode
     return (df_list, len(pd.unique(all_ids)), mapping)
 
-def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
+def fill_grid_forward(grid):
+    """
+    Fill forward (in time) each channel in the grid for timesteps w/o an observation.
+    Returns: copy of grid with filled forward values, and 4 new channels holding fill counts.
+    """
+    filled_channels = np.zeros(grid.shape)
+    filled_counts = np.zeros(grid.shape)
+    for channel in range(grid.shape[1]):
+        ffilled, channel_counts = fill_channel_forward(grid[:,channel,:,:])
+        filled_channels[:,channel,:,:] = ffilled
+        filled_counts[:,channel,:,:] = channel_counts
+    grid_ffill = np.concatenate((filled_channels, filled_counts), axis=1)
+    return grid_ffill
+
+def fill_channel_forward(grid_channel):
+    tsteps, rows, cols = grid_channel.shape
+    mask = grid_channel==-1
+    ffilled = np.copy(grid_channel)
+    channel_counts = np.zeros(grid_channel.shape)
+    for i in range(rows):
+        for j in range(cols):
+            counter = 0
+            for t in range(1,tsteps):
+                if mask[t][i][j]:
+                    counter += 1
+                    ffilled[t][i][j] = ffilled[t-1][i][j]
+                    channel_counts[t][i][j] = counter
+                else:
+                    counter = 0
+                    channel_counts[t][i][j] = counter
+    return ffilled, channel_counts
+
+def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False, grid_res=32, grid_time=30):
     """
     Reshape pandas dataframe to the json format needed to use deeptte.
     trace_data: dataframe with bus trajectories
@@ -381,7 +417,8 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
     trace_data['tripID'] = trace_data['trip_id_recode']
 
     # Calculate and add grid features
-    grid, tbin_idxs, xbin_idxs, ybin_idxs = shape_utils.get_grid_features(trace_data, resolution=128, timestep=30)
+    grid, tbin_idxs, xbin_idxs, ybin_idxs = shape_utils.get_grid_features(trace_data, resolution=grid_res, timestep=grid_time)
+    grid_ffill = fill_grid_forward(grid)
     trace_data['tbin_idx'] = tbin_idxs
     trace_data['xbin_idx'] = xbin_idxs
     trace_data['ybin_idx'] = ybin_idxs
@@ -442,7 +479,7 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False):
             df_json_string = df.to_json(orient='records', lines=True)
             with open(deeptte_formatted_path+"train_0"+str(i), mode='w+') as out_file:
                 out_file.write(df_json_string)
-    return trace_data, grid
+    return trace_data, grid, grid_ffill
 
 def get_summary_config(trace_data, n_unique_veh, n_unique_trip, gtfs_folder, n_folds, epsg):
     """
