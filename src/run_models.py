@@ -75,23 +75,23 @@ def run_models(run_folder, network_folder, hyperparameters):
         train_dataloader_basic = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
         test_dataloader_basic = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
 
-        train_dataloader_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
-        test_dataloader_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
+        # train_dataloader_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
+        # test_dataloader_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
 
         train_dataloader_seq = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
         test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
         _, _ = data_utils.get_seq_info(train_dataloader_seq)
         _, test_mask_seq = data_utils.get_seq_info(test_dataloader_seq)
 
-        train_dataloader_seq_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
-        test_dataloader_seq_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
-        _, _ = data_utils.get_seq_info(train_dataloader_seq_grid)
-        _, test_mask_seq_grid = data_utils.get_seq_info(test_dataloader_seq_grid)
+        # train_dataloader_seq_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
+        # test_dataloader_seq_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
+        # _, _ = data_utils.get_seq_info(train_dataloader_seq_grid)
+        # _, test_mask_seq_grid = data_utils.get_seq_info(test_dataloader_seq_grid)
 
-        train_dataloader_seq_grid_conv = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_grid_conv_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
-        test_dataloader_seq_grid_conv = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_grid_conv_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
-        _, _ = data_utils.get_seq_info(train_dataloader_seq_grid_conv)
-        _, test_mask_seq_grid_conv = data_utils.get_seq_info(test_dataloader_seq_grid_conv)
+        # train_dataloader_seq_grid_conv = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_grid_conv_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
+        # test_dataloader_seq_grid_conv = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_grid_conv_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
+        # _, _ = data_utils.get_seq_info(train_dataloader_seq_grid_conv)
+        # _, test_mask_seq_grid_conv = data_utils.get_seq_info(test_dataloader_seq_grid_conv)
 
         train_dataloader_seq_spd = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_spd_collate, NUM_WORKERS)
         test_dataloader_seq_spd = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_spd_collate, NUM_WORKERS)
@@ -106,10 +106,10 @@ def run_models(run_folder, network_folder, hyperparameters):
         _, _ = data_utils.get_seq_info(train_dataloader_trs)
         _, test_mask_trs = data_utils.get_seq_info(test_dataloader_trs)
 
-        train_dataloader_trs_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.transformer_grid_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
-        test_dataloader_trs_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.transformer_grid_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
-        _, _ = data_utils.get_seq_info(train_dataloader_trs_grid)
-        _, test_mask_trs_grid = data_utils.get_seq_info(test_dataloader_trs_grid)
+        # train_dataloader_trs_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.transformer_grid_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
+        # test_dataloader_trs_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.transformer_grid_collate, NUM_WORKERS, grid=train_grid, n_prior=1, buffer=5)
+        # _, _ = data_utils.get_seq_info(train_dataloader_trs_grid)
+        # _, test_mask_trs_grid = data_utils.get_seq_info(test_dataloader_trs_grid)
 
         print(f"Successfully loaded {len(train_data)} training samples and {len(test_data)} testing samples.")
 
@@ -161,31 +161,31 @@ def run_models(run_folder, network_folder, hyperparameters):
         model_labels.append(avg_labels)
         model_preds.append(avg_preds)
 
-        # print("="*30)
-        # model = time_table.TimeTableModel("SCH", config)
-        # print(f"Training {model.model_name} model...")
-        # model.save_to(f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pkl")
-        # labels, preds = model.predict(test_dataloader_basic)
-        # model_list.append(model)
-        # model_labels.append(avg_labels)
-        # model_preds.append(preds)
+        print("="*30)
+        model = time_table.TimeTableModel("SCH", config)
+        print(f"Training {model.model_name} model...")
+        model.save_to(f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pkl")
+        labels, preds = model.predict(test_dataloader_basic)
+        model_list.append(model)
+        model_labels.append(avg_labels)
+        model_preds.append(preds)
 
-        # print("="*30)
-        # model = ff.FF(
-        #     "FF",
-        #     11,
-        #     HIDDEN_SIZE,
-        #     embed_dict,
-        #     device
-        # ).to(device)
-        # print(f"Training {model.model_name} model...")
-        # train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_basic, test_dataloader_basic, config, LEARN_RATE, EPOCHS)
-        # torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
-        # model_list.append(model)
-        # model_labels.append(avg_labels)
-        # model_preds.append(preds)
-        # curve_models.append(model.model_name)
-        # curves.append({"Train":train_losses, "Test":test_losses})
+        print("="*30)
+        model = ff.FF(
+            "FF",
+            11,
+            HIDDEN_SIZE,
+            embed_dict,
+            device
+        ).to(device)
+        print(f"Training {model.model_name} model...")
+        train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_basic, test_dataloader_basic, config, LEARN_RATE, EPOCHS)
+        torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
+        model_list.append(model)
+        model_labels.append(avg_labels)
+        model_preds.append(preds)
+        curve_models.append(model.model_name)
+        curves.append({"Train":train_losses, "Test":test_losses})
 
         # print("="*30)
         # model = ff.FF_GRID(
@@ -204,47 +204,47 @@ def run_models(run_folder, network_folder, hyperparameters):
         # curve_models.append(model.model_name)
         # curves.append({"Train":train_losses, "Test":test_losses})
 
-        # #### FORECAST TASK ####
-        # print("="*30)
-        # model = persistent.PersistentSpeedSeqModel("PER_SPD", config, 2.0)
-        # print(f"Training {model.model_name} model...")
-        # model.save_to(f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pkl")
-        # labels, preds = model.predict(test_dataloader_seq_spd)
-        # preds = data_utils.convert_speeds_to_tts(preds, test_dataloader_seq_spd, test_mask_spd, config)
-        # labels = data_utils.convert_speeds_to_tts(labels, test_dataloader_seq_spd, test_mask_spd, config)
-        # model_list.append(model)
-        # model_labels.append(avg_labels)
-        # model_preds.append(preds)
+        #### FORECAST TASK ####
+        print("="*30)
+        model = persistent.PersistentSpeedSeqModel("PER_SPD", config, 2.0)
+        print(f"Training {model.model_name} model...")
+        model.save_to(f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pkl")
+        labels, preds = model.predict(test_dataloader_seq_spd)
+        preds = data_utils.convert_speeds_to_tts(preds, test_dataloader_seq_spd, test_mask_spd, config)
+        labels = data_utils.convert_speeds_to_tts(labels, test_dataloader_seq_spd, test_mask_spd, config)
+        model_list.append(model)
+        model_labels.append(avg_labels)
+        model_preds.append(preds)
 
-        # print("="*30)
-        # model = persistent.PersistentTimeSeqModel("PER_TIM", config)
-        # print(f"Training {model.model_name} model...")
-        # model.save_to(f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pkl")
-        # labels, preds = model.predict(test_dataloader_seq)
-        # preds = data_utils.aggregate_tts(preds, test_mask_seq)
-        # labels = data_utils.aggregate_tts(labels, test_mask_seq)
-        # model_list.append(model)
-        # model_labels.append(avg_labels)
-        # model_preds.append(preds)
+        print("="*30)
+        model = persistent.PersistentTimeSeqModel("PER_TIM", config)
+        print(f"Training {model.model_name} model...")
+        model.save_to(f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pkl")
+        labels, preds = model.predict(test_dataloader_seq)
+        preds = data_utils.aggregate_tts(preds, test_mask_seq)
+        labels = data_utils.aggregate_tts(labels, test_mask_seq)
+        model_list.append(model)
+        model_labels.append(avg_labels)
+        model_preds.append(preds)
 
-        # print("="*30)
-        # model = rnn.GRU_RNN(
-        #     "GRU_RNN",
-        #     8,
-        #     1,
-        #     HIDDEN_SIZE,
-        #     BATCH_SIZE,
-        #     embed_dict,
-        #     device
-        # ).to(device)
-        # print(f"Training {model.model_name} model...")
-        # train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_seq, test_dataloader_seq, test_mask_seq, config, LEARN_RATE, EPOCHS)
-        # torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
-        # model_list.append(model)
-        # model_labels.append(avg_labels)
-        # model_preds.append(preds)
-        # curve_models.append(model.model_name)
-        # curves.append({"Train":train_losses, "Test":test_losses})
+        print("="*30)
+        model = rnn.GRU_RNN(
+            "GRU_RNN",
+            8,
+            1,
+            HIDDEN_SIZE,
+            BATCH_SIZE,
+            embed_dict,
+            device
+        ).to(device)
+        print(f"Training {model.model_name} model...")
+        train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_seq, test_dataloader_seq, test_mask_seq, config, LEARN_RATE, EPOCHS)
+        torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
+        model_list.append(model)
+        model_labels.append(avg_labels)
+        model_preds.append(preds)
+        curve_models.append(model.model_name)
+        curves.append({"Train":train_losses, "Test":test_losses})
 
         # print("="*30)
         # model = rnn.GRU_RNN_GRID(
@@ -285,85 +285,9 @@ def run_models(run_folder, network_folder, hyperparameters):
         # curve_models.append(model.model_name)
         # curves.append({"Train":train_losses, "Test":test_losses})
 
-        # print("="*30)
-        # model = rnn.GRU_RNN_MTO(
-        #     "GRU_RNN_MTO",
-        #     8,
-        #     1,
-        #     HIDDEN_SIZE,
-        #     BATCH_SIZE,
-        #     embed_dict,
-        #     device
-        # ).to(device)
-        # print(f"Training {model.model_name} model...")
-        # train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_seq_mto, test_dataloader_seq_mto, config, LEARN_RATE, EPOCHS)
-        # torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
-        # model_list.append(model)
-        # model_labels.append(avg_labels)
-        # model_preds.append(preds)
-        # curve_models.append(model.model_name)
-        # curves.append({"Train":train_losses, "Test":test_losses})
-
-        # print("="*30)
-        # model = rnn.LSTM_RNN(
-        #     "LSTM_RNN",
-        #     8,
-        #     1,
-        #     HIDDEN_SIZE,
-        #     BATCH_SIZE,
-        #     embed_dict,
-        #     device
-        # ).to(device)
-        # print(f"Training {model.model_name} model...")
-        # train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_seq, test_dataloader_seq, test_mask_seq, config, LEARN_RATE, EPOCHS)
-        # torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
-        # model_list.append(model)
-        # model_labels.append(avg_labels)
-        # model_preds.append(preds)
-        # curve_models.append(model.model_name)
-        # curves.append({"Train":train_losses, "Test":test_losses})
-
-        # print("="*30)
-        # model = conv.CONV(
-        #     "CONV1D_MTM",
-        #     8,
-        #     1,
-        #     HIDDEN_SIZE,
-        #     BATCH_SIZE,
-        #     embed_dict,
-        #     device
-        # ).to(device)
-        # print(f"Training {model.model_name} model...")
-        # train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_seq, test_dataloader_seq, test_mask_seq, config, LEARN_RATE, EPOCHS)
-        # torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
-        # model_list.append(model)
-        # model_labels.append(avg_labels)
-        # model_preds.append(preds)
-        # curve_models.append(model.model_name)
-        # curves.append({"Train":train_losses, "Test":test_losses})
-
-        # print("="*30)
-        # model = transformer.TRANSFORMER(
-        #     "TRSF_ENC",
-        #     8,
-        #     1,
-        #     HIDDEN_SIZE,
-        #     BATCH_SIZE,
-        #     embed_dict,
-        #     device
-        # ).to(device)
-        # print(f"Training {model.model_name} model...")
-        # train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_trs, test_dataloader_trs, test_mask_trs, config, LEARN_RATE, EPOCHS)
-        # torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
-        # model_list.append(model)
-        # model_labels.append(avg_labels)
-        # model_preds.append(preds)
-        # curve_models.append(model.model_name)
-        # curves.append({"Train":train_losses, "Test":test_losses})
-
         print("="*30)
-        model = transformer.TRANSFORMER_GRID(
-            "TRSF_ENC_GRID",
+        model = rnn.GRU_RNN_MTO(
+            "GRU_RNN_MTO",
             8,
             1,
             HIDDEN_SIZE,
@@ -372,13 +296,89 @@ def run_models(run_folder, network_folder, hyperparameters):
             device
         ).to(device)
         print(f"Training {model.model_name} model...")
-        train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_trs_grid, test_dataloader_trs_grid, test_mask_trs_grid, config, LEARN_RATE, EPOCHS)
+        train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_seq_mto, test_dataloader_seq_mto, config, LEARN_RATE, EPOCHS)
         torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
         model_list.append(model)
         model_labels.append(avg_labels)
         model_preds.append(preds)
         curve_models.append(model.model_name)
         curves.append({"Train":train_losses, "Test":test_losses})
+
+        print("="*30)
+        model = rnn.LSTM_RNN(
+            "LSTM_RNN",
+            8,
+            1,
+            HIDDEN_SIZE,
+            BATCH_SIZE,
+            embed_dict,
+            device
+        ).to(device)
+        print(f"Training {model.model_name} model...")
+        train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_seq, test_dataloader_seq, test_mask_seq, config, LEARN_RATE, EPOCHS)
+        torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
+        model_list.append(model)
+        model_labels.append(avg_labels)
+        model_preds.append(preds)
+        curve_models.append(model.model_name)
+        curves.append({"Train":train_losses, "Test":test_losses})
+
+        print("="*30)
+        model = conv.CONV(
+            "CONV1D_MTM",
+            8,
+            1,
+            HIDDEN_SIZE,
+            BATCH_SIZE,
+            embed_dict,
+            device
+        ).to(device)
+        print(f"Training {model.model_name} model...")
+        train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_seq, test_dataloader_seq, test_mask_seq, config, LEARN_RATE, EPOCHS)
+        torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
+        model_list.append(model)
+        model_labels.append(avg_labels)
+        model_preds.append(preds)
+        curve_models.append(model.model_name)
+        curves.append({"Train":train_losses, "Test":test_losses})
+
+        print("="*30)
+        model = transformer.TRANSFORMER(
+            "TRSF_ENC",
+            8,
+            1,
+            HIDDEN_SIZE,
+            BATCH_SIZE,
+            embed_dict,
+            device
+        ).to(device)
+        print(f"Training {model.model_name} model...")
+        train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_trs, test_dataloader_trs, test_mask_trs, config, LEARN_RATE, EPOCHS)
+        torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
+        model_list.append(model)
+        model_labels.append(avg_labels)
+        model_preds.append(preds)
+        curve_models.append(model.model_name)
+        curves.append({"Train":train_losses, "Test":test_losses})
+
+        # print("="*30)
+        # model = transformer.TRANSFORMER_GRID(
+        #     "TRSF_ENC_GRID",
+        #     8,
+        #     1,
+        #     HIDDEN_SIZE,
+        #     BATCH_SIZE,
+        #     embed_dict,
+        #     device
+        # ).to(device)
+        # print(f"Training {model.model_name} model...")
+        # train_losses, test_losses, labels, preds = model.fit_to_data(train_dataloader_trs_grid, test_dataloader_trs_grid, test_mask_trs_grid, config, LEARN_RATE, EPOCHS)
+        # torch.save(model.state_dict(), run_folder + network_folder + f"models/{model.model_name}_{fold_num}.pt")
+        # model_list.append(model)
+        # model_labels.append(avg_labels)
+        # model_preds.append(preds)
+        # curve_models.append(model.model_name)
+        # curves.append({"Train":train_losses, "Test":test_losses})
 
         #### CALCULATE METRICS ####
         print("="*30)
@@ -409,15 +409,41 @@ def run_models(run_folder, network_folder, hyperparameters):
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
 
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/debug/",
+    #     network_folder="kcm/",
+    #     hyperparameters={
+    #         "EPOCHS": 2,
+    #         "BATCH_SIZE": 512,
+    #         "LEARN_RATE": 1e-3,
+    #         "HIDDEN_SIZE": 32
+    #     }
+    # )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/debug/",
+    #     network_folder="atb/",
+    #     hyperparameters={
+    #         "EPOCHS": 2,
+    #         "BATCH_SIZE": 512,
+    #         "LEARN_RATE": 1e-3,
+    #         "HIDDEN_SIZE": 32
+    #     }
+    # )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/debug/",
+        run_folder="./results/small/",
         network_folder="kcm/",
         hyperparameters={
-            "EPOCHS": 3,
-            "BATCH_SIZE": 512,
+            "EPOCHS": 30,
+            "BATCH_SIZE": 64,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
         }
@@ -426,11 +452,11 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/debug/",
+        run_folder="./results/small/",
         network_folder="atb/",
         hyperparameters={
-            "EPOCHS": 3,
-            "BATCH_SIZE": 512,
+            "EPOCHS": 30,
+            "BATCH_SIZE": 64,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
         }

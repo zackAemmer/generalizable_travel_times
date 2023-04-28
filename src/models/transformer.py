@@ -105,7 +105,7 @@ class TRANSFORMER_GRID(nn.Module):
         # Join continuous and categorical variables, as queries for cross attention
         x_em = x_em.repeat(1,x_ct.shape[1],1)
         x_query = torch.cat((x_ct, x_em), dim=2)
-        # Add 3d positional encoding to grid convolutional features along channel dimension
+        # Add 3d positional encoding to grid features along channel dimension
         x_key = torch.swapaxes(x_gr, 1, 2)
         penc = self.pos_encoder_grid(x_key)
         x_key = x_key + penc
