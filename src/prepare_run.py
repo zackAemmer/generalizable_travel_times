@@ -58,8 +58,8 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     test_traces = data_utils.shingle(test_data, 2, 5)
 
     print(f"Calculating trace values from shingles...")
-    train_traces = data_utils.calculate_trace_df(train_traces, timezone, epsg)
-    test_traces = data_utils.calculate_trace_df(test_traces, timezone, epsg)
+    train_traces = data_utils.calculate_trace_df(train_traces, timezone, epsg, data_dropout=0.2)
+    test_traces = data_utils.calculate_trace_df(test_traces, timezone, epsg, data_dropout=0.2)
     print(f"Cumulative {np.round(len(train_traces) / len(train_data) * 100, 1)}% of train data retained.")
     print(f"Cumulative {np.round(len(test_traces) / len(test_data) * 100, 1)}% of test data retained.")
 
