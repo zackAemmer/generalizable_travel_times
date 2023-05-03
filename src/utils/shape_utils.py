@@ -306,39 +306,39 @@ def plot_gtfs_trip(ax, trip_id, gtfs_data, epsg):
     to_plot.plot(ax=ax, marker='x', color='lightgreen', markersize=10)
     return None
 
-def plot_closest_stop_anim(shingle_data):
-    # Plot closest stop updates across shingle
-    plot_data = shingle_data
-    next_stops = plot_data[['stop_lon','stop_lat','timeID_s']]
-    next_stops.columns = ["lon","lat","timeID_s"]
-    next_stops['Type'] = "Nearest Scheduled Stop"
-    next_points = shingle_data[['lon','lat','timeID_s']]
-    next_points['Type'] = "Current Position"
-    next_points = interpolate_trajectories(next_points, 'Type')
-    next_stops = fill_trajectories(next_stops, np.min(next_points['timeID_s']), np.max(next_points['timeID_s']), 'Type')
-    plot_data = pd.concat([next_points, next_stops], axis=0)
+# def plot_closest_stop_anim(shingle_data):
+#     # Plot closest stop updates across shingle
+#     plot_data = shingle_data
+#     next_stops = plot_data[['stop_lon','stop_lat','timeID_s']]
+#     next_stops.columns = ["lon","lat","timeID_s"]
+#     next_stops['Type'] = "Nearest Scheduled Stop"
+#     next_points = shingle_data[['lon','lat','timeID_s']]
+#     next_points['Type'] = "Current Position"
+#     next_points = interpolate_trajectories(next_points, 'Type')
+#     next_stops = fill_trajectories(next_stops, np.min(next_points['timeID_s']), np.max(next_points['timeID_s']), 'Type')
+#     plot_data = pd.concat([next_points, next_stops], axis=0)
 
-    fig = px.scatter(
-        plot_data,
-        title=f"Nearest Stop to Target",
-        x="lon",
-        y="lat",
-        range_x=[np.min(plot_data['lon'])-.01, np.max(plot_data['lon'])+.01],
-        range_y=[np.min(plot_data['lat'])-.01, np.max(plot_data['lat'])+.01],
-        animation_frame="timeID_s",
-        animation_group="Type",
-        color="Type"
-    )
-    fig.update_traces(marker={'size': 15})
-    fig.update_layout(
-    template='plotly_dark',
-    margin=dict(r=60, t=25, b=40, l=60)
-    )
-    fig.layout.updatemenus[0].buttons[0].args[1]['frame']['duration'] = 30
-    fig.layout.updatemenus[0].buttons[0].args[1]['transition']['duration'] = 5
-    # fig.write_html("../plots/nearest_stop.html")
-    fig.show()
-    return None
+#     fig = px.scatter(
+#         plot_data,
+#         title=f"Nearest Stop to Target",
+#         x="lon",
+#         y="lat",
+#         range_x=[np.min(plot_data['lon'])-.01, np.max(plot_data['lon'])+.01],
+#         range_y=[np.min(plot_data['lat'])-.01, np.max(plot_data['lat'])+.01],
+#         animation_frame="timeID_s",
+#         animation_group="Type",
+#         color="Type"
+#     )
+#     fig.update_traces(marker={'size': 15})
+#     fig.update_layout(
+#     template='plotly_dark',
+#     margin=dict(r=60, t=25, b=40, l=60)
+#     )
+#     fig.layout.updatemenus[0].buttons[0].args[1]['frame']['duration'] = 30
+#     fig.layout.updatemenus[0].buttons[0].args[1]['transition']['duration'] = 5
+#     # fig.write_html("../plots/nearest_stop.html")
+#     fig.show()
+#     return None
 
 # def plot_adjacent_trips(test_traces):
 #     shingle_id = 5885
@@ -391,42 +391,42 @@ def plot_traces_on_map(mapbox_token, plot_data):
     # fig.write_html("../plots/adjacent_trip_traces.html")
     fig.show()
 
-def fit_poly(x, y):
-    # Fit polynomial to the data
-    z = np.polyfit(x=x, y=y, deg=2)
-    # Get values for plotting the line of fit
-    x_val = np.arange(np.min(x),np.max(x),.1)
-    p = np.poly1d(z)
-    y_val = p(x_val)
-    # R2: variance explained by model / total variance
-    SSR = np.sum((y - p(x))**2)
-    SST = np.sum((y - np.mean(y))**2)
-    R2 = 1 - (SSR/SST)
-    return R2, x_val, y_val
+# def fit_poly(x, y):
+#     # Fit polynomial to the data
+#     z = np.polyfit(x=x, y=y, deg=2)
+#     # Get values for plotting the line of fit
+#     x_val = np.arange(np.min(x),np.max(x),.1)
+#     p = np.poly1d(z)
+#     y_val = p(x_val)
+#     # R2: variance explained by model / total variance
+#     SSR = np.sum((y - p(x))**2)
+#     SST = np.sum((y - np.mean(y))**2)
+#     R2 = 1 - (SSR/SST)
+#     return R2, x_val, y_val
 
-def plot_poly(x, y, R2, x_val, y_val):
-    plot_data = pd.concat([
-        pd.DataFrame({
-            "x": x,
-            "y": y,
-            "Type": "data"
-        }),
-        pd.DataFrame({
-            "x": x_val,
-            "y": y_val,
-            "Type": "pred"
-        })
-    ])
-    fig = px.scatter(
-        plot_data,
-        y="y",
-        color="Type",
-        x="x",
-        title=f"Mean Adjacent Speed D=2 Polynomial R-Squared: {np.round(R2,3)}",
-        labels={
-            "x": "Mean Speed of Adjacent Trips (m/s)",
-            "y": "Mean Speed of Target Trip (m/s)",
-        }
-    )
-    # fig.write_image("../plots/speed_reg.png")
-    fig.show()
+# def plot_poly(x, y, R2, x_val, y_val):
+#     plot_data = pd.concat([
+#         pd.DataFrame({
+#             "x": x,
+#             "y": y,
+#             "Type": "data"
+#         }),
+#         pd.DataFrame({
+#             "x": x_val,
+#             "y": y_val,
+#             "Type": "pred"
+#         })
+#     ])
+#     fig = px.scatter(
+#         plot_data,
+#         y="y",
+#         color="Type",
+#         x="x",
+#         title=f"Mean Adjacent Speed D=2 Polynomial R-Squared: {np.round(R2,3)}",
+#         labels={
+#             "x": "Mean Speed of Adjacent Trips (m/s)",
+#             "y": "Mean Speed of Target Trip (m/s)",
+#         }
+#     )
+#     # fig.write_image("../plots/speed_reg.png")
+#     fig.show()
