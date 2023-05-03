@@ -220,11 +220,9 @@ def calculate_trace_df(data, timezone, epsg, data_dropout=.10, remove_stopped_pt
     data = data.groupby(['file','trip_id'], as_index=False).apply(lambda group: group.iloc[1:,:])
     # Remove any points which seem to be erroneous or repeated
     data = data[data['dist_calc_m']>=0.0]
-    data = data[data['dist_calc_m']<np.quantile(data.dist_calc_m, .95)]
     data = data[data['time_calc_s']>0.0]
-    data = data[data['time_calc_s']<np.quantile(data.time_calc_s, .95)]
     data = data[data['speed_m_s']>=0.0]
-    data = data[data['speed_m_s']<35.0]
+    data = data[data['speed_m_s']<=35.0]
     if remove_stopped_pts:
         data = data[data['dist_calc_m']>0.0]
         data = data[data['speed_m_s']>0.0]
@@ -232,13 +230,21 @@ def calculate_trace_df(data, timezone, epsg, data_dropout=.10, remove_stopped_pt
     # From here out, must filter shingles in order to not change time/dist calcs
     # Note that any point filtering necessitates recalculating travel times for individual points
     data['speed_m_s'], data['dist_calc_m'], data['time_calc_s'], data['bearing'] = calculate_trip_speeds(data)
-    data = data.groupby(['shingle_id'], as_index=False).apply(lambda group: group.iloc[1:,:])
+    shingles = data.groupby(['shingle_id'], as_index=False)
+    data = shingles.apply(lambda group: group.iloc[1:,:])
+    shingle_dists = shingles[['dist_calc_m']].sum()
+    shingle_times = shingles[['time_calc_s']].sum()
     # Remove (shingles this time) based on final calculation of speeds, distances, times
     invalid_shingles = []
+    # Total distance
+    invalid_shingles.append(shingle_dists[shingle_dists['dist_calc_m']<=0].shingle_id)
+    invalid_shingles.append(shingle_dists[shingle_dists['dist_calc_m']>=20000].shingle_id)
+    # Total time
+    invalid_shingles.append(shingle_times[shingle_times['time_calc_s']<=0].shingle_id)
+    invalid_shingles.append(shingle_times[shingle_times['time_calc_s']>=1*60*60].shingle_id)
+    # Invidiual point distance, time, speed
     invalid_shingles.append(data[data['dist_calc_m']<0.0].shingle_id)
-    # invalid_shingles.append(data[data['dist_calc_m']>np.quantile(data.dist_calc_m, .95)].shingle_id)
     invalid_shingles.append(data[data['time_calc_s']<=0.0].shingle_id)
-    # invalid_shingles.append(data[data['time_calc_s']>np.quantile(data.time_calc_s, .95)].shingle_id)
     invalid_shingles.append(data[data['speed_m_s']<0.0].shingle_id)
     invalid_shingles.append(data[data['speed_m_s']>35.0].shingle_id)
     if remove_stopped_pts:
@@ -309,9 +315,6 @@ def clean_trace_df_w_timetables(data, gtfs_data):
     data = data.assign(stop_arrival_s=closest_stops[1])
     data = data.assign(stop_x=closest_stops[2])
     data = data.assign(stop_y=closest_stops[3])
-    # Filter out shingles with stops that are too far away
-    valid_trips = data.groupby('shingle_id').filter(lambda x: x['stop_dist_km'].max() <= 1.0)['shingle_id'].unique()
-    data = data[data['shingle_id'].isin(valid_trips)]
     # Get the timeID_s (for the first point of each trajectory)
     data = pd.merge(data, first_points, on='shingle_id')
     # Calculate the scheduled travel time from the first to each point in the shingle

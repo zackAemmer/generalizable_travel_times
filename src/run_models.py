@@ -409,40 +409,14 @@ def run_models(run_folder, network_folder, hyperparameters):
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
 
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
-    # run_models(
-    #     run_folder="./results/debug/",
-    #     network_folder="kcm/",
-    #     hyperparameters={
-    #         "EPOCHS": 2,
-    #         "BATCH_SIZE": 512,
-    #         "LEARN_RATE": 1e-3,
-    #         "HIDDEN_SIZE": 32
-    #     }
-    # )
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
-    # run_models(
-    #     run_folder="./results/debug/",
-    #     network_folder="atb/",
-    #     hyperparameters={
-    #         "EPOCHS": 2,
-    #         "BATCH_SIZE": 512,
-    #         "LEARN_RATE": 1e-3,
-    #         "HIDDEN_SIZE": 32
-    #     }
-    # )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/small/",
+        run_folder="./results/debug/",
         network_folder="kcm/",
         hyperparameters={
-            "EPOCHS": 50,
+            "EPOCHS": 2,
             "BATCH_SIZE": 64,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
@@ -452,12 +426,38 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/small/",
+        run_folder="./results/debug/",
         network_folder="atb/",
         hyperparameters={
-            "EPOCHS": 50,
+            "EPOCHS": 2,
             "BATCH_SIZE": 64,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
         }
     )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/small/",
+    #     network_folder="kcm/",
+    #     hyperparameters={
+    #         "EPOCHS": 50,
+    #         "BATCH_SIZE": 64,
+    #         "LEARN_RATE": 1e-3,
+    #         "HIDDEN_SIZE": 32
+    #     }
+    # )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/small/",
+    #     network_folder="atb/",
+    #     hyperparameters={
+    #         "EPOCHS": 50,
+    #         "BATCH_SIZE": 64,
+    #         "LEARN_RATE": 1e-3,
+    #         "HIDDEN_SIZE": 32
+    #     }
+    # )
