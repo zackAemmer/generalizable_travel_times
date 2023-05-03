@@ -607,66 +607,6 @@ def get_date_from_filename(filename):
     date_obj = datetime(int(file_parts[0]), int(file_parts[1]), int(file_parts[2].split(".")[0]))
     return date_obj
 
-def calc_data_metrics(data, timezone):
-    """
-    Summarize some metrics for a set of bus data on a given day.
-    data: pandas dataframe with unified bus data
-    timezone: string similar to "America/Los_Angeles"
-    Returns: Dictionary with keys corresponding to metrics. Some are grouped by hour of day.
-    """
-    # Speed
-    data['speed_m_s'], data['dist_calc_m'], data['time_calc_s'] = calculate_trip_speeds(data)
-    data = data[data['dist_calc_m']>0.0]
-    data = data[data['dist_calc_m']<5000.0]
-    data = data[data['time_calc_s']>0.0]
-    data = data[data['time_calc_s']<120.0]
-    data = data[data['speed_m_s']>0.0]
-    data = data[data['speed_m_s']<35.0]
-    data['dist_calc_km'] = data['dist_calc_m'] / 1000.0
-    data = data.dropna()
-    # Simple metrics
-    points = len(data)
-    trajs = len(data.drop_duplicates(['trip_id']))
-    unique_trips = len(pd.unique(data['trip_id']))
-    unique_vehs = len(pd.unique(data['vehicle_id']))
-    # Obs and Speed by time of day
-    data['datetime'] = pd.to_datetime(data['locationtime'], unit='s', utc=True).map(lambda x: x.tz_convert(timezone))
-    data['timeID'] = data['datetime'].dt.hour
-    data['timeID'] = pd.Categorical(data['timeID'], categories=np.arange(24))
-    hourly_agg = data[['timeID','speed_m_s']].groupby('timeID')
-    mean_speeds = hourly_agg.mean(numeric_only=True)['speed_m_s'].values.flatten()
-    sd_speeds = hourly_agg.std(numeric_only=True)['speed_m_s'].values.flatten()
-    n_obs = hourly_agg.count()['speed_m_s'].values.flatten()
-    # Group metrics to return in dict
-    summary = {
-        "n_points": points,
-        "n_trajs": trajs,
-        "nunq_trips": unique_trips,
-        "nunq_vehs": unique_vehs,
-        "hourly_points": n_obs,
-        "hourly_mean_speeds": mean_speeds,
-        "hourly_sd_speeds": sd_speeds
-    }
-    return summary
-
-def full_dataset_summary(folder, given_names, timezone):
-    """
-    Calculate summaries for every raw bus data file in a folder.
-    folder: where to look for .pkl files
-    given_names: feature names (in order) used by the raw feed
-    timezone: string similar to "America/Los_Angeles"
-    Returns: list of dates that data was found for, and list of dicts with summary for each date.
-    """
-    file_list = os.listdir(folder)
-    dates = []
-    data_summaries = []
-    for file in file_list:
-        if file != ".DS_Store":
-            data, _ = combine_pkl_data(folder, [file], given_names)
-            dates.append(get_date_from_filename(file))
-            data_summaries.append(calc_data_metrics(data, timezone))
-    return dates, data_summaries
-
 def format_deeptte_to_features(deeptte_data, resampled_deeptte_data):
     """
     Reformat the DeepTTE json format into a numpy array that can be used for modeling with sklearn.
