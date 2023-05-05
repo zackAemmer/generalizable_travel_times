@@ -675,12 +675,16 @@ def extract_results(city, model_results):
     loss_df = pd.concat(loss_df)
     return result_df, loss_df
 
-def extract_deeptte_results(city, run_folder, network_folder, result_folder="deeptte_results/result", generalization_flag=False):
+def extract_deeptte_results(city, run_folder, network_folder, generalization_flag=False):
     # Extract all fold and epoch losses from deeptte run
     all_run_data = []
-    for res_file in os.listdir(f"{run_folder}{network_folder}{result_folder}"):
+    if generalization_flag:
+        dest_dir = f"{run_folder}{network_folder}deeptte_results/generalization"
+    else:
+        dest_dir = f"{run_folder}{network_folder}deeptte_results/result"
+    for res_file in os.listdir(dest_dir):
         res_preds = pd.read_csv(
-            f"{run_folder}{network_folder}{result_folder}/{res_file}",
+            f"{dest_dir}/{res_file}",
             delimiter=" ",
             header=None,
             names=["Label", "Pred"],

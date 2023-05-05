@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 
 cd ~/Skrivebord/valle
 python ./src/prepare_run.py

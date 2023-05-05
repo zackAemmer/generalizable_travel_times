@@ -416,7 +416,7 @@ if __name__=="__main__":
         run_folder="./results/debug/",
         network_folder="kcm/",
         hyperparameters={
-            "EPOCHS": 2,
+            "EPOCHS": 5,
             "BATCH_SIZE": 64,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
@@ -429,7 +429,7 @@ if __name__=="__main__":
         run_folder="./results/debug/",
         network_folder="atb/",
         hyperparameters={
-            "EPOCHS": 2,
+            "EPOCHS": 5,
             "BATCH_SIZE": 64,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
