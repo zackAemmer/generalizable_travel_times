@@ -675,24 +675,29 @@ def extract_results(city, model_results):
     loss_df = pd.concat(loss_df)
     return result_df, loss_df
 
-def extract_deeptte_results(city, run_folder, network_folder):
+def extract_deeptte_results(city, run_folder, network_folder, result_folder="deeptte_results/result", generalization_flag=False):
     # Extract all fold and epoch losses from deeptte run
     all_run_data = []
-    for res_file in os.listdir(f"{run_folder}{network_folder}deeptte_results/result"):
+    for res_file in os.listdir(f"{run_folder}{network_folder}{result_folder}"):
         res_preds = pd.read_csv(
-            f"{run_folder}{network_folder}deeptte_results/result/{res_file}",
+            f"{run_folder}{network_folder}{result_folder}/{res_file}",
             delimiter=" ",
             header=None,
             names=["Label", "Pred"],
             dtype={"Label": float, "Pred": float}
         )
         res_labels = res_file.split("_")
-        if len(res_labels)==5:
+        if generalization_flag:
+            _, _, test_file_name, _, _ = res_labels
+            fold_num = 0
+            epoch_num = 0
+        elif len(res_labels)==5:
             model_name, test_file_name, test_file_num, fold_num, epoch_num = res_labels
             test_file_name = test_file_name + "_" + test_file_num
+            epoch_num = epoch_num.split(".")[0]
         elif len(res_labels)==4:
             model_name, test_file_name, fold_num, epoch_num = res_labels
-        epoch_num = epoch_num.split(".")[0]
+            epoch_num = epoch_num.split(".")[0]
         res_data = [
             "DeepTTE",
             city,
