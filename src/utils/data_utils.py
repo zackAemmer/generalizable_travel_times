@@ -241,7 +241,7 @@ def calculate_trace_df(data, timezone, epsg, data_dropout=.10, remove_stopped_pt
     invalid_shingles.append(shingle_dists[shingle_dists['dist_calc_m']>=20000].shingle_id)
     # Total time
     invalid_shingles.append(shingle_times[shingle_times['time_calc_s']<=0].shingle_id)
-    invalid_shingles.append(shingle_times[shingle_times['time_calc_s']>=1*60*60].shingle_id)
+    invalid_shingles.append(shingle_times[shingle_times['time_calc_s']>=3*60*60].shingle_id)
     # Invidiual point distance, time, speed
     invalid_shingles.append(data[data['dist_calc_m']<0.0].shingle_id)
     invalid_shingles.append(data[data['time_calc_s']<=0.0].shingle_id)
@@ -275,6 +275,8 @@ def calculate_cumulative_values(data):
     data['dist_cumulative_km'] = data.dist_cumulative_km - unique_traj.dist_cumulative_km.transform('min')
     # Remove shingles that don't traverse more than a kilometer, or have less than n points
     data = data.groupby(['shingle_id']).filter(lambda x: np.max(x.dist_cumulative_km) >= 1.0)
+    # Trips that cross over midnight can end up with outlier travel times; there are very few so remove trips over 3hrs
+    data = data.groupby(['shingle_id']).filter(lambda x: np.max(x.time_cumulative_s) <= 3000)
     data = data.groupby(['shingle_id']).filter(lambda x: len(x) >= 5)
     return data
 
