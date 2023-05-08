@@ -1,7 +1,7 @@
 #!/bin/bash
 
-run_name=debug
-epochs=5
+run_name=small
+epochs=50
 
 ### Move to project folder ###
 cd ~/Skrivebord/valle

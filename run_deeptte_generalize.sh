@@ -1,6 +1,6 @@
 #!/bin/bash
 
-run_name=debug
+run_name=small
 
 ### Move to project folder ###
 cd ~/Skrivebord/valle
