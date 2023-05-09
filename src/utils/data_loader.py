@@ -42,7 +42,7 @@ def make_generic_dataloader(data, config, batch_size, collate_fn, num_workers, g
         pin_memory=True
     else:
         pin_memory=False
-    dataloader = DataLoader(dataset, collate_fn=collate_fn, batch_size=batch_size, shuffle=False, pin_memory=pin_memory, num_workers=num_workers)
+    dataloader = DataLoader(dataset, collate_fn=collate_fn, batch_size=batch_size, shuffle=True, pin_memory=pin_memory, num_workers=num_workers)
     return dataloader
 
 def basic_collate(batch):
