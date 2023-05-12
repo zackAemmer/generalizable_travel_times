@@ -33,7 +33,7 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
     # Select device to train on, and number workers if GPU
     if torch.cuda.is_available():
         device = torch.device("cuda")
-        NUM_WORKERS = 4
+        NUM_WORKERS = 8
     # elif torch.backends.mps.is_available():
     #     device = torch.device("mps")
     else:
@@ -282,11 +282,11 @@ if __name__=="__main__":
         network_folder="kcm/",
         hyperparameters={
             "EPOCHS": 6,
-            "BATCH_SIZE": 64,
+            "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
         },
-        n_folds=5
+        n_folds=2
     )
     random.seed(0)
     np.random.seed(0)
@@ -296,11 +296,11 @@ if __name__=="__main__":
         network_folder="atb/",
         hyperparameters={
             "EPOCHS": 6,
-            "BATCH_SIZE": 64,
+            "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
         },
-        n_folds=5
+        n_folds=2
     )
     # random.seed(0)
     # np.random.seed(0)

@@ -16,15 +16,15 @@ from utils import data_utils
 
 
 def process_data_parallel(data, **kwargs):
-    # Clean and transform the raw bus data records
-    gtfs_data = data_utils.merge_gtfs_files(kwargs['gtfs_folder'], kwargs['epsg'])
+    # Clean and transform raw bus data records
     traces = data_utils.shingle(data, 2, 5)
-    traces = data_utils.calculate_trace_df(traces, kwargs['timezone'], kwargs['epsg'], data_dropout=0.2)
-    traces = data_utils.clean_trace_df_w_timetables(traces, gtfs_data)
+    traces = data_utils.calculate_trace_df(traces, kwargs['timezone'], kwargs['epsg'], kwargs['data_dropout'])
+    traces = data_utils.clean_trace_df_w_timetables(traces, kwargs['gtfs_folder'], kwargs['epsg'])
     traces = data_utils.calculate_cumulative_values(traces)
     return traces
 
 def clean_data(dates, n_save_files, train_or_test, base_folder, **kwargs):
+    # Handle cleaning of a set of dates across n files (allocated to training or validation)
     print(f"Processing {train_or_test} data from {dates}, saving across {n_save_files} files...")
     date_splits = np.array_split(dates, n_save_files)
     date_splits = [list(x) for x in date_splits]
@@ -36,9 +36,9 @@ def clean_data(dates, n_save_files, train_or_test, base_folder, **kwargs):
         if len(fail_dates) > 0:
             print(f"Failed to load data for dates: {fail_dates}")
         num_raw_points = len(traces)
-        print(f"Found {num_raw_points} points, beginning parallel data processing for this chunk, using {multiprocessing.cpu_count()-2} cores/chunks...")
-        traces = np.array_split(traces, multiprocessing.cpu_count()-2)
-        traces = Parallel(n_jobs=-2)(delayed(process_data_parallel)(x, **kwargs) for x in traces)
+        print(f"Found {num_raw_points} points, beginning parallel data processing for this chunk, using {kwargs['n_trace_splits']} cores/chunks...")
+        traces = np.array_split(traces, kwargs['n_trace_splits'])
+        traces = Parallel(n_jobs=kwargs['n_jobs'])(delayed(process_data_parallel)(x, **kwargs) for x in traces)
         # Re-establish unique shingle IDs across parallel chunks
         max_shingle_id = 0
         unique_shingles = [pd.unique(x['shingle_id']) for x in traces]
@@ -88,9 +88,9 @@ def prepare_run(overwrite, run_name, network_name, train_dates, test_dates, **kw
         return None
     # Split train/test dates into arbitrary number of chunks. More chunks = more training files = less ram pressure (chunk files are loaded 1 at a time)
     print(f"Processing training dates...")
-    clean_data(train_dates, 2, "train", base_folder, **kwargs)
+    clean_data(train_dates, kwargs['num_train_files'], "train", base_folder, **kwargs)
     print(f"Processing testing dates...")
-    clean_data(test_dates, 1, "test", base_folder, **kwargs)
+    clean_data(test_dates, kwargs['num_test_files'], "test", base_folder, **kwargs)
     print(f"RUN PREPARATION COMPLETED '{run_name}/{network_name}'")
 
 if __name__=="__main__":
@@ -101,9 +101,14 @@ if __name__=="__main__":
         overwrite=True,
         run_name="debug",
         network_name="kcm",
-        train_dates=data_utils.get_date_list("2023_03_10", 3),
-        test_dates=data_utils.get_date_list("2023_03_13", 3),
-        gtfs_folder="./data/kcm_gtfs/2023_01_23/",
+        train_dates=data_utils.get_date_list("2023_03_17", 3),
+        test_dates=data_utils.get_date_list("2023_03_20", 3),
+        num_train_files=2,
+        num_test_files=2,
+        n_jobs=5,
+        n_trace_splits=5,
+        data_dropout=0.2,
+        gtfs_folder="./data/kcm_gtfs/",
         raw_data_folder="./data/kcm_all/",
         timezone="America/Los_Angeles",
         epsg="32148",
@@ -116,9 +121,14 @@ if __name__=="__main__":
         overwrite=True,
         run_name="debug",
         network_name="atb",
-        train_dates=data_utils.get_date_list("2023_03_10", 3), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
-        test_dates=data_utils.get_date_list("2023_03_13", 3),
-        gtfs_folder="./data/atb_gtfs/2023_03_10/",
+        train_dates=data_utils.get_date_list("2023_03_17", 3), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
+        test_dates=data_utils.get_date_list("2023_03_20", 3),
+        num_train_files=2,
+        num_test_files=2,
+        n_jobs=5,
+        n_trace_splits=5,
+        data_dropout=0.2,
+        gtfs_folder="./data/atb_gtfs/",
         raw_data_folder="./data/atb_all_new/",
         timezone="Europe/Oslo",
         epsg="32632",
@@ -129,28 +139,32 @@ if __name__=="__main__":
     # torch.manual_seed(0)
     # prepare_run(
     #     overwrite=True,
-    #     run_name="small",
+    #     run_name="medium",
     #     network_name="kcm",
+    #     train_dates=data_utils.get_date_list("2023_02_20", 30),
+    #     test_dates=data_utils.get_date_list("2023_03_20", 30),
+    #     num_train_files=10,
+    #     num_test_files=10,
     #     gtfs_folder="./data/kcm_gtfs/2023_01_23/",
     #     raw_data_folder="./data/kcm_all/",
     #     timezone="America/Los_Angeles",
     #     epsg="32148",
-    #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
-    #     train_dates=data_utils.get_date_list("2023_02_20", 21),
-    #     test_dates=data_utils.get_date_list("2023_03_20", 3)
+    #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
     # )
     # random.seed(0)
     # np.random.seed(0)
     # torch.manual_seed(0)
     # prepare_run(
     #     overwrite=True,
-    #     run_name="small",
+    #     run_name="medium",
     #     network_name="atb",
+    #     train_dates=data_utils.get_date_list("2023_02_20", 30), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
+    #     test_dates=data_utils.get_date_list("2023_03_20", 30),
+    #     num_train_files=10,
+    #     num_test_files=10,
     #     gtfs_folder="./data/atb_gtfs/2023_02_12/",
     #     raw_data_folder="./data/atb_all_new/",
     #     timezone="Europe/Oslo",
     #     epsg="32632",
-    #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
-    #     train_dates=data_utils.get_date_list("2023_02_20", 21), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
-    #     test_dates=data_utils.get_date_list("2023_03_20", 3)
+    #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
     # )

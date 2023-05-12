@@ -125,7 +125,7 @@ def load_fold_data(data_folder, train_file, fold_num, total_folds):
     train_data = list(itertools.chain.from_iterable(train_data))
     # Select all data that is not part of this testing fold
     n_per_fold = len(train_data) // total_folds
-    mask = np.ones(len(train_data), np.bool)
+    mask = np.ones(len(train_data), bool)
     mask[fold_num*n_per_fold:(fold_num+1)*n_per_fold] = 0
     return ([item for item, keep in zip(train_data, mask) if keep], [item for item, keep in zip(train_data, mask) if not keep])
 
@@ -141,12 +141,12 @@ def load_all_inputs(run_folder, network_folder, file_num):
     test_traces = load_pkl(f"{run_folder}{network_folder}test{file_num}_traces.pkl")
     with open(f"{run_folder}{network_folder}/deeptte_formatted/train{file_num}_config.json") as f:
         config = json.load(f)
-    gtfs_data = merge_gtfs_files(f".{config['gtfs_folder']}", config['epsg'])
+    # gtfs_data = merge_gtfs_files(f".{config['gtfs_folder']}", config['epsg'])
     return {
         "train_traces": train_traces,
         "test_traces": test_traces,
         "config": config,
-        "gtfs_data": gtfs_data,
+        # "gtfs_data": gtfs_data,
         # "train_data_chunks": train_data_chunks,
         # "test_data": test_data,
         # "train_grid": train_grid,
@@ -272,24 +272,8 @@ def calculate_cumulative_values(data):
     data = data.groupby(['shingle_id']).filter(lambda x: len(x) >= 5)
     return data
 
-def parallel_clean_trace_df_w_timetables(args):
-    data_chunk, gtfs_data = args
-    return clean_trace_df_w_timetables(data_chunk, gtfs_data)
-
-def parallelize_clean_trace_df_w_timetables(data, gtfs_data, n_processes=10):
-    with Pool(n_processes) as p:
-        data_chunks = np.array_split(data, n_processes)
-        args = [(chunk, gtfs_data) for chunk in data_chunks]
-        results = p.map(parallel_clean_trace_df_w_timetables, args)
-    return pd.concat(results)
-
-def clean_trace_df_w_timetables(data, gtfs_data):
-    """
-    Validate a set of tracked bus locations against GTFS.
-    data: pandas dataframe with unified bus data
-    gtfs_data: merged GTFS files
-    Returns: dataframe with only trips that are in GTFS, and are reasonably close to scheduled stop ids.
-    """
+def apply_gtfs_timetables(data, gtfs_data, gtfs_folder_date):
+    data['gtfs_folder_date'] = gtfs_folder_date
     # Remove any trips that are not in the GTFS
     data.drop(data[~data['trip_id'].isin(gtfs_data.trip_id)].index, inplace=True)
     # Filter trips with less than n observations
@@ -318,6 +302,42 @@ def clean_trace_df_w_timetables(data, gtfs_data):
     valid_trips = data.groupby('shingle_id').filter(lambda x: x['scheduled_time_s'].max() <= 10000)['shingle_id'].unique()
     data = data[data['shingle_id'].isin(valid_trips)]
     return data
+
+def get_best_gtfs_lookup(traces, gtfs_folder):
+    # Get the most recent GTFS files available corresponding to each unique file in the traces
+    gtfs_available = [f for f in os.listdir(gtfs_folder) if not f.startswith('.')]
+    gtfs_available = [datetime.strptime(x, "%Y_%m_%d") for x in gtfs_available]
+    dates_needed_string = list(pd.unique(traces['file']))
+    dates_needed = [datetime.strptime(x[:10], "%Y_%m_%d") for x in dates_needed_string]
+    best_gtfs_dates = []
+    for fdate in dates_needed:
+        matching_gtfs = [x for x in gtfs_available if x < fdate]
+        best_gtfs = max(matching_gtfs)
+        best_gtfs_dates.append(best_gtfs)
+    best_gtfs_dates_string = [x.strftime("%Y_%m_%d") for x in best_gtfs_dates]
+    file_to_gtfs_map = {k:v for k,v in zip(dates_needed_string, best_gtfs_dates_string)}
+    return file_to_gtfs_map
+
+def clean_trace_df_w_timetables(traces, gtfs_folder, epsg):
+    """
+    Validate a set of tracked bus locations against GTFS.
+    data: pandas dataframe with unified bus data
+    gtfs_data: merged GTFS files
+    Returns: dataframe with only trips that are in GTFS, and are reasonably close to scheduled stop ids.
+    """
+    # Process each chunk of traces using corresponding GTFS files, load 1 set of GTFS at a time
+    # The dates should be in order so that each GTFS file set is loaded only once
+    # Also seems best to only run the merge once, with as many dates as possible
+    file_to_gtfs_map = get_best_gtfs_lookup(traces, gtfs_folder)
+    result = []
+    unique_gtfs = pd.unique(list(file_to_gtfs_map.values()))
+    for current_gtfs_name in unique_gtfs:
+        keys = [k for k,v in file_to_gtfs_map.items() if v==current_gtfs_name]
+        current_gtfs_data = merge_gtfs_files(f"{gtfs_folder}{current_gtfs_name}/", epsg)
+        result.append(apply_gtfs_timetables(traces[traces['file'].isin(keys)].copy(), current_gtfs_data, current_gtfs_name))
+    result = pd.concat(result)
+    result = result.sort_values(["file","shingle_id","locationtime"], ascending=True)
+    return result
 
 def get_scheduled_arrival(trip_ids, x, y, gtfs_data):
     """
@@ -430,8 +450,6 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, grid_res, grid_time):
         'time': 'max',
         'dist': 'max',
         # IDs
-        # 'vehicleID': 'min',
-        # 'tripID': 'min',
         'weekID': 'min',
         'timeID': 'min',
         'dateID': 'min',
