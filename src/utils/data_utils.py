@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import pyproj
 from sklearn import metrics
+from statsmodels.stats.weightstats import DescrStatsW
 import torch
 
 from utils import shape_utils
@@ -139,7 +140,7 @@ def load_all_data(data_folder, valid_file):
 def load_all_inputs(run_folder, network_folder, file_num):
     train_traces = load_pkl(f"{run_folder}{network_folder}train{file_num}_traces.pkl")
     test_traces = load_pkl(f"{run_folder}{network_folder}test{file_num}_traces.pkl")
-    with open(f"{run_folder}{network_folder}/deeptte_formatted/train{file_num}_config.json") as f:
+    with open(f"{run_folder}{network_folder}/deeptte_formatted/train_config.json") as f:
         config = json.load(f)
     # gtfs_data = merge_gtfs_files(f".{config['gtfs_folder']}", config['epsg'])
     return {
@@ -154,6 +155,40 @@ def load_all_inputs(run_folder, network_folder, file_num):
         # "train_grid_ffill": train_grid_ffill,
         # "test_grid_ffill": test_grid_ffill
     }
+
+def combine_config_files(cfg_folder, n_save_files, train_or_test):
+    temp = []
+    for i in range(n_save_files):
+        # Load config
+        with open(f"{cfg_folder}{train_or_test}{i}_config.json") as f:
+            config = json.load(f)
+        # Save temp
+        temp.append(config)
+        # Delete existing config
+        os.remove(f"{cfg_folder}{train_or_test}{i}_config.json")
+    # Set up train config
+    summary_config = {}
+    for k in temp[0].keys():
+        if k[-4:]=="mean":
+            values = [x[k] for x in temp]
+            weights = [x["n_points"] for x in temp]
+            wtd_mean = float(DescrStatsW(values, weights=weights, ddof=len(weights)).mean)
+            summary_config.update({k:wtd_mean})
+        elif k[-3:]=="std":
+            values = [x[k]**2 for x in temp]
+            weights = [x["n_points"] for x in temp]
+            wtd_std = float(np.sqrt(DescrStatsW(values, weights=weights, ddof=len(weights)).mean))
+            summary_config.update({k:wtd_std})
+    summary_config["n_points"] = int(np.sum([x['n_points'] for x in temp]))
+    summary_config["n_samples"] = int(np.sum([x['n_samples'] for x in temp]))
+    summary_config["gtfs_folder"] = temp[0]["gtfs_folder"]
+    summary_config["n_save_files"] = temp[0]["n_save_files"]
+    summary_config["epsg"] = temp[0]["epsg"]
+    summary_config["train_set"] = temp[0]["train_set"]
+    summary_config["test_set"] = temp[0]["test_set"]
+    # Save final configs
+    with open(f"{cfg_folder}{train_or_test}_config.json", mode="a") as out_file:
+        json.dump(summary_config, out_file)
 
 def combine_pkl_data(folder, file_list, given_names):
     """
@@ -537,6 +572,8 @@ def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg):
         "scheduled_time_s_mean": np.mean(grouped.max()[['scheduled_time_s']].values.flatten()),
         "scheduled_time_s_std": np.std(grouped.max()[['scheduled_time_s']].values.flatten()),
         # Not variables
+        "n_points": len(trace_data),
+        "n_samples": len(grouped),
         "gtfs_folder": gtfs_folder,
         "n_save_files": n_save_files,
         "epsg": epsg,

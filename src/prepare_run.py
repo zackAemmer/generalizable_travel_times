@@ -59,6 +59,8 @@ def clean_data(dates, n_save_files, train_or_test, base_folder, **kwargs):
         data_utils.write_pkl(traces, f"{base_folder}{train_or_test}{file_num}_traces.pkl")
         data_utils.write_pkl(train_grid, f"{base_folder}{train_or_test}{file_num}_grid.pkl")
         data_utils.write_pkl(train_grid_ffill, f"{base_folder}{train_or_test}{file_num}_grid_ffill.pkl")
+    # Combine normalization metrics and other values across all files
+    data_utils.combine_config_files(f"{base_folder}deeptte_formatted/", n_save_files, train_or_test)
 
 def prepare_run(overwrite, run_name, network_name, train_dates, test_dates, **kwargs):
     """
@@ -101,8 +103,8 @@ if __name__=="__main__":
         overwrite=True,
         run_name="debug",
         network_name="kcm",
-        train_dates=data_utils.get_date_list("2023_03_17", 3),
-        test_dates=data_utils.get_date_list("2023_03_20", 3),
+        train_dates=data_utils.get_date_list("2023_03_17", 2),
+        test_dates=data_utils.get_date_list("2023_03_20", 2),
         num_train_files=2,
         num_test_files=2,
         n_jobs=5,
@@ -121,8 +123,8 @@ if __name__=="__main__":
         overwrite=True,
         run_name="debug",
         network_name="atb",
-        train_dates=data_utils.get_date_list("2023_03_17", 3), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
-        test_dates=data_utils.get_date_list("2023_03_20", 3),
+        train_dates=data_utils.get_date_list("2023_03_17", 2), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
+        test_dates=data_utils.get_date_list("2023_03_20", 2),
         num_train_files=2,
         num_test_files=2,
         n_jobs=5,

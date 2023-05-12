@@ -145,7 +145,7 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
 
             # Load data and config for this training fold
             train_data, test_data = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
-            with open(f"{data_folder}{train_file}_config.json", "r") as f:
+            with open(f"{data_folder}train_config.json", "r") as f:
                 config = json.load(f)
 
             # Construct dataloaders for network models
@@ -204,7 +204,7 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
 
             # These are fold holdouts, separate validation files are used for generalization
             train_data, test_data = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
-            with open(f"{data_folder}{train_file}_config.json", "r") as f:
+            with open(f"{data_folder}train_config.json", "r") as f:
                 config = json.load(f)
 
             # Construct dataloaders for network models
