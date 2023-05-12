@@ -1,16 +1,66 @@
 #!/usr/bin python3
+
+
 import json
+import multiprocessing
 import os
 import random
 import shutil
 
 import numpy as np
+import pandas as pd
 import torch
+from joblib import Parallel, delayed
 
 from utils import data_utils
 
 
-def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder, timezone, epsg, given_names, train_dates, test_dates, n_folds):
+def process_data_parallel(data, **kwargs):
+    # Clean and transform the raw bus data records
+    gtfs_data = data_utils.merge_gtfs_files(kwargs['gtfs_folder'], kwargs['epsg'])
+    traces = data_utils.shingle(data, 2, 5)
+    traces = data_utils.calculate_trace_df(traces, kwargs['timezone'], kwargs['epsg'], data_dropout=0.2)
+    traces = data_utils.clean_trace_df_w_timetables(traces, gtfs_data)
+    traces = data_utils.calculate_cumulative_values(traces)
+    return traces
+
+def clean_data(dates, n_save_files, train_or_test, base_folder, **kwargs):
+    print(f"Processing {train_or_test} data from {dates}, saving across {n_save_files} files...")
+    date_splits = np.array_split(dates, n_save_files)
+    date_splits = [list(x) for x in date_splits]
+    # For each file, parallel process the dates, join, and save them to a combined file
+    for file_num, date_list in enumerate(date_splits):
+        print(f"Processing file number {file_num}/{len(date_splits)-1} containing dates {date_list}...")
+        # Load all data for a set of dates, and break into sub-chunks to parallel process
+        traces, fail_dates = data_utils.combine_pkl_data(kwargs['raw_data_folder'], date_list, kwargs['given_names'])
+        if len(fail_dates) > 0:
+            print(f"Failed to load data for dates: {fail_dates}")
+        num_raw_points = len(traces)
+        print(f"Found {num_raw_points} points, beginning parallel data processing for this chunk, using {multiprocessing.cpu_count()-2} cores/chunks...")
+        traces = np.array_split(traces, multiprocessing.cpu_count()-2)
+        traces = Parallel(n_jobs=-2)(delayed(process_data_parallel)(x, **kwargs) for x in traces)
+        # Re-establish unique shingle IDs across parallel chunks
+        max_shingle_id = 0
+        unique_shingles = [pd.unique(x['shingle_id']) for x in traces]
+        # For each shingle ID set, map the IDs to increasing numbers, then increase the max ID
+        for chunk_num, shingle_set in enumerate(unique_shingles):
+            shingle_remap = dict(zip(shingle_set, np.arange(max_shingle_id, max_shingle_id+len(shingle_set))))
+            max_shingle_id = max(list(shingle_remap.values()))+1
+            traces[chunk_num]['shingle_id'] = traces[chunk_num]['shingle_id'].replace(shingle_remap)
+        # Join results for this set of dates, write to file
+        traces = pd.concat(traces)
+        print(f"Saving {len(traces)} samples to run folder, retained {np.round(len(traces)/num_raw_points, 2)*100.0}% of original data points...")
+        deeptte_formatted_path = f"{base_folder}deeptte_formatted/{train_or_test}{file_num}"
+        traces, train_grid, train_grid_ffill = data_utils.map_to_deeptte(traces, deeptte_formatted_path, grid_res=32, grid_time=5*60)
+        summary_config = data_utils.get_summary_config(traces, kwargs['gtfs_folder'], n_save_files, kwargs['epsg'])
+        # Save config, and traces to file for notebook analyses
+        with open(f"{deeptte_formatted_path}_config.json", mode="a") as out_file:
+            json.dump(summary_config, out_file)
+        data_utils.write_pkl(traces, f"{base_folder}{train_or_test}{file_num}_traces.pkl")
+        data_utils.write_pkl(train_grid, f"{base_folder}{train_or_test}{file_num}_grid.pkl")
+        data_utils.write_pkl(train_grid_ffill, f"{base_folder}{train_or_test}{file_num}_grid_ffill.pkl")
+
+def prepare_run(overwrite, run_name, network_name, train_dates, test_dates, **kwargs):
     """
     Set up the folder and data structure for a set of k-fold validated model runs.
     All run data is copied from the original download directory to the run folder.
@@ -21,158 +71,86 @@ def prepare_run(overwrite, run_name, network_name, gtfs_folder, raw_data_folder,
     print("="*30)
     print(f"PREPARE RUN: '{run_name}'")
     print(f"NETWORK: '{network_name}'")
-
-    ### Create folder structure
-    print("="*30)
-    base_folder = "./results/" + run_name + "/" + network_name + "/"    
+    # Create folder structure
+    base_folder = f"./results/{run_name}/{network_name}/"
     if run_name not in os.listdir("./results/"):
-        os.mkdir("./results/" + run_name)
-    if network_name in os.listdir("results/" + run_name + "/") and overwrite:
+        os.mkdir(f"./results/{run_name}")
+    if network_name in os.listdir(f"results/{run_name}/") and overwrite:
         shutil.rmtree(base_folder)
-    if network_name not in os.listdir("results/" + run_name + "/"):
+    if network_name not in os.listdir(f"results/{run_name}/"):
         os.mkdir(base_folder)
-        os.mkdir(base_folder + "deeptte_formatted/")
-        os.mkdir(base_folder + "deeptte_results/")
-        os.mkdir(base_folder + "models/")
+        os.mkdir(f"{base_folder}deeptte_formatted/")
+        os.mkdir(f"{base_folder}deeptte_results/")
+        os.mkdir(f"{base_folder}models/")
         print(f"Created new results folder for '{run_name}'")
     else:
         print(f"Run '{run_name}/{network_name}' folder already exists in 'results/', delete the folder if new run desired.")
         return None
-
-    ### Load data from raw bus data files
-    print("="*30)
-    print(f"Combining raw bus data files...")
-    train_data, train_fail_dates = data_utils.combine_pkl_data(raw_data_folder, train_dates, given_names)
-    test_data, test_fail_dates = data_utils.combine_pkl_data(raw_data_folder, test_dates, given_names)
-    print(f"Lost dates train: {train_fail_dates}, {len(train_data)} samples kept.")
-    print(f"Lost dates test: {test_fail_dates}, {len(test_data)} samples kept.")
-
-    ### Load the GTFS
-    print(f"Loading and merging GTFS files from '{gtfs_folder}'...")
-    gtfs_data = data_utils.merge_gtfs_files(gtfs_folder, epsg)
-
-    ### Process the data into usable features
-    print("="*30)
-    print(f"Shingling trajectories into smaller chunks...")
-    train_traces = data_utils.shingle(train_data, 2, 5)
-    test_traces = data_utils.shingle(test_data, 2, 5)
-
-    print(f"Calculating trace values from shingles...")
-    train_traces = data_utils.calculate_trace_df(train_traces, timezone, epsg, data_dropout=0.2)
-    test_traces = data_utils.calculate_trace_df(test_traces, timezone, epsg, data_dropout=0.2)
-    print(f"Cumulative {np.round(len(train_traces) / len(train_data) * 100, 1)}% of train data retained.")
-    print(f"Cumulative {np.round(len(test_traces) / len(test_data) * 100, 1)}% of test data retained.")
-
-    print(f"Matching traces to GTFS timetables...")
-    train_traces = data_utils.parallelize_clean_trace_df_w_timetables(train_traces, gtfs_data)
-    test_traces = data_utils.parallelize_clean_trace_df_w_timetables(test_traces, gtfs_data)
-    print(f"Cumulative {np.round(len(train_traces) / len(train_data) * 100, 1)}% of train data retained. Saving {len(train_traces)} samples.")
-    print(f"Cumulative {np.round(len(test_traces) / len(test_data) * 100, 1)}% of test data retained. Saving {len(test_traces)} samples.")
-
-    print(f"Calculating cumulative shingle values...")
-    train_traces = data_utils.calculate_cumulative_values(train_traces)
-    test_traces = data_utils.calculate_cumulative_values(test_traces)
-    print(f"Cumulative {np.round(len(train_traces) / len(train_data) * 100, 1)}% of train data retained. Saving {len(train_traces)} samples.")
-    print(f"Cumulative {np.round(len(test_traces) / len(test_data) * 100, 1)}% of test data retained. Saving {len(test_traces)} samples.")
-
-    print(f"Finding new unique embedding IDs...")
-    (train_traces, test_traces), n_unique_veh, unique_veh_dict = data_utils.remap_ids([train_traces, test_traces], "vehicle_id")
-    print(f"Found {n_unique_veh} unique vehicle IDs in this data.")
-    (train_traces, test_traces), n_unique_trip, unique_trip_dict = data_utils.remap_ids([train_traces, test_traces], "trip_id")
-    print(f"Found {n_unique_trip} unique trip IDs in this data.")
-
-    ### Save processed data to analysis files
-    print("="*30)
-    print(f"Mapping trace data to DeepTTE format...")
-    deeptte_formatted_path = base_folder + "deeptte_formatted/"
-    train_traces, train_grid, train_grid_ffill = data_utils.map_to_deeptte(train_traces, deeptte_formatted_path, n_folds, grid_res=128, grid_time=5*60)
-    test_traces, test_grid, test_grid_ffill = data_utils.map_to_deeptte(test_traces, deeptte_formatted_path, n_folds, is_test=True, grid_res=128, grid_time=5*60)
-    summary_config = data_utils.get_summary_config(train_traces, n_unique_veh, n_unique_trip, gtfs_folder, n_folds, epsg)
-
-    print(f"Saving config file...")
-    with open(deeptte_formatted_path+"config.json", mode="a") as out_file:
-        json.dump(summary_config, out_file)
-
-    print(f"Saving embedding ID mappings...")
-    data_utils.write_pkl(unique_veh_dict, base_folder+"vehicle_id_mapping.pkl")
-    data_utils.write_pkl(unique_trip_dict, base_folder+"trip_id_mapping.pkl")
-
-    print(f"Saving processed bus data files...")
-    data_utils.write_pkl(train_traces, base_folder+"train_traces.pkl")
-    data_utils.write_pkl(test_traces, base_folder+"test_traces.pkl")
-
-    print(f"Saving grid features...")
-    data_utils.write_pkl(train_grid, base_folder+"train_grid.pkl")
-    data_utils.write_pkl(test_grid, base_folder+"test_grid.pkl")
-    data_utils.write_pkl(train_grid_ffill, base_folder+"train_grid_ffill.pkl")
-    data_utils.write_pkl(test_grid_ffill, base_folder+"test_grid_ffill.pkl")
-
-    print("="*30)
+    # Split train/test dates into arbitrary number of chunks. More chunks = more training files = less ram pressure (chunk files are loaded 1 at a time)
+    print(f"Processing training dates...")
+    clean_data(train_dates, 2, "train", base_folder, **kwargs)
+    print(f"Processing testing dates...")
+    clean_data(test_dates, 1, "test", base_folder, **kwargs)
     print(f"RUN PREPARATION COMPLETED '{run_name}/{network_name}'")
 
-
 if __name__=="__main__":
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    prepare_run(
+        overwrite=True,
+        run_name="debug",
+        network_name="kcm",
+        train_dates=data_utils.get_date_list("2023_03_10", 3),
+        test_dates=data_utils.get_date_list("2023_03_13", 3),
+        gtfs_folder="./data/kcm_gtfs/2023_01_23/",
+        raw_data_folder="./data/kcm_all/",
+        timezone="America/Los_Angeles",
+        epsg="32148",
+        given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
+    )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    prepare_run(
+        overwrite=True,
+        run_name="debug",
+        network_name="atb",
+        train_dates=data_utils.get_date_list("2023_03_10", 3), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
+        test_dates=data_utils.get_date_list("2023_03_13", 3),
+        gtfs_folder="./data/atb_gtfs/2023_03_10/",
+        raw_data_folder="./data/atb_all_new/",
+        timezone="Europe/Oslo",
+        epsg="32632",
+        given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
+    )
     # random.seed(0)
     # np.random.seed(0)
     # torch.manual_seed(0)
     # prepare_run(
     #     overwrite=True,
-    #     run_name="debug",
+    #     run_name="small",
     #     network_name="kcm",
     #     gtfs_folder="./data/kcm_gtfs/2023_01_23/",
     #     raw_data_folder="./data/kcm_all/",
     #     timezone="America/Los_Angeles",
     #     epsg="32148",
     #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
-    #     train_dates=data_utils.get_date_list("2023_03_10", 2),
-    #     test_dates=data_utils.get_date_list("2023_03_13", 1),
-    #     n_folds=5
+    #     train_dates=data_utils.get_date_list("2023_02_20", 21),
+    #     test_dates=data_utils.get_date_list("2023_03_20", 3)
     # )
     # random.seed(0)
     # np.random.seed(0)
     # torch.manual_seed(0)
     # prepare_run(
     #     overwrite=True,
-    #     run_name="debug",
+    #     run_name="small",
     #     network_name="atb",
-    #     gtfs_folder="./data/atb_gtfs/2023_03_10/",
+    #     gtfs_folder="./data/atb_gtfs/2023_02_12/",
     #     raw_data_folder="./data/atb_all_new/",
     #     timezone="Europe/Oslo",
     #     epsg="32632",
     #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
-    #     train_dates=data_utils.get_date_list("2023_03_10", 2), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
-    #     test_dates=data_utils.get_date_list("2023_03_13", 1),
-    #     n_folds=5
+    #     train_dates=data_utils.get_date_list("2023_02_20", 21), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
+    #     test_dates=data_utils.get_date_list("2023_03_20", 3)
     # )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    prepare_run(
-        overwrite=True,
-        run_name="small",
-        network_name="kcm",
-        gtfs_folder="./data/kcm_gtfs/2023_01_23/",
-        raw_data_folder="./data/kcm_all/",
-        timezone="America/Los_Angeles",
-        epsg="32148",
-        given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
-        train_dates=data_utils.get_date_list("2023_02_20", 21),
-        test_dates=data_utils.get_date_list("2023_03_20", 3),
-        n_folds=5
-    )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    prepare_run(
-        overwrite=True,
-        run_name="small",
-        network_name="atb",
-        gtfs_folder="./data/atb_gtfs/2023_02_12/",
-        raw_data_folder="./data/atb_all_new/",
-        timezone="Europe/Oslo",
-        epsg="32632",
-        given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
-        train_dates=data_utils.get_date_list("2023_02_20", 21), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
-        test_dates=data_utils.get_date_list("2023_03_20", 3),
-        n_folds=5
-    )

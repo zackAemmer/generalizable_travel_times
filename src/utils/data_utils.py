@@ -118,49 +118,41 @@ def get_date_list(start, n_days):
     date_list = [base + timedelta(days=x) for x in range(n_days)]
     return [f"{date.strftime('%Y_%m_%d')}.pkl" for date in date_list]
 
-def load_train_test_data(data_folder, n_folds):
-    """
-    Load files with training/testing samples that have been formatted into json.
-    Files are train_00 - train_05, and test
-    data_folder: location that contains the train/test files
-    Returns: list of training json samples, and list of test samples.
-    """
-    # Read in training data
-    train_data_chunks = []
-    for i in range(0, n_folds):
-        train_data = []
-        contents = open(data_folder + "train_0" + str(i), "r").read()
-        train_data.append([json.loads(str(item)) for item in contents.strip().split('\n')])
-        train_data = list(itertools.chain.from_iterable(train_data))
-        train_data_chunks.append(train_data)
-    # Read in test data
-    contents = open(data_folder + "test", "r").read()
-    test_data = [json.loads(str(item)) for item in contents.strip().split('\n')]
-    # Read in grid features
-    train_grid = load_pkl(f"{data_folder}../train_grid.pkl")
-    test_grid = load_pkl(f"{data_folder}../test_grid.pkl")
-    train_grid_ffill = load_pkl(f"{data_folder}../train_grid_ffill.pkl")
-    test_grid_ffill = load_pkl(f"{data_folder}../test_grid_ffill.pkl")
-    return train_data_chunks, test_data, train_grid, test_grid, train_grid_ffill, test_grid_ffill
+def load_fold_data(data_folder, train_file, fold_num, total_folds):
+    train_data = []
+    contents = open(f"{data_folder}{train_file}", "r").read()
+    train_data.append([json.loads(str(item)) for item in contents.strip().split('\n')])
+    train_data = list(itertools.chain.from_iterable(train_data))
+    # Select all data that is not part of this testing fold
+    n_per_fold = len(train_data) // total_folds
+    mask = np.ones(len(train_data), np.bool)
+    mask[fold_num*n_per_fold:(fold_num+1)*n_per_fold] = 0
+    return ([item for item, keep in zip(train_data, mask) if keep], [item for item, keep in zip(train_data, mask) if not keep])
 
-def load_all_inputs(run_folder, network_folder):
-    train_traces = load_pkl(f"{run_folder}{network_folder}train_traces.pkl")
-    test_traces = load_pkl(f"{run_folder}{network_folder}test_traces.pkl")
-    with open(f"{run_folder}{network_folder}/deeptte_formatted/config.json") as f:
+def load_all_data(data_folder, valid_file):
+    valid_data = []
+    contents = open(f"{data_folder}{valid_file}", "r").read()
+    valid_data.append([json.loads(str(item)) for item in contents.strip().split('\n')])
+    valid_data = list(itertools.chain.from_iterable(valid_data))
+    return valid_data
+
+def load_all_inputs(run_folder, network_folder, file_num):
+    train_traces = load_pkl(f"{run_folder}{network_folder}train{file_num}_traces.pkl")
+    test_traces = load_pkl(f"{run_folder}{network_folder}test{file_num}_traces.pkl")
+    with open(f"{run_folder}{network_folder}/deeptte_formatted/train{file_num}_config.json") as f:
         config = json.load(f)
     gtfs_data = merge_gtfs_files(f".{config['gtfs_folder']}", config['epsg'])
-    train_data_chunks, test_data, train_grid, test_grid, train_grid_ffill, test_grid_ffill = load_train_test_data(f"{run_folder}{network_folder}/deeptte_formatted/", config['n_folds'])
     return {
         "train_traces": train_traces,
         "test_traces": test_traces,
         "config": config,
         "gtfs_data": gtfs_data,
-        "train_data_chunks": train_data_chunks,
-        "test_data": test_data,
-        "train_grid": train_grid,
-        "test_grid": test_grid,
-        "train_grid_ffill": train_grid_ffill,
-        "test_grid_ffill": test_grid_ffill
+        # "train_data_chunks": train_data_chunks,
+        # "test_data": test_data,
+        # "train_grid": train_grid,
+        # "test_grid": test_grid,
+        # "train_grid_ffill": train_grid_ffill,
+        # "test_grid_ffill": test_grid_ffill
     }
 
 def combine_pkl_data(folder, file_list, given_names):
@@ -402,7 +394,7 @@ def fill_channel_forward(grid_channel):
                     channel_counts[t][i][j] = counter
     return ffilled, channel_counts
 
-def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False, grid_res=32, grid_time=30):
+def map_to_deeptte(trace_data, deeptte_formatted_path, grid_res, grid_time):
     """
     Reshape pandas dataframe to the json format needed to use deeptte.
     trace_data: dataframe with bus trajectories
@@ -418,8 +410,6 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False, g
     # Lists
     trace_data['lats'] = trace_data['lat']
     trace_data['lngs'] = trace_data['lon']
-    trace_data['vehicleID'] = trace_data['vehicle_id_recode']
-    trace_data['tripID'] = trace_data['trip_id_recode']
 
     # Calculate and add grid features
     grid, tbin_idxs, xbin_idxs, ybin_idxs = shape_utils.get_grid_features(trace_data, resolution=grid_res, timestep=grid_time)
@@ -440,8 +430,8 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False, g
         'time': 'max',
         'dist': 'max',
         # IDs
-        'vehicleID': 'min',
-        'tripID': 'min',
+        # 'vehicleID': 'min',
+        # 'tripID': 'min',
         'weekID': 'min',
         'timeID': 'min',
         'dateID': 'min',
@@ -472,21 +462,12 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, n_folds, is_test=False, g
     })
 
     # Convert the DataFrame to a dictionary with the original format
-    if is_test:
-        print(f"Saving formatted data to '{deeptte_formatted_path}', across 1 testing file...")
-        result_json_string = result.to_json(orient='records', lines=True)
-        with open(deeptte_formatted_path+"test", mode='w+') as out_file:
-            out_file.write(result_json_string)
-    else:
-        print(f"Saving formatted data to '{deeptte_formatted_path}', across {n_folds} training files...")
-        dfs = np.array_split(result, n_folds)
-        for i, df in enumerate(dfs):
-            df_json_string = df.to_json(orient='records', lines=True)
-            with open(deeptte_formatted_path+"train_0"+str(i), mode='w+') as out_file:
-                out_file.write(df_json_string)
+    result_json_string = result.to_json(orient='records', lines=True)
+    with open(deeptte_formatted_path, mode='w+') as out_file:
+        out_file.write(result_json_string)
     return trace_data, grid, grid_ffill
 
-def get_summary_config(trace_data, n_unique_veh, n_unique_trip, gtfs_folder, n_folds, epsg):
+def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg):
     """
     Get a dict of means and sds which are used to normalize data by DeepTTE.
     trace_data: pandas dataframe with unified columns and calculated distances
@@ -538,13 +519,11 @@ def get_summary_config(trace_data, n_unique_veh, n_unique_trip, gtfs_folder, n_f
         "scheduled_time_s_mean": np.mean(grouped.max()[['scheduled_time_s']].values.flatten()),
         "scheduled_time_s_std": np.std(grouped.max()[['scheduled_time_s']].values.flatten()),
         # Not variables
-        "n_unique_veh": n_unique_veh,
-        "n_unique_trip": n_unique_trip,
         "gtfs_folder": gtfs_folder,
-        "n_folds": n_folds,
+        "n_save_files": n_save_files,
         "epsg": epsg,
-        "train_set": ["train_0"+str(x) for x in range(0,n_folds)],
-        "eval_set": ["test"]
+        "train_set": ["train_"+str(x) for x in range(0,n_save_files)],
+        "test_set": ["test_"+str(x) for x in range(0,n_save_files)]
     }
     return summary_dict
 

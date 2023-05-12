@@ -4,10 +4,11 @@ import torch
 from utils import data_utils
 
 
-def train_model(model, train_dataloader, valid_dataloader, LEARN_RATE, EPOCHS, sequential_flag=False):
+def train(model, train_dataloader, test_dataloader, LEARN_RATE, EPOCHS, EPOCH_EVAL_FREQ, sequential_flag=False):
+    print(f"Training Model: {model.model_name}")
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARN_RATE)
-    training_losses = []
-    validation_losses = []
+    train_losses = []
+    test_losses = []
     for epoch in range(EPOCHS):
         print(f'EPOCH: {epoch}')
         # Use gradients while training
@@ -24,16 +25,18 @@ def train_model(model, train_dataloader, valid_dataloader, LEARN_RATE, EPOCHS, s
             # Adjust weights, save loss
             optimizer.step()
             running_tloss += loss.item()
-        # Save the average batch training loss
-        avg_batch_tloss = running_tloss / num_batches
-        training_losses.append(avg_batch_tloss)
-        # Don't use gradients when evaluating
-        model.train(False)
-        # Calculate the average batch validation loss
-        _, _, avg_batch_vloss = predict(model, valid_dataloader, sequential_flag=sequential_flag)
-        validation_losses.append(avg_batch_vloss)
-        print(f"LOSS: train {avg_batch_tloss} valid {avg_batch_vloss}")
-    return training_losses, validation_losses
+        # Run and save evaluation every n epochs
+        if epoch % EPOCH_EVAL_FREQ == 0:
+            # Don't use gradients when evaluating
+            model.train(False)
+            # Calculate the average batch training loss for this epoch
+            avg_batch_tloss = running_tloss / num_batches
+            train_losses.append(avg_batch_tloss)
+            # Calculate the average batch validation loss
+            _, _, avg_batch_vloss = predict(model, test_dataloader, sequential_flag=sequential_flag)
+            test_losses.append(avg_batch_vloss)
+            print(f"LOSS: train {avg_batch_tloss} valid {avg_batch_vloss}")
+    return train_losses, test_losses
 
 def predict(model, dataloader, sequential_flag=False):
     labels = []
