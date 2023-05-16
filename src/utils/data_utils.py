@@ -728,6 +728,7 @@ def extract_deeptte_results(city, run_folder, network_folder, generalization_fla
         )
         res_labels = res_file.split("_")
         if generalization_flag:
+            # model_name, test_file_name, fold_num, epoch_num = res_labels
             _, _, test_file_name, _, _ = res_labels
             fold_num = 0
             epoch_num = 0

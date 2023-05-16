@@ -135,86 +135,136 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
         model_list.append(conv1d_model)
         model_list.append(trs_model)
 
-        # Train all models on each training file; split samples in each file by fold
+        # Keep track of train/test curves during training for network models
         model_fold_curves = {}
         for x in model_list:
             if hasattr(x, "hidden_size"):
                 model_fold_curves[x.model_name] = {"Train":[], "Test":[]}
-        for train_file in list(train_file_list):
-            print(f"TRAIN ON FILE: {train_file}")
 
-            # Load data and config for this training fold
-            train_data, test_data = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
-            with open(f"{data_folder}train_config.json", "r") as f:
-                config = json.load(f)
-
-            # Construct dataloaders for network models
-            train_dataloader_basic = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
-            test_dataloader_basic = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
-            train_dataloader_seq = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
-            test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
-            train_dataloader_seq_mto = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
-            test_dataloader_seq_mto = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
-            train_dataloader_trs = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
-            test_dataloader_trs = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
-            print(f"Successfully loaded {len(train_data)} training samples and {len(test_data)} testing samples.")
-
-            # Train all models
-            avg_model.fit(train_dataloader_basic, config)
-            sch_model.fit(train_dataloader_basic, config)
-            tim_model.fit(train_dataloader_seq, config)
-
-            train_losses, test_losses = model_utils.train(ff_model, train_dataloader_basic, test_dataloader_basic, LEARN_RATE, EPOCHS, EPOCH_EVAL_FREQ)
-            model_fold_curves[ff_model.model_name]["Train"].extend(train_losses)
-            model_fold_curves[ff_model.model_name]["Test"].extend(test_losses)
-
-            train_losses, test_losses = model_utils.train(gru_model, train_dataloader_seq, test_dataloader_seq, LEARN_RATE, EPOCHS, EPOCH_EVAL_FREQ, sequential_flag=True)
-            model_fold_curves[gru_model.model_name]["Train"].extend(train_losses)
-            model_fold_curves[gru_model.model_name]["Test"].extend(test_losses)
-
-            train_losses, test_losses = model_utils.train(gru_mto_model, train_dataloader_seq_mto, test_dataloader_seq_mto, LEARN_RATE, EPOCHS, EPOCH_EVAL_FREQ)
-            model_fold_curves[gru_mto_model.model_name]["Train"].extend(train_losses)
-            model_fold_curves[gru_mto_model.model_name]["Test"].extend(test_losses)
-
-            train_losses, test_losses = model_utils.train(conv1d_model, train_dataloader_seq, test_dataloader_seq, LEARN_RATE, EPOCHS, EPOCH_EVAL_FREQ, sequential_flag=True)
-            model_fold_curves[conv1d_model.model_name]["Train"].extend(train_losses)
-            model_fold_curves[conv1d_model.model_name]["Test"].extend(test_losses)
-
-            train_losses, test_losses = model_utils.train(trs_model, train_dataloader_trs, test_dataloader_trs, LEARN_RATE, EPOCHS, EPOCH_EVAL_FREQ, sequential_flag=True)
-            model_fold_curves[trs_model.model_name]["Train"].extend(train_losses)
-            model_fold_curves[trs_model.model_name]["Test"].extend(test_losses)
-
-        # Save current model states
-        print(f"Completed training on file {train_file}, saving model states...")
-        avg_model.save_to(f"{run_folder}{network_folder}models/{avg_model.model_name}_{fold_num}.pkl")
-        sch_model.save_to(f"{run_folder}{network_folder}models/{sch_model.model_name}_{fold_num}.pkl")
-        tim_model.save_to(f"{run_folder}{network_folder}models/{tim_model.model_name}_{fold_num}.pkl")
-        torch.save(ff_model.state_dict(), f"{run_folder}{network_folder}models/{ff_model.model_name}_{fold_num}.pt")
-        torch.save(gru_model.state_dict(), f"{run_folder}{network_folder}models/{gru_model.model_name}_{fold_num}.pt")
-        torch.save(gru_mto_model.state_dict(), f"{run_folder}{network_folder}models/{gru_mto_model.model_name}_{fold_num}.pt")
-        torch.save(conv1d_model.state_dict(), f"{run_folder}{network_folder}models/{conv1d_model.model_name}_{fold_num}.pt")
-        torch.save(trs_model.state_dict(), f"{run_folder}{network_folder}models/{trs_model.model_name}_{fold_num}.pt")
-
-        # Test all models on each training file; split samples in each file by fold
+        # Keep track of all model performances
         model_fold_results = {}
         for x in model_list:
             model_fold_results[x.model_name] = {"Labels":[], "Preds":[]}
-        for train_file in train_file_list:
-            print(f"TEST ON FILE: {train_file}")
 
-            # These are fold holdouts, separate validation files are used for generalization
+        for epoch in range(EPOCHS):
+            print(f"EPOCH: {epoch}")
+            # Train all models on each training file; split samples in each file by fold
+            for train_file in list(train_file_list):
+                print(f"TRAIN ON FILE: {train_file}")
+
+                # Load data and config for this training fold
+                train_data, test_data = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
+                with open(f"{data_folder}train_config.json", "r") as f:
+                    config = json.load(f)
+
+                # Construct dataloaders for network models
+                train_dataloader_basic = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
+                train_dataloader_seq = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
+                train_dataloader_seq_mto = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
+                train_dataloader_trs = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
+                print(f"Successfully loaded {len(train_data)} training samples and {len(test_data)} testing samples.")
+
+                # Train all models
+                avg_model.fit(train_dataloader_basic, config)
+                sch_model.fit(train_dataloader_basic, config)
+                tim_model.fit(train_dataloader_seq, config)
+
+                avg_batch_loss = model_utils.train(ff_model, train_dataloader_basic, LEARN_RATE)
+                avg_batch_loss = model_utils.train(gru_model, train_dataloader_seq, LEARN_RATE)
+                avg_batch_loss = model_utils.train(gru_mto_model, train_dataloader_seq_mto, LEARN_RATE)
+                avg_batch_loss = model_utils.train(conv1d_model, train_dataloader_seq, LEARN_RATE)
+                avg_batch_loss = model_utils.train(trs_model, train_dataloader_trs, LEARN_RATE)
+
+            if epoch % EPOCH_EVAL_FREQ == 0:
+                # Save current model states
+                print(f"Reached epoch checkpoint {epoch}, saving model states...")
+                avg_model.save_to(f"{run_folder}{network_folder}models/{avg_model.model_name}_{fold_num}.pkl")
+                sch_model.save_to(f"{run_folder}{network_folder}models/{sch_model.model_name}_{fold_num}.pkl")
+                tim_model.save_to(f"{run_folder}{network_folder}models/{tim_model.model_name}_{fold_num}.pkl")
+                torch.save(ff_model.state_dict(), f"{run_folder}{network_folder}models/{ff_model.model_name}_{fold_num}.pt")
+                torch.save(gru_model.state_dict(), f"{run_folder}{network_folder}models/{gru_model.model_name}_{fold_num}.pt")
+                torch.save(gru_mto_model.state_dict(), f"{run_folder}{network_folder}models/{gru_mto_model.model_name}_{fold_num}.pt")
+                torch.save(conv1d_model.state_dict(), f"{run_folder}{network_folder}models/{conv1d_model.model_name}_{fold_num}.pt")
+                torch.save(trs_model.state_dict(), f"{run_folder}{network_folder}models/{trs_model.model_name}_{fold_num}.pt")
+
+                # Record model curves on all train/test files for this fold
+                ff_train = 0.0
+                ff_test = 0.0
+                gru_train = 0.0
+                gru_test = 0.0
+                gru_mto_train = 0.0
+                gru_mto_test = 0.0
+                conv1d_train = 0.0
+                conv1d_test = 0.0
+                trs_train = 0.0
+                trs_test = 0.0
+                for train_file in train_file_list:
+                    print(f"TEST ON FILE: {train_file}")
+
+                    # Load data and config for this training fold
+                    train_data, test_data = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
+                    with open(f"{data_folder}train_config.json", "r") as f:
+                        config = json.load(f)
+
+                    # Construct dataloaders for network models
+                    train_dataloader_basic = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
+                    train_dataloader_seq = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
+                    train_dataloader_seq_mto = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
+                    train_dataloader_trs = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
+                    test_dataloader_basic = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
+                    test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
+                    test_dataloader_seq_mto = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
+                    test_dataloader_trs = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
+                    print(f"Successfully loaded {len(train_data)} training samples and {len(test_data)} testing samples.")
+
+                    # Test all NN models on training and testing sets for this fold, across all files
+                    ff_labels, ff_preds = ff_model.evaluate(train_dataloader_basic, config)
+                    ff_train += np.round(np.sqrt(metrics.mean_squared_error(ff_labels, ff_preds)), 2)
+                    ff_labels, ff_preds = ff_model.evaluate(test_dataloader_basic, config)
+                    ff_test += np.round(np.sqrt(metrics.mean_squared_error(ff_labels, ff_preds)), 2)
+
+                    gru_labels, gru_preds = gru_model.evaluate(train_dataloader_seq, config)
+                    gru_train += np.round(np.sqrt(metrics.mean_squared_error(gru_labels, gru_preds)), 2)
+                    gru_labels, gru_preds = gru_model.evaluate(test_dataloader_seq, config)
+                    gru_test += np.round(np.sqrt(metrics.mean_squared_error(gru_labels, gru_preds)), 2)
+
+                    gru_mto_labels, gru_mto_preds = gru_mto_model.evaluate(train_dataloader_seq_mto, config)
+                    gru_mto_train += np.round(np.sqrt(metrics.mean_squared_error(gru_mto_labels, gru_mto_preds)), 2)
+                    gru_mto_labels, gru_mto_preds = gru_mto_model.evaluate(test_dataloader_seq_mto, config)
+                    gru_mto_test += np.round(np.sqrt(metrics.mean_squared_error(gru_mto_labels, gru_mto_preds)), 2)
+
+                    conv1d_labels, conv1d_preds = conv1d_model.evaluate(train_dataloader_seq, config)
+                    conv1d_train += np.round(np.sqrt(metrics.mean_squared_error(conv1d_labels, conv1d_preds)), 2)
+                    conv1d_labels, conv1d_preds = conv1d_model.evaluate(test_dataloader_seq, config)
+                    conv1d_test += np.round(np.sqrt(metrics.mean_squared_error(conv1d_labels, conv1d_preds)), 2)
+
+                    trs_labels, trs_preds = trs_model.evaluate(train_dataloader_trs, config)
+                    trs_train += np.round(np.sqrt(metrics.mean_squared_error(trs_labels, trs_preds)), 2)
+                    trs_labels, trs_preds = trs_model.evaluate(test_dataloader_trs, config)
+                    trs_test += np.round(np.sqrt(metrics.mean_squared_error(trs_labels, trs_preds)), 2)
+
+                model_fold_curves[ff_model.model_name]['Train'].append(ff_train / len(train_file_list))
+                model_fold_curves[ff_model.model_name]['Test'].append(ff_test / len(train_file_list))
+                model_fold_curves[gru_model.model_name]['Train'].append(gru_train / len(train_file_list))
+                model_fold_curves[gru_model.model_name]['Test'].append(gru_test / len(train_file_list))
+                model_fold_curves[gru_mto_model.model_name]['Train'].append(gru_mto_train / len(train_file_list))
+                model_fold_curves[gru_mto_model.model_name]['Test'].append(gru_mto_test / len(train_file_list))
+                model_fold_curves[conv1d_model.model_name]['Train'].append(conv1d_train / len(train_file_list))
+                model_fold_curves[conv1d_model.model_name]['Test'].append(conv1d_test / len(train_file_list))
+                model_fold_curves[trs_model.model_name]['Train'].append(trs_train / len(train_file_list))
+                model_fold_curves[trs_model.model_name]['Test'].append(trs_test / len(train_file_list))
+
+        # Calculate performance metrics for fold
+        print(f"Saving model metrics from fold {fold_num}...")
+        for train_file in train_file_list:
             train_data, test_data = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
             with open(f"{data_folder}train_config.json", "r") as f:
                 config = json.load(f)
-
-            # Construct dataloaders for network models
             test_dataloader_basic = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
             test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
             test_dataloader_seq_mto = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
             test_dataloader_trs = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
-            print(f"Successfully loaded {len(test_data)} testing samples.")
 
-            # Test all models
             avg_labels, avg_preds = avg_model.predict(test_dataloader_basic, config)
             model_fold_results[avg_model.model_name]["Labels"].extend(list(avg_labels))
             model_fold_results[avg_model.model_name]["Preds"].extend(list(avg_preds))
@@ -247,8 +297,6 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
             model_fold_results[trs_model.model_name]["Labels"].extend(list(trs_labels))
             model_fold_results[trs_model.model_name]["Preds"].extend(list(trs_preds))
 
-        # Calculate performance metrics
-        print(f"Saving model metrics from fold {fold_num}...")
         fold_results = {
             "Model Names": [x.model_name for x in model_list],
             "Fold": fold_num,
@@ -256,7 +304,6 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
             "Loss Curves": [{model: curve_dict} for model, curve_dict in zip(model_fold_curves.keys(), list(model_fold_curves.values()))]
         }
         # Calculate various losses:
-        # for mname, mlabels, mpreds in zip(model_names, model_labels, model_preds):
         for mname in fold_results["Model Names"]:
             _ = [mname]
             _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Labels"], model_fold_results[mname]["Preds"]), 2))
@@ -274,59 +321,59 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
 
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
-    # run_models(
-    #     run_folder="./results/debug/",
-    #     network_folder="kcm/",
-    #     hyperparameters={
-    #         "EPOCHS": 6,
-    #         "BATCH_SIZE": 512,
-    #         "LEARN_RATE": 1e-3,
-    #         "HIDDEN_SIZE": 32
-    #     },
-    #     n_folds=2
-    # )
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
-    # run_models(
-    #     run_folder="./results/debug/",
-    #     network_folder="atb/",
-    #     hyperparameters={
-    #         "EPOCHS": 6,
-    #         "BATCH_SIZE": 512,
-    #         "LEARN_RATE": 1e-3,
-    #         "HIDDEN_SIZE": 32
-    #     },
-    #     n_folds=2
-    # )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/medium/",
+        run_folder="./results/debug/",
         network_folder="kcm/",
         hyperparameters={
-            "EPOCHS": 30,
+            "EPOCHS": 6,
             "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
         },
-        n_folds=5
+        n_folds=2
     )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/medium/",
+        run_folder="./results/debug/",
         network_folder="atb/",
         hyperparameters={
-            "EPOCHS": 30,
+            "EPOCHS": 6,
             "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
         },
-        n_folds=5
+        n_folds=2
     )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/medium/",
+    #     network_folder="kcm/",
+    #     hyperparameters={
+    #         "EPOCHS": 30,
+    #         "BATCH_SIZE": 512,
+    #         "LEARN_RATE": 1e-3,
+    #         "HIDDEN_SIZE": 32
+    #     },
+    #     n_folds=5
+    # )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/medium/",
+    #     network_folder="atb/",
+    #     hyperparameters={
+    #         "EPOCHS": 30,
+    #         "BATCH_SIZE": 512,
+    #         "LEARN_RATE": 1e-3,
+    #         "HIDDEN_SIZE": 32
+    #     },
+    #     n_folds=5
+    # )
