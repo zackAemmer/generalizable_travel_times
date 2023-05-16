@@ -1,6 +1,8 @@
 #!/bin/bash
+set -e
+run_name=debug
+n_folds=2
 
-run_name=medium
 
 ### Move to project folder ###
 cd ~/Skrivebord/valle
@@ -14,7 +16,7 @@ rm -rf ./result && mkdir ./result
 rm -rf ./saved_weights && mkdir ./saved_weights
 rm -rf ./logs && mkdir ./logs
 cp ../valle/results/$run_name/kcm/deeptte_results/saved_weights/weights_0 ./saved_weights/weights_0
-python main.py --task test --batch_size 10 --epochs 2 --result_file ./result/deeptte --pooling_method attention --kernel_size 3 --alpha 0.1 --log_file test_log --weight_file ./saved_weights/weights_0 --flag KCM_KCM
+python main.py --task test --batch_size 10 --epochs 2 --n_folds $n_folds --result_file ./result/deeptte --pooling_method attention --kernel_size 3 --alpha 0.1 --log_file test_log --weight_file ./saved_weights/weights_0 --flag KCM_KCM
 # Copy Deeptte results back to results folder
 cd ~/Skrivebord/valle
 mkdir -p ./results/$run_name/kcm/deeptte_results/generalization/
@@ -29,7 +31,7 @@ rm -rf ./result && mkdir ./result
 rm -rf ./saved_weights && mkdir ./saved_weights
 rm -rf ./logs && mkdir ./logs
 cp ../valle/results/$run_name/kcm/deeptte_results/saved_weights/weights_0 ./saved_weights/weights_0
-python main.py --task test --batch_size 10 --epochs 2 --result_file ./result/deeptte --pooling_method attention --kernel_size 3 --alpha 0.1 --log_file test_log --weight_file ./saved_weights/weights_0 --flag KCM_ATB
+python main.py --task test --batch_size 10 --epochs 2 --n_folds $n_folds --result_file ./result/deeptte --pooling_method attention --kernel_size 3 --alpha 0.1 --log_file test_log --weight_file ./saved_weights/weights_0 --flag KCM_ATB
 # Copy Deeptte results back to results folder
 cd ~/Skrivebord/valle
 mkdir -p ./results/$run_name/kcm/deeptte_results/generalization/
@@ -44,7 +46,7 @@ rm -rf ./result && mkdir ./result
 rm -rf ./saved_weights && mkdir ./saved_weights
 rm -rf ./logs && mkdir ./logs
 cp ../valle/results/$run_name/atb/deeptte_results/saved_weights/weights_0 ./saved_weights/weights_0
-python main.py --task test --batch_size 10 --epochs 2 --result_file ./result/deeptte --pooling_method attention --kernel_size 3 --alpha 0.1 --log_file test_log --weight_file ./saved_weights/weights_0 --flag ATB_ATB
+python main.py --task test --batch_size 10 --epochs 2 --n_folds $n_folds --result_file ./result/deeptte --pooling_method attention --kernel_size 3 --alpha 0.1 --log_file test_log --weight_file ./saved_weights/weights_0 --flag ATB_ATB
 # Copy Deeptte results back to results folder
 cd ~/Skrivebord/valle
 mkdir -p ./results/$run_name/atb/deeptte_results/generalization/
@@ -59,7 +61,7 @@ rm -rf ./result && mkdir ./result
 rm -rf ./saved_weights && mkdir ./saved_weights
 rm -rf ./logs && mkdir ./logs
 cp ../valle/results/$run_name/atb/deeptte_results/saved_weights/weights_0 ./saved_weights/weights_0
-python main.py --task test --batch_size 10 --epochs 2 --result_file ./result/deeptte --pooling_method attention --kernel_size 3 --alpha 0.1 --log_file test_log --weight_file ./saved_weights/weights_0 --flag ATB_KCM
+python main.py --task test --batch_size 10 --epochs 2 --n_folds $n_folds --result_file ./result/deeptte --pooling_method attention --kernel_size 3 --alpha 0.1 --log_file test_log --weight_file ./saved_weights/weights_0 --flag ATB_KCM
 # Copy Deeptte results back to results folder
 cd ~/Skrivebord/valle
 mkdir -p ./results/$run_name/atb/deeptte_results/generalization/

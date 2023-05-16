@@ -5,7 +5,6 @@ from utils import data_utils
 
 
 def train(model, dataloader, LEARN_RATE):
-    print(f"Training Model: {model.model_name}")
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARN_RATE)
     # Use gradients while training
     model.train(True)
@@ -25,7 +24,6 @@ def train(model, dataloader, LEARN_RATE):
     return avg_batch_tloss
 
 def predict(model, dataloader, sequential_flag=False):
-    print(f"Testing Model: {model.model_name}")
     # Don't use gradients while testing
     model.train(False)
     running_vloss = 0.0

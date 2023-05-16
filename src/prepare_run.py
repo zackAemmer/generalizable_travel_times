@@ -103,8 +103,8 @@ if __name__=="__main__":
         overwrite=True,
         run_name="debug",
         network_name="kcm",
-        train_dates=data_utils.get_date_list("2023_03_17", 2),
-        test_dates=data_utils.get_date_list("2023_03_20", 2),
+        train_dates=data_utils.get_date_list("2023_03_17", 3),
+        test_dates=data_utils.get_date_list("2023_03_20", 3),
         num_train_files=2,
         num_test_files=2,
         n_jobs=5,
@@ -123,8 +123,8 @@ if __name__=="__main__":
         overwrite=True,
         run_name="debug",
         network_name="atb",
-        train_dates=data_utils.get_date_list("2023_03_17", 2), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
-        test_dates=data_utils.get_date_list("2023_03_20", 2),
+        train_dates=data_utils.get_date_list("2023_03_17", 3), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
+        test_dates=data_utils.get_date_list("2023_03_20", 3),
         num_train_files=2,
         num_test_files=2,
         n_jobs=5,

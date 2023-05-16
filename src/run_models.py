@@ -39,15 +39,15 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
     else:
         device = torch.device("cpu")
         NUM_WORKERS = 0
-    print(f"Using device: {device}")
-    print(f"Using num_workers: {NUM_WORKERS}")
+    print(f"DEVICE: {device}")
+    print(f"WORKERS: {NUM_WORKERS}")
 
     # Set hyperparameters
     EPOCHS = hyperparameters['EPOCHS']
     BATCH_SIZE = hyperparameters['BATCH_SIZE']
     LEARN_RATE = hyperparameters['LEARN_RATE']
     HIDDEN_SIZE = hyperparameters['HIDDEN_SIZE']
-    EPOCH_EVAL_FREQ = 2
+    EPOCH_EVAL_FREQ = 5
 
     # Define embedded variables for network models
     embed_dict = {
@@ -63,15 +63,19 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
 
     # Get list of available train/test files
     data_folder = f"{run_folder}{network_folder}deeptte_formatted/"
-    print(f"Loading data from '{data_folder}'...")
+    print(f"DATA: '{data_folder}'")
     train_file_list = list(filter(lambda x: x[:5]=="train" and len(x)==6, os.listdir(data_folder)))
+    train_file_list.sort()
     test_file_list = list(filter(lambda x: x[:4]=="test" and len(x)==5, os.listdir(data_folder)))
+    test_file_list.sort()
+    print(f"TRAIN FILES: {train_file_list}")
+    print(f"VALID FILES: {test_file_list}")
 
     # Run full training process for each model during each validation fold
     run_results = []
     for fold_num in range(0, kwargs['n_folds']):
         print("="*30)
-        print(f"FOLD: {fold_num} NETWORK: {network_folder}")
+        print(f"BEGIN FOLD: {fold_num}")
 
         # Declare baseline models
         avg_model = avg_speed.AvgHourlySpeedModel("AVG")
@@ -147,13 +151,12 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
             model_fold_results[x.model_name] = {"Labels":[], "Preds":[]}
 
         for epoch in range(EPOCHS):
-            print(f"EPOCH: {epoch}")
+            print(f"FOLD: {fold_num}, EPOCH: {epoch}")
             # Train all models on each training file; split samples in each file by fold
             for train_file in list(train_file_list):
-                print(f"TRAIN ON FILE: {train_file}")
-
                 # Load data and config for this training fold
                 train_data, test_data = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
+                print(f"TRAIN FILE: {train_file}, {len(train_data)} train samples, {len(test_data)} test samples")
                 with open(f"{data_folder}train_config.json", "r") as f:
                     config = json.load(f)
 
@@ -162,7 +165,6 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                 train_dataloader_seq = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
                 train_dataloader_seq_mto = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
                 train_dataloader_trs = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
-                print(f"Successfully loaded {len(train_data)} training samples and {len(test_data)} testing samples.")
 
                 # Train all models
                 avg_model.fit(train_dataloader_basic, config)
@@ -177,7 +179,7 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
 
             if epoch % EPOCH_EVAL_FREQ == 0:
                 # Save current model states
-                print(f"Reached epoch checkpoint {epoch}, saving model states...")
+                print(f"Reached epoch {epoch} checkpoint, saving model states and curve values...")
                 avg_model.save_to(f"{run_folder}{network_folder}models/{avg_model.model_name}_{fold_num}.pkl")
                 sch_model.save_to(f"{run_folder}{network_folder}models/{sch_model.model_name}_{fold_num}.pkl")
                 tim_model.save_to(f"{run_folder}{network_folder}models/{tim_model.model_name}_{fold_num}.pkl")
@@ -199,10 +201,9 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                 trs_train = 0.0
                 trs_test = 0.0
                 for train_file in train_file_list:
-                    print(f"TEST ON FILE: {train_file}")
-
                     # Load data and config for this training fold
                     train_data, test_data = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
+                    print(f"TEST FILE: {train_file}, {len(train_data)} train samples, {len(test_data)} test samples")
                     with open(f"{data_folder}train_config.json", "r") as f:
                         config = json.load(f)
 
@@ -215,7 +216,6 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                     test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
                     test_dataloader_seq_mto = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
                     test_dataloader_trs = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
-                    print(f"Successfully loaded {len(train_data)} training samples and {len(test_data)} testing samples.")
 
                     # Test all NN models on training and testing sets for this fold, across all files
                     ff_labels, ff_preds = ff_model.evaluate(train_dataloader_basic, config)
@@ -255,7 +255,7 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                 model_fold_curves[trs_model.model_name]['Test'].append(trs_test / len(train_file_list))
 
         # Calculate performance metrics for fold
-        print(f"Saving model metrics from fold {fold_num}...")
+        print(f"Fold {fold_num} training complete, saving model metrics...")
         for train_file in train_file_list:
             train_data, test_data = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
             with open(f"{data_folder}train_config.json", "r") as f:
@@ -328,7 +328,7 @@ if __name__=="__main__":
         run_folder="./results/debug/",
         network_folder="kcm/",
         hyperparameters={
-            "EPOCHS": 6,
+            "EPOCHS": 50,
             "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
@@ -342,7 +342,7 @@ if __name__=="__main__":
         run_folder="./results/debug/",
         network_folder="atb/",
         hyperparameters={
-            "EPOCHS": 6,
+            "EPOCHS": 50,
             "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
