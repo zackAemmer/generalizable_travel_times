@@ -1,6 +1,6 @@
 #!/bin/bash
 
-run_name=small
+run_name=medium
 epochs=50
 
 ### Move to project folder ###

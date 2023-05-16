@@ -577,8 +577,8 @@ def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg):
         "gtfs_folder": gtfs_folder,
         "n_save_files": n_save_files,
         "epsg": epsg,
-        "train_set": ["train_"+str(x) for x in range(0,n_save_files)],
-        "test_set": ["test_"+str(x) for x in range(0,n_save_files)]
+        "train_set": ["train"+str(x) for x in range(0,n_save_files)],
+        "test_set": ["test"+str(x) for x in range(0,n_save_files)]
     }
     return summary_dict
 
