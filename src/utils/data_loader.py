@@ -6,16 +6,15 @@ from utils import data_utils, shape_utils
 
 
 class GenericDataset(Dataset):
-    def __init__(self, content, config, grid=None, n_prior=None, buffer=None):
+    def __init__(self, content, config, grid=None, buffer=1):
         self.content = content
         self.config = config
         self.grid = grid
-        self.n_prior = n_prior
         self.buffer = buffer
     def __getitem__(self, index):
         sample = self.content[index]
         if self.grid is not None:
-            grid_features = shape_utils.extract_grid_features(self.grid, sample['tbin_idx'], sample['xbin_idx'], sample['ybin_idx'], self.n_prior, self.buffer)
+            grid_features = shape_utils.extract_grid_features(self.grid, sample['tbin_idx'], sample['xbin_idx'], sample['ybin_idx'], self.buffer)
             sample['grid_features'] = grid_features
         sample = apply_normalization(sample.copy(), self.config)
         return sample
@@ -36,8 +35,8 @@ def apply_normalization(sample, config):
             sample[var_name] = data_utils.normalize(np.array(sample[var_name]), config[f"{var_name}_mean"], config[f"{var_name}_std"])
     return sample
 
-def make_generic_dataloader(data, config, batch_size, collate_fn, num_workers, grid=None, n_prior=None, buffer=None):
-    dataset = GenericDataset(data, config, grid, n_prior, buffer)
+def make_generic_dataloader(data, config, batch_size, collate_fn, num_workers, grid=None, buffer=None):
+    dataset = GenericDataset(data, config, grid, buffer)
     if num_workers > 0:
         pin_memory=True
     else:
@@ -78,13 +77,11 @@ def basic_collate(batch):
 
 def basic_grid_collate(batch):
     # Context variables to embed
-    context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID'], x['tripID']]) for x in batch], dtype='int32')
+    context = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
     # Last dimension is number of sequence variables below
     seq_lens = [len(x['lats']) for x in batch]
     max_len = max(seq_lens)
-    X = np.zeros((len(batch), 11))
-    grid_shape = batch[0]['grid_features'].shape
-    X_gr = np.zeros((len(batch), grid_shape[1], grid_shape[2], grid_shape[3]))
+    X = np.zeros((len(batch), 13))
     # Sequence variables
     for i in range(len(batch)):
         X[i,0] = batch[i]['x'][0]
@@ -98,9 +95,9 @@ def basic_grid_collate(batch):
         X[i,8] = batch[i]['speed_m_s'][0]
         X[i,9] = batch[i]['bearing'][0]
         X[i,10] = batch[i]['dist']
-        X_gr[i,:,:,:] = np.mean(batch[i]['grid_features'], axis=0)
+        X[i,11] = np.mean(batch[i]['grid_features'][0][:4,:,:]) # Avg speed in all directions at 1st pt
+        X[i,12] = np.mean(batch[i]['grid_features'][0][4:,:,:]) # Avg age of obs in all directions at 1st pt
     X = torch.from_numpy(X)
-    X_gr = torch.from_numpy(X_gr)
     context = torch.from_numpy(context)
     y = torch.from_numpy(np.array([x['time'] for x in batch]))
     # Sort all dataloaders so that they are consistent in the results
@@ -108,9 +105,8 @@ def basic_grid_collate(batch):
     sorted_slens = sorted_slens.int()
     context = context[sorted_indices,:].int()
     X = X[sorted_indices,:].float()
-    X_gr = X_gr[sorted_indices,:,:,:].float()
     y = y[sorted_indices].float()
-    return [context, X, X_gr], y
+    return [context, X], y
 
 def sequential_collate(batch):
     # Context variables to embed
@@ -199,34 +195,6 @@ def sequential_grid_conv_collate(batch):
     X_gr = X_gr[sorted_indices,:,:].float()
     y = y[sorted_indices,:].float()
     return [context, X, sorted_slens, X_gr], y
-
-# def sequential_spd_collate(batch):
-#     # Context variables to embed
-#     context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID'], x['tripID']]) for x in batch], dtype='int32')
-#     # Last dimension is number of sequence variables below
-#     seq_lens = [len(x['lats']) for x in batch]
-#     max_len = max(seq_lens)
-#     X = torch.zeros((len(batch), max_len, 9))
-#     # Sequence variables
-#     X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
-#     X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
-#     X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
-#     X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
-#     X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
-#     X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
-#     X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
-#     X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
-#     # Used for persistent model, do not use in RNN
-#     X[:,:,8] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['speed_m_s']) for x in batch], batch_first=True)
-#     context = torch.from_numpy(context)
-#     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['speed_m_s']) for x in batch], batch_first=True)
-#     # Sort all by sequence length descending, for potential packing of each batch
-#     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-#     sorted_slens = sorted_slens.int()
-#     context = context[sorted_indices,:].int()
-#     X = X[sorted_indices,:,:].float()
-#     y = y[sorted_indices,:].float()
-#     return [context, X, sorted_slens], y
 
 def sequential_mto_collate(batch):
     # Context variables to embed

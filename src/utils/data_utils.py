@@ -119,16 +119,17 @@ def get_date_list(start, n_days):
     date_list = [base + timedelta(days=x) for x in range(n_days)]
     return [f"{date.strftime('%Y_%m_%d')}.pkl" for date in date_list]
 
-def load_fold_data(data_folder, train_file, fold_num, total_folds):
+def load_fold_data(data_folder, filename, fold_num, total_folds):
+    grid = load_pkl(f"{data_folder}/../{filename}_grid_ffill.pkl")
     train_data = []
-    contents = open(f"{data_folder}{train_file}", "r").read()
+    contents = open(f"{data_folder}{filename}", "r").read()
     train_data.append([json.loads(str(item)) for item in contents.strip().split('\n')])
     train_data = list(itertools.chain.from_iterable(train_data))
     # Select all data that is not part of this testing fold
     n_per_fold = len(train_data) // total_folds
     mask = np.ones(len(train_data), bool)
     mask[fold_num*n_per_fold:(fold_num+1)*n_per_fold] = 0
-    return ([item for item, keep in zip(train_data, mask) if keep], [item for item, keep in zip(train_data, mask) if not keep])
+    return ([item for item, keep in zip(train_data, mask) if keep], [item for item, keep in zip(train_data, mask) if not keep], grid)
 
 def load_all_data(data_folder, valid_file):
     valid_data = []

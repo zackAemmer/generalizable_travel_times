@@ -91,33 +91,41 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
             embed_dict,
             device
         ).to(device)
-        gru_model = rnn.GRU_RNN(
-            "GRU_RNN",
-            8,
-            1,
+        ff_grid_model = ff.FF_GRID(
+            "FF_GRID",
+            13,
             HIDDEN_SIZE,
             BATCH_SIZE,
             embed_dict,
             device
         ).to(device)
-        gru_mto_model = rnn.GRU_RNN_MTO(
-            "GRU_RNN_MTO",
-            8,
-            1,
-            HIDDEN_SIZE,
-            BATCH_SIZE,
-            embed_dict,
-            device
-        ).to(device)
-        conv1d_model = conv.CONV(
-            "CONV1D",
-            8,
-            1,
-            HIDDEN_SIZE,
-            BATCH_SIZE,
-            embed_dict,
-            device
-        ).to(device)
+        # gru_model = rnn.GRU_RNN(
+        #     "GRU_RNN",
+        #     8,
+        #     1,
+        #     HIDDEN_SIZE,
+        #     BATCH_SIZE,
+        #     embed_dict,
+        #     device
+        # ).to(device)
+        # gru_mto_model = rnn.GRU_RNN_MTO(
+        #     "GRU_RNN_MTO",
+        #     8,
+        #     1,
+        #     HIDDEN_SIZE,
+        #     BATCH_SIZE,
+        #     embed_dict,
+        #     device
+        # ).to(device)
+        # conv1d_model = conv.CONV(
+        #     "CONV1D",
+        #     8,
+        #     1,
+        #     HIDDEN_SIZE,
+        #     BATCH_SIZE,
+        #     embed_dict,
+        #     device
+        # ).to(device)
         trs_model = transformer.TRANSFORMER(
             "TRSF_ENC",
             8,
@@ -134,9 +142,10 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
         model_list.append(sch_model)
         model_list.append(tim_model)
         model_list.append(ff_model)
-        model_list.append(gru_model)
-        model_list.append(gru_mto_model)
-        model_list.append(conv1d_model)
+        model_list.append(ff_grid_model)
+        # model_list.append(gru_model)
+        # model_list.append(gru_mto_model)
+        # model_list.append(conv1d_model)
         model_list.append(trs_model)
 
         # Keep track of train/test curves during training for network models
@@ -155,13 +164,14 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
             # Train all models on each training file; split samples in each file by fold
             for train_file in list(train_file_list):
                 # Load data and config for this training fold
-                train_data, test_data = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
+                train_data, test_data, grid = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
                 print(f"TRAIN FILE: {train_file}, {len(train_data)} train samples, {len(test_data)} test samples")
                 with open(f"{data_folder}train_config.json", "r") as f:
                     config = json.load(f)
 
                 # Construct dataloaders for network models
                 train_dataloader_basic = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
+                train_dataloader_basic_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid, buffer=1)
                 train_dataloader_seq = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
                 train_dataloader_seq_mto = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
                 train_dataloader_trs = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
@@ -172,9 +182,10 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                 tim_model.fit(train_dataloader_seq, config)
 
                 avg_batch_loss = model_utils.train(ff_model, train_dataloader_basic, LEARN_RATE)
-                avg_batch_loss = model_utils.train(gru_model, train_dataloader_seq, LEARN_RATE)
-                avg_batch_loss = model_utils.train(gru_mto_model, train_dataloader_seq_mto, LEARN_RATE)
-                avg_batch_loss = model_utils.train(conv1d_model, train_dataloader_seq, LEARN_RATE)
+                avg_batch_loss = model_utils.train(ff_grid_model, train_dataloader_basic_grid, LEARN_RATE)
+                # avg_batch_loss = model_utils.train(gru_model, train_dataloader_seq, LEARN_RATE)
+                # avg_batch_loss = model_utils.train(gru_mto_model, train_dataloader_seq_mto, LEARN_RATE)
+                # avg_batch_loss = model_utils.train(conv1d_model, train_dataloader_seq, LEARN_RATE)
                 avg_batch_loss = model_utils.train(trs_model, train_dataloader_trs, LEARN_RATE)
 
             if epoch % EPOCH_EVAL_FREQ == 0:
@@ -184,14 +195,17 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                 sch_model.save_to(f"{run_folder}{network_folder}models/{sch_model.model_name}_{fold_num}.pkl")
                 tim_model.save_to(f"{run_folder}{network_folder}models/{tim_model.model_name}_{fold_num}.pkl")
                 torch.save(ff_model.state_dict(), f"{run_folder}{network_folder}models/{ff_model.model_name}_{fold_num}.pt")
-                torch.save(gru_model.state_dict(), f"{run_folder}{network_folder}models/{gru_model.model_name}_{fold_num}.pt")
-                torch.save(gru_mto_model.state_dict(), f"{run_folder}{network_folder}models/{gru_mto_model.model_name}_{fold_num}.pt")
-                torch.save(conv1d_model.state_dict(), f"{run_folder}{network_folder}models/{conv1d_model.model_name}_{fold_num}.pt")
+                torch.save(ff_grid_model.state_dict(), f"{run_folder}{network_folder}models/{ff_grid_model.model_name}_{fold_num}.pt")
+                # torch.save(gru_model.state_dict(), f"{run_folder}{network_folder}models/{gru_model.model_name}_{fold_num}.pt")
+                # torch.save(gru_mto_model.state_dict(), f"{run_folder}{network_folder}models/{gru_mto_model.model_name}_{fold_num}.pt")
+                # torch.save(conv1d_model.state_dict(), f"{run_folder}{network_folder}models/{conv1d_model.model_name}_{fold_num}.pt")
                 torch.save(trs_model.state_dict(), f"{run_folder}{network_folder}models/{trs_model.model_name}_{fold_num}.pt")
 
                 # Record model curves on all train/test files for this fold
                 ff_train = 0.0
                 ff_test = 0.0
+                ff_grid_train = 0.0
+                ff_grid_test = 0.0
                 gru_train = 0.0
                 gru_test = 0.0
                 gru_mto_train = 0.0
@@ -202,17 +216,19 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                 trs_test = 0.0
                 for train_file in train_file_list:
                     # Load data and config for this training fold
-                    train_data, test_data = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
+                    train_data, test_data, grid = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
                     print(f"TEST FILE: {train_file}, {len(train_data)} train samples, {len(test_data)} test samples")
                     with open(f"{data_folder}train_config.json", "r") as f:
                         config = json.load(f)
 
                     # Construct dataloaders for network models
                     train_dataloader_basic = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
+                    train_dataloader_basic_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid, buffer=1)
                     train_dataloader_seq = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
                     train_dataloader_seq_mto = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
                     train_dataloader_trs = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
                     test_dataloader_basic = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
+                    test_dataloader_basic_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid, buffer=1)
                     test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
                     test_dataloader_seq_mto = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
                     test_dataloader_trs = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
@@ -223,20 +239,25 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                     ff_labels, ff_preds = ff_model.evaluate(test_dataloader_basic, config)
                     ff_test += np.round(np.sqrt(metrics.mean_squared_error(ff_labels, ff_preds)), 2)
 
-                    gru_labels, gru_preds = gru_model.evaluate(train_dataloader_seq, config)
-                    gru_train += np.round(np.sqrt(metrics.mean_squared_error(gru_labels, gru_preds)), 2)
-                    gru_labels, gru_preds = gru_model.evaluate(test_dataloader_seq, config)
-                    gru_test += np.round(np.sqrt(metrics.mean_squared_error(gru_labels, gru_preds)), 2)
+                    ff_grid_labels, ff_grid_preds = ff_grid_model.evaluate(train_dataloader_basic_grid, config)
+                    ff_grid_train += np.round(np.sqrt(metrics.mean_squared_error(ff_grid_labels, ff_grid_preds)), 2)
+                    ff_grid_labels, ff_grid_preds = ff_grid_model.evaluate(test_dataloader_basic_grid, config)
+                    ff_grid_test += np.round(np.sqrt(metrics.mean_squared_error(ff_grid_labels, ff_grid_preds)), 2)
 
-                    gru_mto_labels, gru_mto_preds = gru_mto_model.evaluate(train_dataloader_seq_mto, config)
-                    gru_mto_train += np.round(np.sqrt(metrics.mean_squared_error(gru_mto_labels, gru_mto_preds)), 2)
-                    gru_mto_labels, gru_mto_preds = gru_mto_model.evaluate(test_dataloader_seq_mto, config)
-                    gru_mto_test += np.round(np.sqrt(metrics.mean_squared_error(gru_mto_labels, gru_mto_preds)), 2)
+                    # gru_labels, gru_preds = gru_model.evaluate(train_dataloader_seq, config)
+                    # gru_train += np.round(np.sqrt(metrics.mean_squared_error(gru_labels, gru_preds)), 2)
+                    # gru_labels, gru_preds = gru_model.evaluate(test_dataloader_seq, config)
+                    # gru_test += np.round(np.sqrt(metrics.mean_squared_error(gru_labels, gru_preds)), 2)
 
-                    conv1d_labels, conv1d_preds = conv1d_model.evaluate(train_dataloader_seq, config)
-                    conv1d_train += np.round(np.sqrt(metrics.mean_squared_error(conv1d_labels, conv1d_preds)), 2)
-                    conv1d_labels, conv1d_preds = conv1d_model.evaluate(test_dataloader_seq, config)
-                    conv1d_test += np.round(np.sqrt(metrics.mean_squared_error(conv1d_labels, conv1d_preds)), 2)
+                    # gru_mto_labels, gru_mto_preds = gru_mto_model.evaluate(train_dataloader_seq_mto, config)
+                    # gru_mto_train += np.round(np.sqrt(metrics.mean_squared_error(gru_mto_labels, gru_mto_preds)), 2)
+                    # gru_mto_labels, gru_mto_preds = gru_mto_model.evaluate(test_dataloader_seq_mto, config)
+                    # gru_mto_test += np.round(np.sqrt(metrics.mean_squared_error(gru_mto_labels, gru_mto_preds)), 2)
+
+                    # conv1d_labels, conv1d_preds = conv1d_model.evaluate(train_dataloader_seq, config)
+                    # conv1d_train += np.round(np.sqrt(metrics.mean_squared_error(conv1d_labels, conv1d_preds)), 2)
+                    # conv1d_labels, conv1d_preds = conv1d_model.evaluate(test_dataloader_seq, config)
+                    # conv1d_test += np.round(np.sqrt(metrics.mean_squared_error(conv1d_labels, conv1d_preds)), 2)
 
                     trs_labels, trs_preds = trs_model.evaluate(train_dataloader_trs, config)
                     trs_train += np.round(np.sqrt(metrics.mean_squared_error(trs_labels, trs_preds)), 2)
@@ -245,22 +266,25 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
 
                 model_fold_curves[ff_model.model_name]['Train'].append(ff_train / len(train_file_list))
                 model_fold_curves[ff_model.model_name]['Test'].append(ff_test / len(train_file_list))
-                model_fold_curves[gru_model.model_name]['Train'].append(gru_train / len(train_file_list))
-                model_fold_curves[gru_model.model_name]['Test'].append(gru_test / len(train_file_list))
-                model_fold_curves[gru_mto_model.model_name]['Train'].append(gru_mto_train / len(train_file_list))
-                model_fold_curves[gru_mto_model.model_name]['Test'].append(gru_mto_test / len(train_file_list))
-                model_fold_curves[conv1d_model.model_name]['Train'].append(conv1d_train / len(train_file_list))
-                model_fold_curves[conv1d_model.model_name]['Test'].append(conv1d_test / len(train_file_list))
+                model_fold_curves[ff_grid_model.model_name]['Train'].append(ff_grid_train / len(train_file_list))
+                model_fold_curves[ff_grid_model.model_name]['Test'].append(ff_grid_test / len(train_file_list))
+                # model_fold_curves[gru_model.model_name]['Train'].append(gru_train / len(train_file_list))
+                # model_fold_curves[gru_model.model_name]['Test'].append(gru_test / len(train_file_list))
+                # model_fold_curves[gru_mto_model.model_name]['Train'].append(gru_mto_train / len(train_file_list))
+                # model_fold_curves[gru_mto_model.model_name]['Test'].append(gru_mto_test / len(train_file_list))
+                # model_fold_curves[conv1d_model.model_name]['Train'].append(conv1d_train / len(train_file_list))
+                # model_fold_curves[conv1d_model.model_name]['Test'].append(conv1d_test / len(train_file_list))
                 model_fold_curves[trs_model.model_name]['Train'].append(trs_train / len(train_file_list))
                 model_fold_curves[trs_model.model_name]['Test'].append(trs_test / len(train_file_list))
 
         # Calculate performance metrics for fold
         print(f"Fold {fold_num} training complete, saving model metrics...")
         for train_file in train_file_list:
-            train_data, test_data = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
+            train_data, test_data, grid = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
             with open(f"{data_folder}train_config.json", "r") as f:
                 config = json.load(f)
             test_dataloader_basic = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
+            test_dataloader_basic_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid, buffer=1)
             test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
             test_dataloader_seq_mto = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
             test_dataloader_trs = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
@@ -281,17 +305,21 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
             model_fold_results[ff_model.model_name]["Labels"].extend(list(ff_labels))
             model_fold_results[ff_model.model_name]["Preds"].extend(list(ff_preds))
 
-            gru_labels, gru_preds = gru_model.evaluate(test_dataloader_seq, config)
-            model_fold_results[gru_model.model_name]["Labels"].extend(list(gru_labels))
-            model_fold_results[gru_model.model_name]["Preds"].extend(list(gru_preds))
+            ff_grid_labels, ff_grid_preds = ff_grid_model.evaluate(test_dataloader_basic_grid, config)
+            model_fold_results[ff_grid_model.model_name]["Labels"].extend(list(ff_grid_labels))
+            model_fold_results[ff_grid_model.model_name]["Preds"].extend(list(ff_grid_preds))
 
-            gru_mto_labels, gru_mto_preds = gru_mto_model.evaluate(test_dataloader_seq_mto, config)
-            model_fold_results[gru_mto_model.model_name]["Labels"].extend(list(gru_mto_labels))
-            model_fold_results[gru_mto_model.model_name]["Preds"].extend(list(gru_mto_preds))
+            # gru_labels, gru_preds = gru_model.evaluate(test_dataloader_seq, config)
+            # model_fold_results[gru_model.model_name]["Labels"].extend(list(gru_labels))
+            # model_fold_results[gru_model.model_name]["Preds"].extend(list(gru_preds))
 
-            conv1d_labels, conv1d_preds = conv1d_model.evaluate(test_dataloader_seq, config)
-            model_fold_results[conv1d_model.model_name]["Labels"].extend(list(conv1d_labels))
-            model_fold_results[conv1d_model.model_name]["Preds"].extend(list(conv1d_preds))
+            # gru_mto_labels, gru_mto_preds = gru_mto_model.evaluate(test_dataloader_seq_mto, config)
+            # model_fold_results[gru_mto_model.model_name]["Labels"].extend(list(gru_mto_labels))
+            # model_fold_results[gru_mto_model.model_name]["Preds"].extend(list(gru_mto_preds))
+
+            # conv1d_labels, conv1d_preds = conv1d_model.evaluate(test_dataloader_seq, config)
+            # model_fold_results[conv1d_model.model_name]["Labels"].extend(list(conv1d_labels))
+            # model_fold_results[conv1d_model.model_name]["Preds"].extend(list(conv1d_preds))
 
             trs_labels, trs_preds = trs_model.evaluate(test_dataloader_trs, config)
             model_fold_results[trs_model.model_name]["Labels"].extend(list(trs_labels))

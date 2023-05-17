@@ -50,37 +50,37 @@ def get_closest_point(points, query_points):
     dists, idxs = tree.query(query_points)
     return dists, idxs
 
-def extract_grid_features(grid, tbins, xbins, ybins, n_prior=1, buffer=20):
+def extract_grid_features(grid, tbins, xbins, ybins, buffer=1):
     """
     Given sequence of bins from a trip, reconstruct grid features.
     Normalize the grid based on the starting point.
     """
+    # All points in the sequence will have the information at the time of the starting point
+    # However the starting information is shifted in space to center features on each point
     tbin_start_idx = tbins[0]
     grid_features = []
     for i in range(len(tbins)):
-        # If the point occurs before start, or buffer would put off edge of grid, use 0s
-        if tbin_start_idx - n_prior < 0:
-            feature = np.ones((n_prior, grid.shape[1], 2*buffer+1, 2*buffer+1))*-1
-        elif xbins[i]-buffer-1 < 0 or ybins[i]-buffer-1 < 0:
-            feature = np.ones((n_prior, grid.shape[1], 2*buffer+1, 2*buffer+1))*-1
+        # Handle case where buffer goes off edge of grid (-1's)
+        if xbins[i]-buffer-1 < 0 or ybins[i]-buffer-1 < 0:
+            feature = np.ones((grid.shape[1], 2*buffer+1, 2*buffer+1))*-1
         elif xbins[i]+buffer > grid.shape[3] or ybins[i]+buffer > grid.shape[2]:
-            feature = np.ones((n_prior, grid.shape[1], 2*buffer+1, 2*buffer+1))*-1
+            feature = np.ones((grid.shape[1], 2*buffer+1, 2*buffer+1))*-1
         else:
-            # Filter grid based on shingle start time (pts<start), and adjacent squares to buffer (pts +/- buffer, including middle point)
-            feature = grid[tbin_start_idx-n_prior:tbin_start_idx,:,ybins[i]-buffer-1:ybins[i]+buffer,xbins[i]-buffer-1:xbins[i]+buffer]
+            # Filter grid based on shingle start time, and adjacent squares to buffer (pts +/- buffer, including middle point)
+            feature = grid[tbin_start_idx,:,ybins[i]-buffer-1:ybins[i]+buffer,xbins[i]-buffer-1:xbins[i]+buffer]
         grid_features.append(feature)
-    grid_features = np.concatenate(grid_features)
-    # Normalize the grid to the information present when the trip starts=
-    if len(grid_features[grid_features!=-1])==0:
-        # The grid may be completely empty
-        grid_avg = 0.0
-        grid_std = 1.0
-    else:
-        grid_avg = np.mean(grid_features[grid_features!=-1])
-        grid_std = np.std(grid_features[grid_features!=-1])
-    # All unknown cells are given the average, all are then normalized
-    grid_features[grid_features==-1] = grid_avg
-    grid_features = data_utils.normalize(grid_features, grid_avg, grid_std)
+    # grid_features = np.concatenate(grid_features)
+    # # Normalize the grid to the information present when the trip starts=
+    # if len(grid_features[grid_features!=-1])==0:
+    #     # The grid may be completely empty
+    #     grid_avg = 0.0
+    #     grid_std = 1.0
+    # else:
+    #     grid_avg = np.mean(grid_features[grid_features!=-1])
+    #     grid_std = np.std(grid_features[grid_features!=-1])
+    # # All unknown cells are given the average, all are then normalized
+    # grid_features[grid_features==-1] = grid_avg
+    # grid_features = data_utils.normalize(grid_features, grid_avg, grid_std)
     return grid_features
 
 def get_grid_features(traces, resolution=64, timestep=30):
