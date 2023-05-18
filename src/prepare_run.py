@@ -29,8 +29,10 @@ def clean_data(dates, n_save_files, train_or_test, base_folder, **kwargs):
     date_splits = np.array_split(dates, n_save_files)
     date_splits = [list(x) for x in date_splits]
     # For each file, parallel process the dates, join, and save them to a combined file
+    file_num_mod = 0
     for file_num, date_list in enumerate(date_splits):
         print(f"Processing file number {file_num}/{len(date_splits)-1} containing dates {date_list}...")
+        file_num = file_num - file_num_mod
         # Load all data for a set of dates, and break into sub-chunks to parallel process
         traces, fail_dates = data_utils.combine_pkl_data(kwargs['raw_data_folder'], date_list, kwargs['given_names'])
         if len(fail_dates) > 0:
@@ -44,14 +46,23 @@ def clean_data(dates, n_save_files, train_or_test, base_folder, **kwargs):
         unique_shingles = [pd.unique(x['shingle_id']) for x in traces]
         # For each shingle ID set, map the IDs to increasing numbers, then increase the max ID
         for chunk_num, shingle_set in enumerate(unique_shingles):
+            if len(shingle_set)==0:
+                # The process either received no data or filtered out all shingles, returning nothing
+                continue
             shingle_remap = dict(zip(shingle_set, np.arange(max_shingle_id, max_shingle_id+len(shingle_set))))
             max_shingle_id = max(list(shingle_remap.values()))+1
             traces[chunk_num]['shingle_id'] = traces[chunk_num]['shingle_id'].replace(shingle_remap)
         # Join results for this set of dates, write to file
         traces = pd.concat(traces)
-        print(f"Saving {len(traces)} samples to run folder, retained {np.round(len(traces)/num_raw_points, 2)*100.0}% of original data points...")
+        # Sometimes, the chunk of dates has no data remaining. For example when AtB switches trip_id's
+        # In this case, skip writing the chunk, and subtract 1 from the file number to keep them sequential
+        if len(traces)==0:
+            print("No traces retained...")
+            file_num_mod += 1
+            continue
+        print(f"Saving {len(traces)} samples to run folder, retained {np.round(len(traces)/num_raw_points, 2)*100}% of original data points...")
         deeptte_formatted_path = f"{base_folder}deeptte_formatted/{train_or_test}{file_num}"
-        traces, train_grid, train_grid_ffill = data_utils.map_to_deeptte(traces, deeptte_formatted_path, grid_res=32, grid_time=5*60)
+        traces, train_grid, train_grid_ffill = data_utils.map_to_deeptte(traces, deeptte_formatted_path, grid_res=64, grid_time=30)
         summary_config = data_utils.get_summary_config(traces, kwargs['gtfs_folder'], n_save_files, kwargs['epsg'])
         # Save config, and traces to file for notebook analyses
         with open(f"{deeptte_formatted_path}_config.json", mode="a") as out_file:
@@ -96,59 +107,19 @@ def prepare_run(overwrite, run_name, network_name, train_dates, test_dates, **kw
     print(f"RUN PREPARATION COMPLETED '{run_name}/{network_name}'")
 
 if __name__=="__main__":
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    prepare_run(
-        overwrite=True,
-        run_name="debug",
-        network_name="kcm",
-        train_dates=data_utils.get_date_list("2023_03_17", 3),
-        test_dates=data_utils.get_date_list("2023_03_20", 3),
-        num_train_files=2,
-        num_test_files=2,
-        n_jobs=5,
-        n_trace_splits=5,
-        data_dropout=0.2,
-        gtfs_folder="./data/kcm_gtfs/",
-        raw_data_folder="./data/kcm_all/",
-        timezone="America/Los_Angeles",
-        epsg="32148",
-        given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
-    )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    prepare_run(
-        overwrite=True,
-        run_name="debug",
-        network_name="atb",
-        train_dates=data_utils.get_date_list("2023_03_17", 3), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
-        test_dates=data_utils.get_date_list("2023_03_20", 3),
-        num_train_files=2,
-        num_test_files=2,
-        n_jobs=5,
-        n_trace_splits=5,
-        data_dropout=0.2,
-        gtfs_folder="./data/atb_gtfs/",
-        raw_data_folder="./data/atb_all_new/",
-        timezone="Europe/Oslo",
-        epsg="32632",
-        given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
-    )
     # random.seed(0)
     # np.random.seed(0)
     # torch.manual_seed(0)
     # prepare_run(
     #     overwrite=True,
-    #     run_name="medium",
+    #     run_name="debug",
     #     network_name="kcm",
-    #     train_dates=data_utils.get_date_list("2023_02_15", 28),
-    #     test_dates=data_utils.get_date_list("2023_03_15", 7),
-    #     num_train_files=5,
-    #     num_test_files=5,
-    #     n_jobs=8,
-    #     n_trace_splits=8,
+    #     train_dates=data_utils.get_date_list("2023_03_17", 3),
+    #     test_dates=data_utils.get_date_list("2023_03_20", 3),
+    #     num_train_files=2,
+    #     num_test_files=2,
+    #     n_jobs=5,
+    #     n_trace_splits=5,
     #     data_dropout=0.2,
     #     gtfs_folder="./data/kcm_gtfs/",
     #     raw_data_folder="./data/kcm_all/",
@@ -161,14 +132,14 @@ if __name__=="__main__":
     # torch.manual_seed(0)
     # prepare_run(
     #     overwrite=True,
-    #     run_name="medium",
+    #     run_name="debug",
     #     network_name="atb",
-    #     train_dates=data_utils.get_date_list("2023_02_15", 28), # Need to get mapping of old IDs to new IDs in order to use schedule data before 2022_11_02
-    #     test_dates=data_utils.get_date_list("2023_03_15", 7),
-    #     num_train_files=5,
-    #     num_test_files=5,
-    #     n_jobs=8,
-    #     n_trace_splits=8,
+    #     train_dates=data_utils.get_date_list("2023_03_17", 3),
+    #     test_dates=data_utils.get_date_list("2023_03_20", 3),
+    #     num_train_files=2,
+    #     num_test_files=2,
+    #     n_jobs=5,
+    #     n_trace_splits=5,
     #     data_dropout=0.2,
     #     gtfs_folder="./data/atb_gtfs/",
     #     raw_data_folder="./data/atb_all_new/",
@@ -176,3 +147,43 @@ if __name__=="__main__":
     #     epsg="32632",
     #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
     # )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # prepare_run(
+    #     overwrite=True,
+    #     run_name="medium",
+    #     network_name="kcm",
+    #     train_dates=data_utils.get_date_list("2023_02_15", 60),
+    #     test_dates=data_utils.get_date_list("2023_04_20", 7),
+    #     num_train_files=5,
+    #     num_test_files=5,
+    #     n_jobs=8,
+    #     n_trace_splits=8,
+    #     data_dropout=0.2,
+    #     gtfs_folder="./data/kcm_gtfs/",
+    #     raw_data_folder="./data/kcm_all/",
+    #     timezone="America/Los_Angeles",
+    #     epsg="32148",
+    #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
+    # )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    prepare_run(
+        overwrite=True,
+        run_name="medium",
+        network_name="atb",
+        train_dates=data_utils.get_date_list("2023_02_15", 60),
+        test_dates=data_utils.get_date_list("2023_04_20", 7),
+        num_train_files=5,
+        num_test_files=5,
+        n_jobs=8,
+        n_trace_splits=8,
+        data_dropout=0.2,
+        gtfs_folder="./data/atb_gtfs/",
+        raw_data_folder="./data/atb_all_new/",
+        timezone="Europe/Oslo",
+        epsg="32632",
+        given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
+    )

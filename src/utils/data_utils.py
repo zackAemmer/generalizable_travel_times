@@ -143,17 +143,15 @@ def load_all_inputs(run_folder, network_folder, file_num):
     test_traces = load_pkl(f"{run_folder}{network_folder}test{file_num}_traces.pkl")
     with open(f"{run_folder}{network_folder}/deeptte_formatted/train_config.json") as f:
         config = json.load(f)
-    # gtfs_data = merge_gtfs_files(f".{config['gtfs_folder']}", config['epsg'])
+    train_data = load_all_data(f"{run_folder}{network_folder}deeptte_formatted/", f"train{file_num}")
+    train_grid_ffill = load_pkl(f"{run_folder}{network_folder}train{file_num}_grid_ffill.pkl")
     return {
         "train_traces": train_traces,
         "test_traces": test_traces,
         "config": config,
-        # "gtfs_data": gtfs_data,
-        # "train_data_chunks": train_data_chunks,
+        "train_data": train_data,
         # "test_data": test_data,
-        # "train_grid": train_grid,
-        # "test_grid": test_grid,
-        # "train_grid_ffill": train_grid_ffill,
+        "train_grid_ffill": train_grid_ffill,
         # "test_grid_ffill": test_grid_ffill
     }
 
@@ -429,6 +427,7 @@ def fill_grid_forward(grid):
         ffilled, channel_counts = fill_channel_forward(grid[:,channel,:,:])
         filled_channels[:,channel,:,:] = ffilled
         filled_counts[:,channel,:,:] = channel_counts
+    # First n channels are original speeds, second n are the obs histories in grid resolution
     grid_ffill = np.concatenate((filled_channels, filled_counts), axis=1)
     return grid_ffill
 
@@ -437,15 +436,18 @@ def fill_channel_forward(grid_channel):
     mask = grid_channel==-1
     ffilled = np.copy(grid_channel)
     channel_counts = np.zeros(grid_channel.shape)
+    # For each cell, fill the value at this timestep w/previous value if it is masked
     for i in range(rows):
         for j in range(cols):
             counter = 0
             for t in range(1,tsteps):
                 if mask[t][i][j]:
+                    # Keep record of how many steps have been filled since last known value
                     counter += 1
                     ffilled[t][i][j] = ffilled[t-1][i][j]
                     channel_counts[t][i][j] = counter
                 else:
+                    # When a known value is found, reset counter to 0
                     counter = 0
                     channel_counts[t][i][j] = counter
     return ffilled, channel_counts
@@ -600,17 +602,18 @@ def extract_operator(old_folder, new_folder, source_col, op_name):
             with open(f"{new_folder}{file}", 'wb') as f:
                 pickle.dump(data, f)
 
-def extract_operator_gtfs(old_folder, new_folder, source_col, op_name):
+def extract_operator_gtfs(old_folder, new_folder, source_col_trips, source_col_stop_times, op_name):
     """
     First make a copy of the GTFS directory, then this function will overwrite the key files.
+    Example SCP with ipv6: scp -6 ./test.file osis@\[2001:db8:0:1\]:/home/osis/test.file
     """
     gtfs_folders = os.listdir(old_folder)
     for file in gtfs_folders:
         if file != ".DS_Store" and len(file)==10:
             z = pd.read_csv(f"{old_folder}{file}/trips.txt", low_memory=False, dtype=GTFS_LOOKUP)
             st = pd.read_csv(f"{old_folder}{file}/stop_times.txt", low_memory=False, dtype=GTFS_LOOKUP)
-            z = z[z[source_col].str[:3]==op_name]
-            st = st[st[source_col].str[:3]==op_name]
+            z = z[z[source_col_trips].str[:3]==op_name]
+            st = st[st[source_col_stop_times].str[:3]==op_name]
             z.to_csv(f"{new_folder}{file}/trips.txt")
             st.to_csv(f"{new_folder}{file}/stop_times.txt")
 

@@ -91,14 +91,62 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
             embed_dict,
             device
         ).to(device)
-        ff_grid_model = ff.FF_GRID(
-            "FF_GRID",
-            13,
-            HIDDEN_SIZE,
-            BATCH_SIZE,
-            embed_dict,
-            device
+        # Average speed, average obs age
+        ff_grid_model1 = ff.FF_GRID(
+            "FF_GRID_AVG_ALL",
+            n_features=11,
+            n_grid_features=1,
+            hidden_size=HIDDEN_SIZE,
+            grid_compression_size=4,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
         ).to(device)
+        # Individual speeds, no weights
+        ff_grid_model2 = ff.FF_GRID(
+            "FF_GRID_IND",
+            n_features=11,
+            n_grid_features=36,
+            hidden_size=HIDDEN_SIZE,
+            grid_compression_size=4,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device)
+        # Average speed, average obs age per channel
+        ff_grid_model3 = ff.FF_GRID(
+            "FF_GRID_AVG_CHAN",
+            n_features=11,
+            n_grid_features=4,
+            hidden_size=HIDDEN_SIZE,
+            grid_compression_size=4,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device)
+        # Average speed, average obs age per cell
+        ff_grid_model4 = ff.FF_GRID(
+            "FF_GRID_AVG_CELL",
+            n_features=11,
+            n_grid_features=9,
+            hidden_size=HIDDEN_SIZE,
+            grid_compression_size=4,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device)
+        # Copy of 4 with less compression
+        ff_grid_model5 = ff.FF_GRID(
+            "FF_GRID_AVG_LEN",
+            n_features=11,
+            n_grid_features=9,
+            hidden_size=HIDDEN_SIZE,
+            grid_compression_size=8,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device)
+
         # gru_model = rnn.GRU_RNN(
         #     "GRU_RNN",
         #     8,
@@ -142,7 +190,11 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
         model_list.append(sch_model)
         model_list.append(tim_model)
         model_list.append(ff_model)
-        model_list.append(ff_grid_model)
+        model_list.append(ff_grid_model1)
+        model_list.append(ff_grid_model2)
+        model_list.append(ff_grid_model3)
+        model_list.append(ff_grid_model4)
+        model_list.append(ff_grid_model5)
         # model_list.append(gru_model)
         # model_list.append(gru_mto_model)
         # model_list.append(conv1d_model)
@@ -171,9 +223,13 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
 
                 # Construct dataloaders for network models
                 train_dataloader_basic = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
-                train_dataloader_basic_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid, buffer=1)
+                train_dataloader_basic_grid1 = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid1_collate, NUM_WORKERS, grid=grid, buffer=1)
+                train_dataloader_basic_grid2 = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid2_collate, NUM_WORKERS, grid=grid, buffer=1)
+                train_dataloader_basic_grid3 = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid3_collate, NUM_WORKERS, grid=grid, buffer=1)
+                train_dataloader_basic_grid4 = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid4_collate, NUM_WORKERS, grid=grid, buffer=1)
+                train_dataloader_basic_grid5 = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid5_collate, NUM_WORKERS, grid=grid, buffer=1)
                 train_dataloader_seq = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
-                train_dataloader_seq_mto = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
+                # train_dataloader_seq_mto = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
                 train_dataloader_trs = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
 
                 # Train all models
@@ -182,7 +238,11 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                 tim_model.fit(train_dataloader_seq, config)
 
                 avg_batch_loss = model_utils.train(ff_model, train_dataloader_basic, LEARN_RATE)
-                avg_batch_loss = model_utils.train(ff_grid_model, train_dataloader_basic_grid, LEARN_RATE)
+                avg_batch_loss = model_utils.train(ff_grid_model1, train_dataloader_basic_grid1, LEARN_RATE)
+                avg_batch_loss = model_utils.train(ff_grid_model2, train_dataloader_basic_grid2, LEARN_RATE)
+                avg_batch_loss = model_utils.train(ff_grid_model3, train_dataloader_basic_grid3, LEARN_RATE)
+                avg_batch_loss = model_utils.train(ff_grid_model4, train_dataloader_basic_grid4, LEARN_RATE)
+                avg_batch_loss = model_utils.train(ff_grid_model5, train_dataloader_basic_grid5, LEARN_RATE)
                 # avg_batch_loss = model_utils.train(gru_model, train_dataloader_seq, LEARN_RATE)
                 # avg_batch_loss = model_utils.train(gru_mto_model, train_dataloader_seq_mto, LEARN_RATE)
                 # avg_batch_loss = model_utils.train(conv1d_model, train_dataloader_seq, LEARN_RATE)
@@ -195,7 +255,11 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                 sch_model.save_to(f"{run_folder}{network_folder}models/{sch_model.model_name}_{fold_num}.pkl")
                 tim_model.save_to(f"{run_folder}{network_folder}models/{tim_model.model_name}_{fold_num}.pkl")
                 torch.save(ff_model.state_dict(), f"{run_folder}{network_folder}models/{ff_model.model_name}_{fold_num}.pt")
-                torch.save(ff_grid_model.state_dict(), f"{run_folder}{network_folder}models/{ff_grid_model.model_name}_{fold_num}.pt")
+                torch.save(ff_grid_model1.state_dict(), f"{run_folder}{network_folder}models/{ff_grid_model1.model_name}_{fold_num}.pt")
+                torch.save(ff_grid_model2.state_dict(), f"{run_folder}{network_folder}models/{ff_grid_model2.model_name}_{fold_num}.pt")
+                torch.save(ff_grid_model3.state_dict(), f"{run_folder}{network_folder}models/{ff_grid_model3.model_name}_{fold_num}.pt")
+                torch.save(ff_grid_model4.state_dict(), f"{run_folder}{network_folder}models/{ff_grid_model4.model_name}_{fold_num}.pt")
+                torch.save(ff_grid_model5.state_dict(), f"{run_folder}{network_folder}models/{ff_grid_model5.model_name}_{fold_num}.pt")
                 # torch.save(gru_model.state_dict(), f"{run_folder}{network_folder}models/{gru_model.model_name}_{fold_num}.pt")
                 # torch.save(gru_mto_model.state_dict(), f"{run_folder}{network_folder}models/{gru_mto_model.model_name}_{fold_num}.pt")
                 # torch.save(conv1d_model.state_dict(), f"{run_folder}{network_folder}models/{conv1d_model.model_name}_{fold_num}.pt")
@@ -203,17 +267,27 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
 
                 # Record model curves on all train/test files for this fold
                 ff_train = 0.0
-                ff_test = 0.0
-                ff_grid_train = 0.0
-                ff_grid_test = 0.0
-                gru_train = 0.0
-                gru_test = 0.0
-                gru_mto_train = 0.0
-                gru_mto_test = 0.0
-                conv1d_train = 0.0
-                conv1d_test = 0.0
+                ff_grid1_train = 0.0
+                ff_grid2_train = 0.0
+                ff_grid3_train = 0.0
+                ff_grid4_train = 0.0
+                ff_grid5_train = 0.0
+                # gru_train = 0.0
+                # gru_mto_train = 0.0
+                # conv1d_train = 0.0
                 trs_train = 0.0
+
+                ff_test = 0.0
+                ff_grid1_test = 0.0
+                ff_grid2_test = 0.0
+                ff_grid3_test = 0.0
+                ff_grid4_test = 0.0
+                ff_grid5_test = 0.0
+                # gru_test = 0.0
+                # gru_mto_test = 0.0
+                # conv1d_test = 0.0
                 trs_test = 0.0
+
                 for train_file in train_file_list:
                     # Load data and config for this training fold
                     train_data, test_data, grid = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
@@ -223,41 +297,70 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
 
                     # Construct dataloaders for network models
                     train_dataloader_basic = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
-                    train_dataloader_basic_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid, buffer=1)
-                    train_dataloader_seq = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
-                    train_dataloader_seq_mto = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
+                    train_dataloader_basic_grid1 = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid1_collate, NUM_WORKERS, grid=grid, buffer=1)
+                    train_dataloader_basic_grid2 = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid2_collate, NUM_WORKERS, grid=grid, buffer=1)
+                    train_dataloader_basic_grid3 = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid3_collate, NUM_WORKERS, grid=grid, buffer=1)
+                    train_dataloader_basic_grid4 = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid4_collate, NUM_WORKERS, grid=grid, buffer=1)
+                    train_dataloader_basic_grid5 = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid5_collate, NUM_WORKERS, grid=grid, buffer=1)
+                    # train_dataloader_seq = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
+                    # train_dataloader_seq_mto = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
                     train_dataloader_trs = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
+
                     test_dataloader_basic = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
-                    test_dataloader_basic_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid, buffer=1)
-                    test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
-                    test_dataloader_seq_mto = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
+                    test_dataloader_basic_grid1 = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid1_collate, NUM_WORKERS, grid=grid, buffer=1)
+                    test_dataloader_basic_grid2 = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid2_collate, NUM_WORKERS, grid=grid, buffer=1)
+                    test_dataloader_basic_grid3 = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid3_collate, NUM_WORKERS, grid=grid, buffer=1)
+                    test_dataloader_basic_grid4 = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid4_collate, NUM_WORKERS, grid=grid, buffer=1)
+                    test_dataloader_basic_grid5 = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid5_collate, NUM_WORKERS, grid=grid, buffer=1)
+                    # test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
+                    # test_dataloader_seq_mto = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
                     test_dataloader_trs = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
 
                     # Test all NN models on training and testing sets for this fold, across all files
-                    ff_labels, ff_preds = ff_model.evaluate(train_dataloader_basic, config)
-                    ff_train += np.round(np.sqrt(metrics.mean_squared_error(ff_labels, ff_preds)), 2)
-                    ff_labels, ff_preds = ff_model.evaluate(test_dataloader_basic, config)
-                    ff_test += np.round(np.sqrt(metrics.mean_squared_error(ff_labels, ff_preds)), 2)
+                    labels, preds = ff_model.evaluate(train_dataloader_basic, config)
+                    ff_train += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+                    labels, preds = ff_model.evaluate(test_dataloader_basic, config)
+                    ff_test += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
 
-                    ff_grid_labels, ff_grid_preds = ff_grid_model.evaluate(train_dataloader_basic_grid, config)
-                    ff_grid_train += np.round(np.sqrt(metrics.mean_squared_error(ff_grid_labels, ff_grid_preds)), 2)
-                    ff_grid_labels, ff_grid_preds = ff_grid_model.evaluate(test_dataloader_basic_grid, config)
-                    ff_grid_test += np.round(np.sqrt(metrics.mean_squared_error(ff_grid_labels, ff_grid_preds)), 2)
+                    labels, preds = ff_grid_model1.evaluate(train_dataloader_basic_grid1, config)
+                    ff_grid1_train += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+                    labels, preds = ff_grid_model1.evaluate(test_dataloader_basic_grid1, config)
+                    ff_grid1_test += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
 
-                    # gru_labels, gru_preds = gru_model.evaluate(train_dataloader_seq, config)
-                    # gru_train += np.round(np.sqrt(metrics.mean_squared_error(gru_labels, gru_preds)), 2)
-                    # gru_labels, gru_preds = gru_model.evaluate(test_dataloader_seq, config)
-                    # gru_test += np.round(np.sqrt(metrics.mean_squared_error(gru_labels, gru_preds)), 2)
+                    labels, preds = ff_grid_model2.evaluate(train_dataloader_basic_grid2, config)
+                    ff_grid1_train += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+                    labels, preds = ff_grid_model2.evaluate(test_dataloader_basic_grid2, config)
+                    ff_grid1_test += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
 
-                    # gru_mto_labels, gru_mto_preds = gru_mto_model.evaluate(train_dataloader_seq_mto, config)
-                    # gru_mto_train += np.round(np.sqrt(metrics.mean_squared_error(gru_mto_labels, gru_mto_preds)), 2)
-                    # gru_mto_labels, gru_mto_preds = gru_mto_model.evaluate(test_dataloader_seq_mto, config)
-                    # gru_mto_test += np.round(np.sqrt(metrics.mean_squared_error(gru_mto_labels, gru_mto_preds)), 2)
+                    labels, preds = ff_grid_model3.evaluate(train_dataloader_basic_grid3, config)
+                    ff_grid1_train += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+                    labels, preds = ff_grid_model3.evaluate(test_dataloader_basic_grid3, config)
+                    ff_grid1_test += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
 
-                    # conv1d_labels, conv1d_preds = conv1d_model.evaluate(train_dataloader_seq, config)
-                    # conv1d_train += np.round(np.sqrt(metrics.mean_squared_error(conv1d_labels, conv1d_preds)), 2)
-                    # conv1d_labels, conv1d_preds = conv1d_model.evaluate(test_dataloader_seq, config)
-                    # conv1d_test += np.round(np.sqrt(metrics.mean_squared_error(conv1d_labels, conv1d_preds)), 2)
+                    labels, preds = ff_grid_model4.evaluate(train_dataloader_basic_grid4, config)
+                    ff_grid1_train += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+                    labels, preds = ff_grid_model4.evaluate(test_dataloader_basic_grid4, config)
+                    ff_grid1_test += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+
+                    labels, preds = ff_grid_model5.evaluate(train_dataloader_basic_grid5, config)
+                    ff_grid1_train += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+                    labels, preds = ff_grid_model5.evaluate(test_dataloader_basic_grid5, config)
+                    ff_grid1_test += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+
+                    # labels, preds = gru_model.evaluate(train_dataloader_seq, config)
+                    # gru_train += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+                    # labels, preds = gru_model.evaluate(test_dataloader_seq, config)
+                    # gru_test += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+
+                    # labels, preds = gru_mto_model.evaluate(train_dataloader_seq_mto, config)
+                    # gru_mto_train += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+                    # labels, preds = gru_mto_model.evaluate(test_dataloader_seq_mto, config)
+                    # gru_mto_test += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+
+                    # labels, preds = conv1d_model.evaluate(train_dataloader_seq, config)
+                    # conv1d_train += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+                    # labels, preds = conv1d_model.evaluate(test_dataloader_seq, config)
+                    # conv1d_test += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
 
                     trs_labels, trs_preds = trs_model.evaluate(train_dataloader_trs, config)
                     trs_train += np.round(np.sqrt(metrics.mean_squared_error(trs_labels, trs_preds)), 2)
@@ -266,8 +369,16 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
 
                 model_fold_curves[ff_model.model_name]['Train'].append(ff_train / len(train_file_list))
                 model_fold_curves[ff_model.model_name]['Test'].append(ff_test / len(train_file_list))
-                model_fold_curves[ff_grid_model.model_name]['Train'].append(ff_grid_train / len(train_file_list))
-                model_fold_curves[ff_grid_model.model_name]['Test'].append(ff_grid_test / len(train_file_list))
+                model_fold_curves[ff_grid_model1.model_name]['Train'].append(ff_grid1_train / len(train_file_list))
+                model_fold_curves[ff_grid_model1.model_name]['Test'].append(ff_grid1_test / len(train_file_list))
+                model_fold_curves[ff_grid_model2.model_name]['Train'].append(ff_grid2_train / len(train_file_list))
+                model_fold_curves[ff_grid_model2.model_name]['Test'].append(ff_grid2_test / len(train_file_list))
+                model_fold_curves[ff_grid_model3.model_name]['Train'].append(ff_grid3_train / len(train_file_list))
+                model_fold_curves[ff_grid_model3.model_name]['Test'].append(ff_grid3_test / len(train_file_list))
+                model_fold_curves[ff_grid_model4.model_name]['Train'].append(ff_grid4_train / len(train_file_list))
+                model_fold_curves[ff_grid_model4.model_name]['Test'].append(ff_grid4_test / len(train_file_list))
+                model_fold_curves[ff_grid_model5.model_name]['Train'].append(ff_grid5_train / len(train_file_list))
+                model_fold_curves[ff_grid_model5.model_name]['Test'].append(ff_grid5_test / len(train_file_list))
                 # model_fold_curves[gru_model.model_name]['Train'].append(gru_train / len(train_file_list))
                 # model_fold_curves[gru_model.model_name]['Test'].append(gru_test / len(train_file_list))
                 # model_fold_curves[gru_mto_model.model_name]['Train'].append(gru_mto_train / len(train_file_list))
@@ -284,30 +395,50 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
             with open(f"{data_folder}train_config.json", "r") as f:
                 config = json.load(f)
             test_dataloader_basic = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
-            test_dataloader_basic_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid, buffer=1)
+            test_dataloader_basic_grid1 = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid1_collate, NUM_WORKERS, grid=grid, buffer=1)
+            test_dataloader_basic_grid2 = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid2_collate, NUM_WORKERS, grid=grid, buffer=1)
+            test_dataloader_basic_grid3 = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid3_collate, NUM_WORKERS, grid=grid, buffer=1)
+            test_dataloader_basic_grid4 = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid4_collate, NUM_WORKERS, grid=grid, buffer=1)
+            test_dataloader_basic_grid5 = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid5_collate, NUM_WORKERS, grid=grid, buffer=1)
             test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
-            test_dataloader_seq_mto = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
+            # test_dataloader_seq_mto = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
             test_dataloader_trs = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
 
-            avg_labels, avg_preds = avg_model.predict(test_dataloader_basic, config)
-            model_fold_results[avg_model.model_name]["Labels"].extend(list(avg_labels))
-            model_fold_results[avg_model.model_name]["Preds"].extend(list(avg_preds))
+            labels, preds = avg_model.predict(test_dataloader_basic, config)
+            model_fold_results[avg_model.model_name]["Labels"].extend(list(labels))
+            model_fold_results[avg_model.model_name]["Preds"].extend(list(preds))
 
-            sch_labels, sch_preds = sch_model.predict(test_dataloader_basic, config)
-            model_fold_results[sch_model.model_name]["Labels"].extend(list(sch_labels))
-            model_fold_results[sch_model.model_name]["Preds"].extend(list(sch_preds))
+            labels, preds = sch_model.predict(test_dataloader_basic, config)
+            model_fold_results[sch_model.model_name]["Labels"].extend(list(labels))
+            model_fold_results[sch_model.model_name]["Preds"].extend(list(preds))
 
-            tim_labels, tim_preds = tim_model.predict(test_dataloader_seq, config)
-            model_fold_results[tim_model.model_name]["Labels"].extend(list(tim_labels))
-            model_fold_results[tim_model.model_name]["Preds"].extend(list(tim_preds))
+            labels, preds = tim_model.predict(test_dataloader_seq, config)
+            model_fold_results[tim_model.model_name]["Labels"].extend(list(labels))
+            model_fold_results[tim_model.model_name]["Preds"].extend(list(preds))
 
-            ff_labels, ff_preds = ff_model.evaluate(test_dataloader_basic, config)
-            model_fold_results[ff_model.model_name]["Labels"].extend(list(ff_labels))
-            model_fold_results[ff_model.model_name]["Preds"].extend(list(ff_preds))
+            labels, preds = ff_model.evaluate(test_dataloader_basic, config)
+            model_fold_results[ff_model.model_name]["Labels"].extend(list(labels))
+            model_fold_results[ff_model.model_name]["Preds"].extend(list(preds))
 
-            ff_grid_labels, ff_grid_preds = ff_grid_model.evaluate(test_dataloader_basic_grid, config)
-            model_fold_results[ff_grid_model.model_name]["Labels"].extend(list(ff_grid_labels))
-            model_fold_results[ff_grid_model.model_name]["Preds"].extend(list(ff_grid_preds))
+            labels, preds = ff_grid_model1.evaluate(test_dataloader_basic_grid1, config)
+            model_fold_results[ff_grid_model1.model_name]["Labels"].extend(list(labels))
+            model_fold_results[ff_grid_model1.model_name]["Preds"].extend(list(preds))
+
+            labels, preds = ff_grid_model2.evaluate(test_dataloader_basic_grid2, config)
+            model_fold_results[ff_grid_model2.model_name]["Labels"].extend(list(labels))
+            model_fold_results[ff_grid_model2.model_name]["Preds"].extend(list(preds))
+
+            labels, preds = ff_grid_model3.evaluate(test_dataloader_basic_grid3, config)
+            model_fold_results[ff_grid_model3.model_name]["Labels"].extend(list(labels))
+            model_fold_results[ff_grid_model3.model_name]["Preds"].extend(list(preds))
+
+            labels, preds = ff_grid_model4.evaluate(test_dataloader_basic_grid4, config)
+            model_fold_results[ff_grid_model4.model_name]["Labels"].extend(list(labels))
+            model_fold_results[ff_grid_model4.model_name]["Preds"].extend(list(preds))
+
+            labels, preds = ff_grid_model5.evaluate(test_dataloader_basic_grid5, config)
+            model_fold_results[ff_grid_model5.model_name]["Labels"].extend(list(labels))
+            model_fold_results[ff_grid_model5.model_name]["Preds"].extend(list(preds))
 
             # gru_labels, gru_preds = gru_model.evaluate(test_dataloader_seq, config)
             # model_fold_results[gru_model.model_name]["Labels"].extend(list(gru_labels))
@@ -361,7 +492,7 @@ if __name__=="__main__":
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
         },
-        n_folds=2
+        n_folds=5
     )
     random.seed(0)
     np.random.seed(0)
@@ -375,7 +506,7 @@ if __name__=="__main__":
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
         },
-        n_folds=2
+        n_folds=5
     )
     # random.seed(0)
     # np.random.seed(0)

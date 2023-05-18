@@ -50,7 +50,7 @@ def get_closest_point(points, query_points):
     dists, idxs = tree.query(query_points)
     return dists, idxs
 
-def extract_grid_features(grid, tbins, xbins, ybins, buffer=1):
+def extract_grid_features(grid, tbins, xbins, ybins, config, buffer=1):
     """
     Given sequence of bins from a trip, reconstruct grid features.
     Normalize the grid based on the starting point.
@@ -58,6 +58,9 @@ def extract_grid_features(grid, tbins, xbins, ybins, buffer=1):
     # All points in the sequence will have the information at the time of the starting point
     # However the starting information is shifted in space to center features on each point
     tbin_start_idx = tbins[0]
+    # Points in data correspond to final tbin
+    if tbin_start_idx==grid.shape[0]:
+        tbin_start_idx = tbin_start_idx-1
     grid_features = []
     for i in range(len(tbins)):
         # Handle case where buffer goes off edge of grid (-1's)
@@ -68,19 +71,11 @@ def extract_grid_features(grid, tbins, xbins, ybins, buffer=1):
         else:
             # Filter grid based on shingle start time, and adjacent squares to buffer (pts +/- buffer, including middle point)
             feature = grid[tbin_start_idx,:,ybins[i]-buffer-1:ybins[i]+buffer,xbins[i]-buffer-1:xbins[i]+buffer]
+        # Fill undefined cells with global average
+        feature[:4,:,:][feature[:4,:,:]==-1] = config['speed_m_s_mean']
+        # Normalize all cells
+        feature[:4,:,:] = data_utils.normalize(feature[:4,:,:], config['speed_m_s_mean'], config['speed_m_s_std'])
         grid_features.append(feature)
-    # grid_features = np.concatenate(grid_features)
-    # # Normalize the grid to the information present when the trip starts=
-    # if len(grid_features[grid_features!=-1])==0:
-    #     # The grid may be completely empty
-    #     grid_avg = 0.0
-    #     grid_std = 1.0
-    # else:
-    #     grid_avg = np.mean(grid_features[grid_features!=-1])
-    #     grid_std = np.std(grid_features[grid_features!=-1])
-    # # All unknown cells are given the average, all are then normalized
-    # grid_features[grid_features==-1] = grid_avg
-    # grid_features = data_utils.normalize(grid_features, grid_avg, grid_std)
     return grid_features
 
 def get_grid_features(traces, resolution=64, timestep=30):
