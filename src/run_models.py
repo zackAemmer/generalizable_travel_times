@@ -115,15 +115,25 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
             embed_dict=embed_dict,
             device=device
         ).to(device)
-        # gru_model = rnn.GRU_RNN(
-        #     "GRU_RNN",
-        #     8,
-        #     1,
-        #     HIDDEN_SIZE,
-        #     BATCH_SIZE,
-        #     embed_dict,
-        #     device
-        # ).to(device)
+        gru_model = rnn.GRU_RNN(
+            "GRU_RNN",
+            n_features=8,
+            hidden_size=HIDDEN_SIZE,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device)
+        gru_grid_model1 = rnn.GRU_RNN_GRID(
+            "GRU_RNN_GRID_ATTN",
+            n_features=8,
+            n_grid_features=72,
+            n_channels=8,
+            hidden_size=HIDDEN_SIZE,
+            grid_compression_size=4,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device)
         # gru_mto_model = rnn.GRU_RNN_MTO(
         #     "GRU_RNN_MTO",
         #     8,
@@ -159,7 +169,8 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
         model_list.append(ff_model)
         model_list.append(ff_grid_model1)
         model_list.append(ff_grid_model2)
-        # model_list.append(gru_model)
+        model_list.append(gru_model)
+        model_list.append(gru_grid_model1)
         # model_list.append(gru_mto_model)
         # model_list.append(conv1d_model)
         model_list.append(trs_model)
@@ -189,6 +200,7 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                 train_dataloader_basic = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
                 train_dataloader_basic_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid, buffer=1)
                 train_dataloader_seq = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
+                train_dataloader_seq_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid, buffer=1)
                 # train_dataloader_seq_mto = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
                 train_dataloader_trs = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
 
@@ -200,7 +212,8 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                 avg_batch_loss = model_utils.train(ff_model, train_dataloader_basic, LEARN_RATE)
                 avg_batch_loss = model_utils.train(ff_grid_model1, train_dataloader_basic_grid, LEARN_RATE)
                 avg_batch_loss = model_utils.train(ff_grid_model2, train_dataloader_basic_grid, LEARN_RATE)
-                # avg_batch_loss = model_utils.train(gru_model, train_dataloader_seq, LEARN_RATE)
+                avg_batch_loss = model_utils.train(gru_model, train_dataloader_seq, LEARN_RATE)
+                avg_batch_loss = model_utils.train(gru_grid_model1, train_dataloader_seq_grid, LEARN_RATE)
                 # avg_batch_loss = model_utils.train(gru_mto_model, train_dataloader_seq_mto, LEARN_RATE)
                 # avg_batch_loss = model_utils.train(conv1d_model, train_dataloader_seq, LEARN_RATE)
                 avg_batch_loss = model_utils.train(trs_model, train_dataloader_trs, LEARN_RATE)
@@ -214,7 +227,8 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                 torch.save(ff_model.state_dict(), f"{run_folder}{network_folder}models/{ff_model.model_name}_{fold_num}.pt")
                 torch.save(ff_grid_model1.state_dict(), f"{run_folder}{network_folder}models/{ff_grid_model1.model_name}_{fold_num}.pt")
                 torch.save(ff_grid_model2.state_dict(), f"{run_folder}{network_folder}models/{ff_grid_model2.model_name}_{fold_num}.pt")
-                # torch.save(gru_model.state_dict(), f"{run_folder}{network_folder}models/{gru_model.model_name}_{fold_num}.pt")
+                torch.save(gru_model.state_dict(), f"{run_folder}{network_folder}models/{gru_model.model_name}_{fold_num}.pt")
+                torch.save(gru_grid_model1.state_dict(), f"{run_folder}{network_folder}models/{gru_grid_model1.model_name}_{fold_num}.pt")
                 # torch.save(gru_mto_model.state_dict(), f"{run_folder}{network_folder}models/{gru_mto_model.model_name}_{fold_num}.pt")
                 # torch.save(conv1d_model.state_dict(), f"{run_folder}{network_folder}models/{conv1d_model.model_name}_{fold_num}.pt")
                 torch.save(trs_model.state_dict(), f"{run_folder}{network_folder}models/{trs_model.model_name}_{fold_num}.pt")
@@ -223,7 +237,8 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                 ff_train = 0.0
                 ff_grid1_train = 0.0
                 ff_grid2_train = 0.0
-                # gru_train = 0.0
+                gru_train = 0.0
+                gru_grid1_train = 0.0
                 # gru_mto_train = 0.0
                 # conv1d_train = 0.0
                 trs_train = 0.0
@@ -231,7 +246,8 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                 ff_test = 0.0
                 ff_grid1_test = 0.0
                 ff_grid2_test = 0.0
-                # gru_test = 0.0
+                gru_test = 0.0
+                gru_grid1_test = 0.0
                 # gru_mto_test = 0.0
                 # conv1d_test = 0.0
                 trs_test = 0.0
@@ -246,13 +262,15 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                     # Construct dataloaders for network models
                     train_dataloader_basic = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
                     train_dataloader_basic_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid, buffer=1)
-                    # train_dataloader_seq = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
+                    train_dataloader_seq = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
+                    train_dataloader_seq_grid = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid, buffer=1)
                     # train_dataloader_seq_mto = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
                     train_dataloader_trs = data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
 
                     test_dataloader_basic = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
                     test_dataloader_basic_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid, buffer=1)
-                    # test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
+                    test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
+                    test_dataloader_seq_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid, buffer=1)
                     # test_dataloader_seq_mto = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
                     test_dataloader_trs = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
 
@@ -272,10 +290,15 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                     labels, preds = ff_grid_model2.evaluate(test_dataloader_basic_grid, config)
                     ff_grid2_test += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
 
-                    # labels, preds = gru_model.evaluate(train_dataloader_seq, config)
-                    # gru_train += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
-                    # labels, preds = gru_model.evaluate(test_dataloader_seq, config)
-                    # gru_test += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+                    labels, preds = gru_model.evaluate(train_dataloader_seq, config)
+                    gru_train += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+                    labels, preds = gru_model.evaluate(test_dataloader_seq, config)
+                    gru_test += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+
+                    labels, preds = gru_grid_model1.evaluate(train_dataloader_seq_grid, config)
+                    gru_grid1_train += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+                    labels, preds = gru_grid_model1.evaluate(test_dataloader_seq_grid, config)
+                    gru_grid1_test += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
 
                     # labels, preds = gru_mto_model.evaluate(train_dataloader_seq_mto, config)
                     # gru_mto_train += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
@@ -298,8 +321,10 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                 model_fold_curves[ff_grid_model1.model_name]['Test'].append(ff_grid1_test / len(train_file_list))
                 model_fold_curves[ff_grid_model2.model_name]['Train'].append(ff_grid2_train / len(train_file_list))
                 model_fold_curves[ff_grid_model2.model_name]['Test'].append(ff_grid2_test / len(train_file_list))
-                # model_fold_curves[gru_model.model_name]['Train'].append(gru_train / len(train_file_list))
-                # model_fold_curves[gru_model.model_name]['Test'].append(gru_test / len(train_file_list))
+                model_fold_curves[gru_model.model_name]['Train'].append(gru_train / len(train_file_list))
+                model_fold_curves[gru_model.model_name]['Test'].append(gru_test / len(train_file_list))
+                model_fold_curves[gru_grid_model1.model_name]['Train'].append(gru_grid1_train / len(train_file_list))
+                model_fold_curves[gru_grid_model1.model_name]['Test'].append(gru_grid1_test / len(train_file_list))
                 # model_fold_curves[gru_mto_model.model_name]['Train'].append(gru_mto_train / len(train_file_list))
                 # model_fold_curves[gru_mto_model.model_name]['Test'].append(gru_mto_test / len(train_file_list))
                 # model_fold_curves[conv1d_model.model_name]['Train'].append(conv1d_train / len(train_file_list))
@@ -316,6 +341,7 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
             test_dataloader_basic = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS)
             test_dataloader_basic_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid, buffer=1)
             test_dataloader_seq = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS)
+            test_dataloader_seq_grid = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid, buffer=1)
             # test_dataloader_seq_mto = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS)
             test_dataloader_trs = data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS)
 
@@ -343,9 +369,13 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
             model_fold_results[ff_grid_model2.model_name]["Labels"].extend(list(labels))
             model_fold_results[ff_grid_model2.model_name]["Preds"].extend(list(preds))
 
-            # gru_labels, gru_preds = gru_model.evaluate(test_dataloader_seq, config)
-            # model_fold_results[gru_model.model_name]["Labels"].extend(list(gru_labels))
-            # model_fold_results[gru_model.model_name]["Preds"].extend(list(gru_preds))
+            labels, preds = gru_model.evaluate(test_dataloader_seq, config)
+            model_fold_results[gru_model.model_name]["Labels"].extend(list(labels))
+            model_fold_results[gru_model.model_name]["Preds"].extend(list(preds))
+
+            labels, preds = gru_grid_model1.evaluate(test_dataloader_seq_grid, config)
+            model_fold_results[gru_grid_model1.model_name]["Labels"].extend(list(labels))
+            model_fold_results[gru_grid_model1.model_name]["Preds"].extend(list(preds))
 
             # gru_mto_labels, gru_mto_preds = gru_mto_model.evaluate(test_dataloader_seq_mto, config)
             # model_fold_results[gru_mto_model.model_name]["Labels"].extend(list(gru_mto_labels))

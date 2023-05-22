@@ -45,13 +45,13 @@ def make_generic_dataloader(data, config, batch_size, collate_fn, num_workers, g
     return dataloader
 
 def basic_collate(batch):
-    # Context variables to embed
-    X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
     # Last dimension is number of sequence variables below
     seq_lens = [len(x['lats']) for x in batch]
     max_len = max(seq_lens)
+    # Embedded context features
+    X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
+    # Continuous features
     X_ct = np.zeros((len(batch), 11))
-    # Sequence variables
     for i in range(len(batch)):
         X_ct[i,0] = batch[i]['x'][0]
         X_ct[i,1] = batch[i]['y'][0]
@@ -78,12 +78,13 @@ def basic_collate(batch):
 def basic_grid_collate(batch):
     # Last dimension is number of sequence variables below
     seq_lens = [len(x['lats']) for x in batch]
-    # Context variables to embed
+    max_len = max(seq_lens)
+    # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
-    # Grid variables
-    X_gr = np.zeros((len(batch), 8, 3, 3))
-    # Continuous variables
+    # Continuous features
     X_ct = np.zeros((len(batch), 11))
+    # Grid features
+    X_gr = np.zeros((len(batch), 8, 3, 3))
     for i in range(len(batch)):
         # Continuous
         X_ct[i,0] = batch[i]['x'][0]
@@ -116,118 +117,87 @@ def basic_grid_collate(batch):
     return [X_em, X_ct, X_gr], y
 
 def sequential_collate(batch):
-    # Context variables to embed
-    context = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
     # Last dimension is number of sequence variables below
     seq_lens = [len(x['lats']) for x in batch]
     max_len = max(seq_lens)
-    X = torch.zeros((len(batch), max_len, 8))
-    # Sequence variables
-    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
-    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
-    X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
-    X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
-    X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
-    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
-    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
-    X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
-    context = torch.from_numpy(context)
+    # Embedded context features
+    X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
+    X_em = torch.from_numpy(X_em)
+    # Continuous features
+    X_ct = torch.zeros((len(batch), max_len, 8))
+    X_ct[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
+    X_ct[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
+    X_ct[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
+    X_ct[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
+    X_ct[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
+    X_ct[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
+    X_ct[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
+    X_ct[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
     # Sort all by sequence length descending, for potential packing of each batch
     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
     sorted_slens = sorted_slens.int()
-    context = context[sorted_indices,:].int()
-    X = X[sorted_indices,:,:].float()
+    X_em = X_em[sorted_indices,:].int()
+    X_ct = X_ct[sorted_indices,:,:].float()
     y = y[sorted_indices,:].float()
-    return [context, X, sorted_slens], y
+    return [X_em, X_ct, sorted_slens], y
 
 def sequential_grid_collate(batch):
-    # Context variables to embed
-    context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID'], x['tripID']]) for x in batch], dtype='int32')
     # Last dimension is number of sequence variables below
     seq_lens = [len(x['lats']) for x in batch]
     max_len = max(seq_lens)
-    X = torch.zeros((len(batch), max_len, 12))
-    X_gr = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['grid_features']) for x in batch], batch_first=True)
-    # Average across the full grid
-    X_gr = torch.mean(X_gr, dim=(3,4))
-    # Sequence variables
-    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
-    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
-    X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
-    X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
-    X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
-    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
-    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
-    X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
-    # Use the average channel speed as its own feature (no convolution)
-    X[:,:,8] = X_gr[:,:,0]
-    X[:,:,9] = X_gr[:,:,1]
-    X[:,:,10] = X_gr[:,:,2]
-    X[:,:,11] = X_gr[:,:,3]
-    context = torch.from_numpy(context)
+    # Embedded context features
+    X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
+    X_em = torch.from_numpy(X_em)
+    # Grid features (NxCxLxHxW)
+    z = [torch.tensor(np.array(x['grid_features'])) for x in batch]
+    X_gr = torch.nn.utils.rnn.pad_sequence(z, batch_first=True)
+    # Continuous features
+    X_ct = torch.zeros((len(batch), max_len, 8))
+    X_ct[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
+    X_ct[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
+    X_ct[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
+    X_ct[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
+    X_ct[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
+    X_ct[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
+    X_ct[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
+    X_ct[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
     # Sort all by sequence length descending, for potential packing of each batch
     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
     sorted_slens = sorted_slens.int()
-    context = context[sorted_indices,:].int()
-    X = X[sorted_indices,:,:].float()
-    y = y[sorted_indices,:].float()
-    return [context, X, sorted_slens], y
-
-def sequential_grid_conv_collate(batch):
-    # Context variables to embed
-    context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID'], x['tripID']]) for x in batch], dtype='int32')
-    # Last dimension is number of sequence variables below
-    seq_lens = [len(x['lats']) for x in batch]
-    max_len = max(seq_lens)
-    X = torch.zeros((len(batch), max_len, 8))
-    X_gr = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['grid_features']) for x in batch], batch_first=True)
-    # Sequence variables
-    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
-    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
-    X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
-    X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
-    X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
-    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
-    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
-    X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
-    context = torch.from_numpy(context)
-    y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
-    # Sort all by sequence length descending, for potential packing of each batch
-    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    sorted_slens = sorted_slens.int()
-    context = context[sorted_indices,:].int()
-    X = X[sorted_indices,:,:].float()
+    X_em = X_em[sorted_indices,:].int()
+    X_ct = X_ct[sorted_indices,:,:].float()
     X_gr = X_gr[sorted_indices,:,:].float()
     y = y[sorted_indices,:].float()
-    return [context, X, sorted_slens, X_gr], y
+    return [X_em, X_ct, X_gr, sorted_slens], y
 
-def sequential_mto_collate(batch):
-    # Context variables to embed
-    context = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
-    # Last dimension is number of sequence variables below
-    seq_lens = [len(x['lats']) for x in batch]
-    max_len = max(seq_lens)
-    X = torch.zeros((len(batch), max_len, 8))
-    # Sequence variables
-    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
-    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
-    X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
-    X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
-    X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
-    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
-    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
-    X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
-    context = torch.from_numpy(context)
-    y = torch.from_numpy(np.array([x['time'] for x in batch]))
-    # Sort all by sequence length descending, for potential packing of each batch
-    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    sorted_slens = sorted_slens.int()
-    context = context[sorted_indices,:].int()
-    X = X[sorted_indices,:,:].float()
-    y = y[sorted_indices].float()
-    return [context, X, sorted_slens], y
+
+# def sequential_mto_collate(batch):
+#     # Context variables to embed
+#     context = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
+#     # Last dimension is number of sequence variables below
+#     seq_lens = [len(x['lats']) for x in batch]
+#     max_len = max(seq_lens)
+#     X = torch.zeros((len(batch), max_len, 8))
+#     # Sequence variables
+#     X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
+#     X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
+#     X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
+#     X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
+#     X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
+#     X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
+#     X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
+#     X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
+#     context = torch.from_numpy(context)
+#     y = torch.from_numpy(np.array([x['time'] for x in batch]))
+#     # Sort all by sequence length descending, for potential packing of each batch
+#     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
+#     sorted_slens = sorted_slens.int()
+#     context = context[sorted_indices,:].int()
+#     X = X[sorted_indices,:,:].float()
+#     y = y[sorted_indices].float()
+#     return [context, X, sorted_slens], y
 
 def transformer_collate(batch):
     # Context variables to embed
@@ -255,30 +225,30 @@ def transformer_collate(batch):
     y = y[sorted_indices,:].float()
     return [context, X, sorted_slens], y
 
-def transformer_grid_collate(batch):
-    # Context variables to embed
-    context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID'], x['tripID']]) for x in batch], dtype='int32')
-    # Last dimension is number of sequence variables below
-    seq_lens = [len(x['lats']) for x in batch]
-    max_len = max(seq_lens)
-    X = torch.zeros((len(batch), max_len, 8))
-    X_gr = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['grid_features']) for x in batch], batch_first=True)
-    # Sequence variables
-    X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
-    X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
-    X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
-    X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
-    X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
-    X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
-    X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
-    X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
-    context = torch.from_numpy(context)
-    y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
-    # Sort all by sequence length descending, for potential packing of each batch
-    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    sorted_slens = sorted_slens.int()
-    context = context[sorted_indices,:].int()
-    X = X[sorted_indices,:,:].float()
-    X_gr = X_gr[sorted_indices,:,:].float()
-    y = y[sorted_indices,:].float()
-    return [context, X, sorted_slens, X_gr], y
+# def transformer_grid_collate(batch):
+#     # Context variables to embed
+#     context = np.array([np.array([x['timeID'], x['weekID'], x['vehicleID'], x['tripID']]) for x in batch], dtype='int32')
+#     # Last dimension is number of sequence variables below
+#     seq_lens = [len(x['lats']) for x in batch]
+#     max_len = max(seq_lens)
+#     X = torch.zeros((len(batch), max_len, 8))
+#     X_gr = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['grid_features']) for x in batch], batch_first=True)
+#     # Sequence variables
+#     X[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
+#     X[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
+#     X[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
+#     X[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
+#     X[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
+#     X[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
+#     X[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
+#     X[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
+#     context = torch.from_numpy(context)
+#     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
+#     # Sort all by sequence length descending, for potential packing of each batch
+#     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
+#     sorted_slens = sorted_slens.int()
+#     context = context[sorted_indices,:].int()
+#     X = X[sorted_indices,:,:].float()
+#     X_gr = X_gr[sorted_indices,:,:].float()
+#     y = y[sorted_indices,:].float()
+#     return [context, X, sorted_slens, X_gr], y
