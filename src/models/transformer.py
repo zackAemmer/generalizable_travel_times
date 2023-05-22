@@ -9,11 +9,10 @@ from models import masked_loss
 
 
 class TRANSFORMER(nn.Module):
-    def __init__(self, model_name, input_size, output_size, hidden_size, batch_size, embed_dict, device):
+    def __init__(self, model_name, n_features, hidden_size, batch_size, embed_dict, device):
         super(TRANSFORMER, self).__init__()
         self.model_name = model_name
-        self.input_size = input_size
-        self.output_size = output_size
+        self.n_features = n_features
         self.hidden_size = hidden_size
         self.batch_size = batch_size
         self.embed_dict = embed_dict
@@ -26,12 +25,12 @@ class TRANSFORMER(nn.Module):
         # Activation layer
         self.activation = nn.ReLU()
         # Positional encoding layer
-        self.pos_encoder = PositionalEncoding(self.input_size+self.embed_total_dims)
+        self.pos_encoder = PositionalEncoding(self.n_features+self.embed_total_dims)
         # Encoder layer
-        encoder_layer = nn.TransformerEncoderLayer(d_model=self.input_size+self.embed_total_dims, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features+self.embed_total_dims, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
         # Linear compression layer
-        self.linear = nn.Linear(self.input_size + self.embed_total_dims, self.output_size)
+        self.linear = nn.Linear(self.n_features + self.embed_total_dims, 1)
     def forward(self, x):
         x_em, x_ct, slens = x
         # Embed categorical variables
@@ -63,11 +62,10 @@ class TRANSFORMER(nn.Module):
         return labels, preds
 
 # class TRANSFORMER_GRID(nn.Module):
-#     def __init__(self, model_name, input_size, output_size, hidden_size, batch_size, embed_dict, device):
+#     def __init__(self, model_name, n_features, hidden_size, batch_size, embed_dict, device):
 #         super(TRANSFORMER_GRID, self).__init__()
 #         self.model_name = model_name
-#         self.input_size = input_size
-#         self.output_size = output_size
+#         self.n_features = n_features
 #         self.hidden_size = hidden_size
 #         self.batch_size = batch_size
 #         self.embed_dict = embed_dict
@@ -81,19 +79,19 @@ class TRANSFORMER(nn.Module):
 #         # Activation layer
 #         self.activation = nn.ReLU()
 #         # Linear compression layer
-#         self.linear = nn.Linear(self.input_size + self.embed_total_dims, self.output_size)
+#         self.linear = nn.Linear(self.n_features + self.embed_total_dims, 1)
 #         # Flat layer
 #         self.flatten = nn.Flatten(start_dim=1)
 
 #         # 3d positional encoding for grid/positions
 #         self.pos_encoder_grid = PositionalEncodingPermute3D(4)
 #         # Cross attention for grid
-#         self.cross_attn = nn.MultiheadAttention(embed_dim=self.input_size+self.embed_total_dims, num_heads=4, dropout=0.1, batch_first=True, kdim=1, vdim=1)
+#         self.cross_attn = nn.MultiheadAttention(embed_dim=self.n_features+self.embed_total_dims, num_heads=4, dropout=0.1, batch_first=True, kdim=1, vdim=1)
 
 #         # 1d positional encoding layer for sequence
-#         self.pos_encoder = PositionalEncoding(self.input_size+self.embed_total_dims)
+#         self.pos_encoder = PositionalEncoding(self.n_features+self.embed_total_dims)
 #         # Self attention for sequence
-#         encoder_seq = nn.TransformerEncoderLayer(d_model=self.input_size+self.embed_total_dims, nhead=4, dropout=0.1, dim_feedforward=self.hidden_size, batch_first=True)
+#         encoder_seq = nn.TransformerEncoderLayer(d_model=self.n_features+self.embed_total_dims, nhead=4, dropout=0.1, dim_feedforward=self.hidden_size, batch_first=True)
 #         self.transformer = nn.TransformerEncoder(encoder_seq, num_layers=2)
 
 #     def forward(self, x):

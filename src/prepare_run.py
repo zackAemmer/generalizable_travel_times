@@ -2,7 +2,6 @@
 
 
 import json
-import multiprocessing
 import os
 import random
 import shutil
@@ -107,19 +106,59 @@ def prepare_run(overwrite, run_name, network_name, train_dates, test_dates, **kw
     print(f"RUN PREPARATION COMPLETED '{run_name}/{network_name}'")
 
 if __name__=="__main__":
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    prepare_run(
+        overwrite=True,
+        run_name="debug",
+        network_name="kcm",
+        train_dates=data_utils.get_date_list("2023_03_17", 3),
+        test_dates=data_utils.get_date_list("2023_03_20", 3),
+        num_train_files=2,
+        num_test_files=2,
+        n_jobs=5,
+        n_trace_splits=5,
+        data_dropout=0.2,
+        gtfs_folder="./data/kcm_gtfs/",
+        raw_data_folder="./data/kcm_all/",
+        timezone="America/Los_Angeles",
+        epsg="32148",
+        given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
+    )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    prepare_run(
+        overwrite=True,
+        run_name="debug",
+        network_name="atb",
+        train_dates=data_utils.get_date_list("2023_03_17", 3),
+        test_dates=data_utils.get_date_list("2023_03_20", 3),
+        num_train_files=2,
+        num_test_files=2,
+        n_jobs=5,
+        n_trace_splits=5,
+        data_dropout=0.2,
+        gtfs_folder="./data/atb_gtfs/",
+        raw_data_folder="./data/atb_all_new/",
+        timezone="Europe/Oslo",
+        epsg="32632",
+        given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
+    )
     # random.seed(0)
     # np.random.seed(0)
     # torch.manual_seed(0)
     # prepare_run(
     #     overwrite=True,
-    #     run_name="debug",
+    #     run_name="small",
     #     network_name="kcm",
-    #     train_dates=data_utils.get_date_list("2023_03_17", 3),
-    #     test_dates=data_utils.get_date_list("2023_03_20", 3),
-    #     num_train_files=2,
-    #     num_test_files=2,
-    #     n_jobs=5,
-    #     n_trace_splits=5,
+    #     train_dates=data_utils.get_date_list("2023_02_15", 30),
+    #     test_dates=data_utils.get_date_list("2023_04_20", 7),
+    #     num_train_files=5,
+    #     num_test_files=5,
+    #     n_jobs=8,
+    #     n_trace_splits=8,
     #     data_dropout=0.2,
     #     gtfs_folder="./data/kcm_gtfs/",
     #     raw_data_folder="./data/kcm_all/",
@@ -132,14 +171,14 @@ if __name__=="__main__":
     # torch.manual_seed(0)
     # prepare_run(
     #     overwrite=True,
-    #     run_name="debug",
+    #     run_name="small",
     #     network_name="atb",
-    #     train_dates=data_utils.get_date_list("2023_03_17", 3),
-    #     test_dates=data_utils.get_date_list("2023_03_20", 3),
-    #     num_train_files=2,
-    #     num_test_files=2,
-    #     n_jobs=5,
-    #     n_trace_splits=5,
+    #     train_dates=data_utils.get_date_list("2023_02_15", 30),
+    #     test_dates=data_utils.get_date_list("2023_04_20", 7),
+    #     num_train_files=5,
+    #     num_test_files=5,
+    #     n_jobs=8,
+    #     n_trace_splits=8,
     #     data_dropout=0.2,
     #     gtfs_folder="./data/atb_gtfs/",
     #     raw_data_folder="./data/atb_all_new/",
@@ -167,23 +206,23 @@ if __name__=="__main__":
     #     epsg="32148",
     #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
     # )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    prepare_run(
-        overwrite=True,
-        run_name="medium",
-        network_name="atb",
-        train_dates=data_utils.get_date_list("2023_02_15", 60),
-        test_dates=data_utils.get_date_list("2023_04_20", 7),
-        num_train_files=5,
-        num_test_files=5,
-        n_jobs=8,
-        n_trace_splits=8,
-        data_dropout=0.2,
-        gtfs_folder="./data/atb_gtfs/",
-        raw_data_folder="./data/atb_all_new/",
-        timezone="Europe/Oslo",
-        epsg="32632",
-        given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
-    )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # prepare_run(
+    #     overwrite=True,
+    #     run_name="medium",
+    #     network_name="atb",
+    #     train_dates=data_utils.get_date_list("2023_02_15", 60),
+    #     test_dates=data_utils.get_date_list("2023_04_20", 7),
+    #     num_train_files=5,
+    #     num_test_files=5,
+    #     n_jobs=8,
+    #     n_trace_splits=8,
+    #     data_dropout=0.2,
+    #     gtfs_folder="./data/atb_gtfs/",
+    #     raw_data_folder="./data/atb_all_new/",
+    #     timezone="Europe/Oslo",
+    #     epsg="32632",
+    #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
+    # )
