@@ -809,7 +809,7 @@ def extract_all_dataloader(dataloader, sequential_flag=False):
         all_X.append(X)
         all_y.append(y)
         if sequential_flag:
-            seq_lens.append(data[2])
+            seq_lens.append(data[-1])
     if sequential_flag:
         # Pad batches to match batch w/longest sequence
         max_len = max(torch.cat(seq_lens))
