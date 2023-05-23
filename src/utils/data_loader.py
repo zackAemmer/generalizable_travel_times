@@ -16,7 +16,7 @@ class GenericDataset(Dataset):
         sample = self.content[index]
         if self.grid is not None:
             # Handles normalization, and selection of the specific buffered t/x/y bins
-            grid_features = grid.extract_grid_features(self.grid.get_fill_content(), sample['tbin_idx'], sample['xbin_idx'], sample['ybin_idx'], self.config, self.buffer)
+            grid_features = grid.extract_grid_features(self.grid, sample['tbin_idx'], sample['xbin_idx'], sample['ybin_idx'], self.config, self.buffer)
             sample['grid_features'] = grid_features
         sample = apply_normalization(sample.copy(), self.config)
         return sample
@@ -173,7 +173,6 @@ def sequential_grid_collate(batch):
     X_gr = X_gr[sorted_indices,:,:].float()
     y = y[sorted_indices,:].float()
     return [X_em, X_ct, X_gr, sorted_slens], y
-
 
 # def sequential_mto_collate(batch):
 #     # Context variables to embed
