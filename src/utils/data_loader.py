@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 
+from models import grid
 from utils import data_utils, shape_utils
 
 
@@ -14,7 +15,8 @@ class GenericDataset(Dataset):
     def __getitem__(self, index):
         sample = self.content[index]
         if self.grid is not None:
-            grid_features = shape_utils.extract_grid_features(self.grid, sample['tbin_idx'], sample['xbin_idx'], sample['ybin_idx'], self.config, self.buffer)
+            # Handles normalization, and selection of the specific buffered t/x/y bins
+            grid_features = grid.extract_grid_features(self.grid.get_fill_content(), sample['tbin_idx'], sample['xbin_idx'], sample['ybin_idx'], self.config, self.buffer)
             sample['grid_features'] = grid_features
         sample = apply_normalization(sample.copy(), self.config)
         return sample

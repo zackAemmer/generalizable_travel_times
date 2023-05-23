@@ -16,6 +16,7 @@ from sklearn import metrics
 from statsmodels.stats.weightstats import DescrStatsW
 import torch
 
+from models import grid
 from utils import shape_utils
 
 
@@ -416,43 +417,7 @@ def remap_ids(df_list, id_col):
         df[f"{id_col}_recode"] = recode
     return (df_list, len(pd.unique(all_ids)), mapping)
 
-def fill_grid_forward(grid):
-    """
-    Fill forward (in time) each channel in the grid for timesteps w/o an observation.
-    Returns: copy of grid with filled forward values, and 4 new channels holding fill counts.
-    """
-    filled_channels = np.zeros(grid.shape)
-    filled_counts = np.zeros(grid.shape)
-    for channel in range(grid.shape[1]):
-        ffilled, channel_counts = fill_channel_forward(grid[:,channel,:,:])
-        filled_channels[:,channel,:,:] = ffilled
-        filled_counts[:,channel,:,:] = channel_counts
-    # First n channels are original speeds, second n are the obs histories in grid resolution
-    grid_ffill = np.concatenate((filled_channels, filled_counts), axis=1)
-    return grid_ffill
-
-def fill_channel_forward(grid_channel):
-    tsteps, rows, cols = grid_channel.shape
-    mask = grid_channel==-1
-    ffilled = np.copy(grid_channel)
-    channel_counts = np.zeros(grid_channel.shape)
-    # For each cell, fill the value at this timestep w/previous value if it is masked
-    for i in range(rows):
-        for j in range(cols):
-            counter = 0
-            for t in range(1,tsteps):
-                if mask[t][i][j]:
-                    # Keep record of how many steps have been filled since last known value
-                    counter += 1
-                    ffilled[t][i][j] = ffilled[t-1][i][j]
-                    channel_counts[t][i][j] = counter
-                else:
-                    # When a known value is found, reset counter to 0
-                    counter = 0
-                    channel_counts[t][i][j] = counter
-    return ffilled, channel_counts
-
-def map_to_deeptte(trace_data, deeptte_formatted_path, grid_res, grid_time):
+def map_to_deeptte(trace_data, deeptte_formatted_path, grid_s_res, grid_t_res):
     """
     Reshape pandas dataframe to the json format needed to use deeptte.
     trace_data: dataframe with bus trajectories
@@ -470,8 +435,8 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, grid_res, grid_time):
     trace_data['lngs'] = trace_data['lon']
 
     # Calculate and add grid features
-    grid, tbin_idxs, xbin_idxs, ybin_idxs = shape_utils.get_grid_features(trace_data, resolution=grid_res, timestep=grid_time)
-    grid_ffill = fill_grid_forward(grid)
+    grid_normal, tbin_idxs, xbin_idxs, ybin_idxs = grid.traces_to_grid(trace_data, resolution=grid_s_res, timestep=grid_t_res)
+    grid.fill_grid_forward(grid_normal)
     trace_data['tbin_idx'] = tbin_idxs
     trace_data['xbin_idx'] = xbin_idxs
     trace_data['ybin_idx'] = ybin_idxs
@@ -521,7 +486,7 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, grid_res, grid_time):
     result_json_string = result.to_json(orient='records', lines=True)
     with open(deeptte_formatted_path, mode='w+') as out_file:
         out_file.write(result_json_string)
-    return trace_data, grid, grid_ffill
+    return trace_data, grid_normal
 
 def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg):
     """
