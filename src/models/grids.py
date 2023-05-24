@@ -7,24 +7,25 @@ from utils import data_utils
 
 
 class Grid:
-    def __init__(self, content, counts, mask, c_resolution, s_resolution, t_resolution):
+    def __init__(self, content, counts, mask, c_resolution, x_resolution, y_resolution, t_resolution):
         self.content = sparse.csr_matrix(content.reshape(content.shape[0],-1))
         self.counts = sparse.csr_matrix(counts.reshape(counts.shape[0],-1))
         self.mask = sparse.csr_matrix(mask.reshape(mask.shape[0],-1))
         self.c_resolution = c_resolution
-        self.s_resolution = s_resolution
+        self.x_resolution = x_resolution
+        self.y_resolution = y_resolution
         self.t_resolution = t_resolution
         self.fill_content = None
         self.fill_counts = None
     def get_content(self):
         c = self.content.toarray()
-        c = np.reshape(c, (c.shape[0], self.c_resolution, self.s_resolution, self.s_resolution))
+        c = np.reshape(c, (c.shape[0], self.c_resolution, self.y_resolution, self.x_resolution))
         return c
     def get_fill_content(self):
         c = self.fill_content.toarray()
         o = self.fill_counts.toarray()
-        c = np.reshape(c, (c.shape[0], self.c_resolution, self.s_resolution, self.s_resolution))
-        o = np.reshape(o, (o.shape[0], self.c_resolution, self.s_resolution, self.s_resolution))
+        c = np.reshape(c, (c.shape[0], self.c_resolution, self.y_resolution, self.x_resolution))
+        o = np.reshape(o, (o.shape[0], self.c_resolution, self.y_resolution, self.x_resolution))
         return np.concatenate([c,o], axis=1)
     def get_masked_content(self):
         # Same regardless if applied to fill or not
@@ -46,9 +47,100 @@ class Grid:
         self.fill_content = sparse.csr_matrix(fill_content.reshape(fill_content.shape[0],-1))
         self.fill_counts = sparse.csr_matrix(fill_counts.reshape(fill_counts.shape[0],-1))
 
-def traces_to_grid(traces, resolution=128, timestep=60):
+class NGrid:
+    def __init__(self, content, c_resolution, x_resolution, y_resolution, t_resolution, n_resolution):
+        self.content = content
+        self.c_resolution = c_resolution
+        self.x_resolution = x_resolution
+        self.y_resolution = y_resolution
+        self.t_resolution = t_resolution
+        self.n_resolution = n_resolution
+        self.fill_content = None
+    def get_content(self, tbin_idx):
+        c = np.zeros((self.c_resolution, self.n_resolution, self.y_resolution, self.x_resolution))
+        c[:,:,:,:] = np.nan
+        counter = np.zeros((self.y_resolution, self.x_resolution), dtype='int')
+        t_idx_content = self.content[self.content['tbin_idx'] == tbin_idx]
+        x_indices = t_idx_content['xbin_idx'].values
+        y_indices = t_idx_content['ybin_idx'].values
+        obs_values = t_idx_content[['x','y','bearing','speed_m_s']].values
+        for x, y, obs in zip(x_indices, y_indices, obs_values):
+            counter_state = counter[y,x]
+            c[:,counter_state,y,x] = obs
+            counter[y,x] += 1
+        return c
+    def get_all_content(self):
+        c = np.array([self.get_content(t) for t in range(self.t_resolution-1)])
+        return c
+    def get_range_content(self, tbin_idx_start, tbin_idx_end):
+        c = np.array([self.get_content(t) for t in range(0, (tbin_idx_end-tbin_idx_start)-1, 1)])
+        return c
+    def get_masked_content(self):
+        feature_content = []
+        c = self.get_all_content()
+        for feature_idx in range(c.shape[1]):
+            c_sub = c[:,feature_idx,:,:,:]
+            f = c_sub[~np.isnan(c_sub)]
+            feature_content.append(f)
+        return feature_content
+    def get_density(self):
+        c = self.get_all_content()
+        return np.sum(~np.isnan(c)) / c.size
+    # def get_fill_content(self):
+    #     c = self.fill_content.toarray()
+    #     o = self.fill_counts.toarray()
+    #     c = np.reshape(c, (c.shape[0], self.c_resolution, self.y_resolution, self.x_resolution))
+    #     o = np.reshape(o, (o.shape[0], self.c_resolution, self.y_resolution, self.x_resolution))
+    #     return np.concatenate([c,o], axis=1)
+    # def get_masked_content(self):
+    #     # Same regardless if applied to fill or not
+    #     c = self.content.toarray()
+    #     m = self.mask.toarray()
+    #     return c[m==1]
+    # def get_masked_counts(self):
+    #     # Fill counts are just 0's
+    #     c = self.counts.toarray()
+    #     m = self.mask.toarray()
+    #     return c[m==1]
+    # def get_density(self):
+    #     m = self.content.toarray()
+    #     return np.sum(m!=-1) / m.size
+    # def get_fill_density(self):
+    #     m = self.fill_content.toarray()
+    #     return np.sum(m!=-1) / m.size
+    # def set_fill_content(self, fill_content, fill_counts):
+    #     self.fill_content = sparse.csr_matrix(fill_content.reshape(fill_content.shape[0],-1))
+    #     self.fill_counts = sparse.csr_matrix(fill_counts.reshape(fill_counts.shape[0],-1))
+
+def traces_to_ngrid(traces, grid_x_bounds, grid_y_bounds, grid_s_res, grid_t_res, grid_n_res):
+    times = traces['locationtime'].values
+    # Create grid boundaries and cells
+    y_resolution = (grid_y_bounds[1] - grid_y_bounds[0]) // grid_s_res
+    x_resolution = (grid_x_bounds[1] - grid_x_bounds[0]) // grid_s_res
+    ybins = np.linspace(grid_y_bounds[0], grid_y_bounds[1], y_resolution)
+    ybins = np.append(ybins, ybins[-1]+.0000001)
+    xbins = np.linspace(grid_x_bounds[0], grid_x_bounds[1], x_resolution)
+    xbins = np.append(xbins, xbins[-1]+.0000001)
+    tbins = np.arange(np.min(times),np.max(times),grid_t_res)
+    tbins = np.append(tbins, tbins[-1]+1)
+    # Get indexes of all datapoints in the grid
+    tbin_idxs = np.digitize(traces['locationtime'].values, tbins, right=True) - 1
+    tbin_idxs = np.maximum(0,tbin_idxs)
+    xbin_idxs = np.digitize(traces['x'].values, xbins, right=False)
+    xbin_idxs = np.maximum(0,xbin_idxs)
+    ybin_idxs = np.digitize(traces['y'].values, ybins, right=False)
+    ybin_idxs = np.maximum(0,ybin_idxs)
+    # For every grid cell, collect the most recent 3 observations, mask with -1 if unavailable
+    traces['tbin_idx'] = tbin_idxs
+    traces['xbin_idx'] = xbin_idxs
+    traces['ybin_idx'] = ybin_idxs
+    obs = traces.groupby(['tbin_idx','xbin_idx','ybin_idx']).head(grid_n_res)[['tbin_idx','xbin_idx','ybin_idx','x','y','bearing','speed_m_s']]
+    ngrid = NGrid(content=obs, c_resolution=4, x_resolution=x_resolution, y_resolution=y_resolution, t_resolution=len(tbins), n_resolution=grid_n_res)
+    return ngrid, tbin_idxs, xbin_idxs, ybin_idxs
+
+def traces_to_grid(traces, grid_x_bounds, grid_y_bounds, grid_s_res, grid_t_res):
     # Create grid
-    grid, tbins, xbins, ybins = decompose_and_rasterize(traces['speed_m_s'].values, traces['bearing'].values, traces['x'].values, traces['y'].values, traces['locationtime'].values, timestep, resolution)
+    grid, tbins, xbins, ybins = decompose_and_rasterize(traces['speed_m_s'].values, traces['bearing'].values, traces['x'].values, traces['y'].values, traces['locationtime'].values, grid_x_bounds, grid_y_bounds, grid_s_res, grid_t_res)
     # Get tbins for each trace. No overlap between current trip and grid values.
     # Grid assigned values: binedge[i-1] <= x < binedge[i]
     # Trace values: binedge[i-1] < x <= binedge[i]
@@ -64,15 +156,17 @@ def traces_to_grid(traces, resolution=128, timestep=60):
     ybin_idxs = np.maximum(0,ybin_idxs)
     return grid, tbin_idxs, xbin_idxs, ybin_idxs
 
-def decompose_and_rasterize(features, bearings, x, y, times, timestep, resolution):
+def decompose_and_rasterize(features, bearings, x, y, times, grid_x_bounds, grid_y_bounds, grid_s_res, grid_t_res):
     # Get regularly spaced bins at given resolution/timestep across bbox for all collected points
     # Need to flip bins for latitude because it should decrease downward through array
     # Add a bin to the upper end; all obs are assigned such that bin_edge[i-1] <= x < bin_edge[i]
-    ybins = np.linspace(np.min(y), np.max(y), resolution)
+    y_resolution = (grid_y_bounds[1] - grid_y_bounds[0]) // grid_s_res
+    x_resolution = (grid_x_bounds[1] - grid_x_bounds[0]) // grid_s_res
+    ybins = np.linspace(grid_y_bounds[0], grid_y_bounds[1], y_resolution)
     ybins = np.append(ybins, ybins[-1]+.0000001)
-    xbins = np.linspace(np.min(x), np.max(x), resolution)
+    xbins = np.linspace(grid_x_bounds[0], grid_x_bounds[1], x_resolution)
     xbins = np.append(xbins, xbins[-1]+.0000001)
-    tbins = np.arange(np.min(times),np.max(times),timestep)
+    tbins = np.arange(np.min(times),np.max(times),grid_t_res)
     tbins = np.append(tbins, tbins[-1]+1)
     # Split features into quadrant channels
     channel_obs = decompose_vector(features, bearings, np.column_stack([x, y, times]))
@@ -94,7 +188,7 @@ def decompose_and_rasterize(features, bearings, x, y, times, timestep, resolutio
         count_content[:,i,:,:] = count_hist
         mask_content[:,i,:,:] = mask
     # Invert mask when saving so that True/1 points to specified values instead of unspecified
-    grid = Grid(grid_content, count_content, (1-mask_content), len(channel_obs), resolution, timestep)
+    grid = Grid(grid_content, count_content, (1-mask_content), len(channel_obs), x_resolution, y_resolution, grid_t_res)
     return grid, tbins, xbins, ybins
 
 def decompose_vector(scalars, bearings, data_to_attach=None):
@@ -159,7 +253,6 @@ def fill_channel_forward(grid_channel):
 def extract_grid_features(g, tbins, xbins, ybins, config, buffer=1):
     """
     Given sequence of bins from a trip, reconstruct grid features.
-    Normalize the grid based on the starting point.
     """
     # All points in the sequence will have the information at the time of the starting point
     # However the starting information is shifted in space to center features on each point
@@ -181,6 +274,42 @@ def extract_grid_features(g, tbins, xbins, ybins, config, buffer=1):
         feature[:4,:,:][feature[:4,:,:]==-1] = config['speed_m_s_mean']
         # Normalize all cells
         feature[:4,:,:] = data_utils.normalize(feature[:4,:,:], config['speed_m_s_mean'], config['speed_m_s_std'])
+        grid_features.append(feature)
+    return grid_features
+
+def extract_ngrid_features(grid, tbins, xbins, ybins, config, buffer=1):
+    """
+    Given sequence of bins from a trip, reconstruct grid features.
+    """
+    # All points in the sequence will have the information at the time of the starting point
+    # However the starting information is shifted in space to center features on each point
+    tbin_start_idx = tbins[0]
+    # Points in data correspond to final tbin
+    if tbin_start_idx==grid.t_resolution:
+        tbin_start_idx = tbin_start_idx-1
+    g = grid.get_content(tbin_start_idx)
+    grid_features = []
+    for i, tbin in enumerate(tbins):
+        # Handle case where buffer goes off edge of grid
+        if xbins[i]-buffer-1 < 0 or ybins[i]-buffer-1 < 0:
+            feature = np.ones((g.shape[0], g.shape[1], 2*buffer+1, 2*buffer+1))*-1
+            feature[:,:,:,:] = np.nan
+        elif xbins[i]+buffer > g.shape[3] or ybins[i]+buffer > g.shape[2]:
+            feature = np.ones((g.shape[0], g.shape[1], 2*buffer+1, 2*buffer+1))*-1
+            feature[:,:,:,:] = np.nan
+        else:
+            # Filter grid based on adjacent squares to buffer (pts +/- buffer, including middle point)
+            feature = g[:,:,ybins[i]-buffer-1:ybins[i]+buffer,xbins[i]-buffer-1:xbins[i]+buffer].copy()
+        # Fill undefined cells with global averages (per variable)
+        feature[0,:,:,:][np.isnan(feature[0,:,:,:])] = config['x_mean']
+        feature[1,:,:,:][np.isnan(feature[1,:,:,:])] = config['y_mean']
+        feature[2,:,:,:][np.isnan(feature[2,:,:,:])] = config['bearing_mean']
+        feature[3,:,:,:][np.isnan(feature[3,:,:,:])] = config['speed_m_s_mean']
+        # Normalize all cells
+        feature[0,:,:,:] = data_utils.normalize(feature[0,:,:,:], config['x_mean'], config['x_std'])
+        feature[1,:,:,:] = data_utils.normalize(feature[1,:,:,:], config['y_mean'], config['y_std'])
+        feature[2,:,:,:] = data_utils.normalize(feature[2,:,:,:], config['bearing_mean'], config['bearing_std'])
+        feature[3,:,:,:] = data_utils.normalize(feature[3,:,:,:], config['speed_m_s_mean'], config['speed_m_s_std'])
         grid_features.append(feature)
     return grid_features
 

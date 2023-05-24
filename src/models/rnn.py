@@ -114,7 +114,6 @@ class GRU_RNN_GRID(nn.Module):
             z[sum(seq_lens[:i]):sum(seq_lens[:i])+L,:,:,:] = torch.flatten(x_gr[i,:L,:,:,:], 0, 0)
         x_gr = self.pos_enc(z)
         x_gr = torch.flatten(x_gr, 1)
-        x_gr = x_gr.to(self.device)
         x_gr = self.transformer_encoder(x_gr)
         x_gr = self.linear_relu_stack_grid(x_gr)
         # Turn back into masked sequences

@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from models import grid
+from models import grids
 from utils import data_utils, shape_utils
 
 
@@ -16,7 +16,7 @@ class GenericDataset(Dataset):
         sample = self.content[index]
         if self.grid is not None:
             # Handles normalization, and selection of the specific buffered t/x/y bins
-            grid_features = grid.extract_grid_features(self.grid, sample['tbin_idx'], sample['xbin_idx'], sample['ybin_idx'], self.config, self.buffer)
+            grid_features = grids.extract_grid_features(self.grid, sample['tbin_idx'], sample['xbin_idx'], sample['ybin_idx'], self.config, self.buffer)
             sample['grid_features'] = grid_features
         sample = apply_normalization(sample.copy(), self.config)
         return sample
@@ -101,9 +101,6 @@ def basic_grid_collate(batch):
         X_ct[i,9] = batch[i]['bearing'][0]
         X_ct[i,10] = batch[i]['dist']
         # Turn list of features by point into array, mean along time dimension
-        # grid_fts = z[:,:4,:,:]
-        # grid_mean_diff = grid_fts - np.mean(grid_fts)
-        # grid_sq_diff = abs(grid_mean_diff) * grid_mean_diff
         X_gr[i,:,:,:] = np.mean(np.concatenate([np.expand_dims(x, 0) for x in batch[i]['grid_features']]), axis=0)
     X_ct = torch.from_numpy(X_ct)
     X_em = torch.from_numpy(X_em)

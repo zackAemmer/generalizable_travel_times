@@ -17,7 +17,7 @@ from utils import data_utils
 def process_data_parallel(data, **kwargs):
     # Clean and transform raw bus data records
     traces = data_utils.shingle(data, 2, 5)
-    traces = data_utils.calculate_trace_df(traces, kwargs['timezone'], kwargs['epsg'], kwargs['data_dropout'])
+    traces = data_utils.calculate_trace_df(traces, kwargs['timezone'], kwargs['epsg'], kwargs['grid_x_bounds'], kwargs['grid_y_bounds'], kwargs['data_dropout'])
     traces = data_utils.clean_trace_df_w_timetables(traces, kwargs['gtfs_folder'], kwargs['epsg'])
     traces = data_utils.calculate_cumulative_values(traces)
     return traces
@@ -61,13 +61,14 @@ def clean_data(dates, n_save_files, train_or_test, base_folder, **kwargs):
             continue
         print(f"Saving {len(traces)} samples to run folder, retained {np.round(len(traces)/num_raw_points, 2)*100}% of original data points...")
         deeptte_formatted_path = f"{base_folder}deeptte_formatted/{train_or_test}{file_num}"
-        traces, train_grid = data_utils.map_to_deeptte(traces, deeptte_formatted_path, grid_s_res=128, grid_t_res=120)
+        traces, train_n_grid, train_fill_grid = data_utils.map_to_deeptte(traces, deeptte_formatted_path, grid_x_bounds=kwargs['grid_x_bounds'], grid_y_bounds=kwargs['grid_y_bounds'], grid_s_res=kwargs['grid_s_res'], grid_t_res=kwargs['grid_t_res'], grid_n_res=kwargs['grid_n_res'])
         summary_config = data_utils.get_summary_config(traces, kwargs['gtfs_folder'], n_save_files, kwargs['epsg'])
         # Save config, and traces to file for notebook analyses
         with open(f"{deeptte_formatted_path}_config.json", mode="a") as out_file:
             json.dump(summary_config, out_file)
         data_utils.write_pkl(traces, f"{base_folder}{train_or_test}{file_num}_traces.pkl")
-        data_utils.write_pkl(train_grid, f"{base_folder}{train_or_test}{file_num}_grid_ffill.pkl")
+        data_utils.write_pkl(train_n_grid, f"{base_folder}{train_or_test}{file_num}_grid.pkl")
+        data_utils.write_pkl(train_fill_grid, f"{base_folder}{train_or_test}{file_num}_grid_ffill.pkl")
     # Combine normalization metrics and other values across all files
     data_utils.combine_config_files(f"{base_folder}deeptte_formatted/", n_save_files, train_or_test)
 
@@ -123,6 +124,11 @@ if __name__=="__main__":
         raw_data_folder="./data/kcm_all/",
         timezone="America/Los_Angeles",
         epsg="32148",
+        grid_x_bounds=[368279,416973], # 48694 x 76563 = 3000sqkm
+        grid_y_bounds=[15350, 91913],
+        grid_s_res=500,
+        grid_t_res=120,
+        grid_n_res=3,
         given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
     )
     random.seed(0)
@@ -143,6 +149,11 @@ if __name__=="__main__":
         raw_data_folder="./data/atb_all_new/",
         timezone="Europe/Oslo",
         epsg="32632",
+        grid_x_bounds=[533551, 677502], # 143951 x 164933 = 23000sqkm
+        grid_y_bounds=[7011518, 7176451],
+        grid_s_res=500,
+        grid_t_res=120,
+        grid_n_res=3,
         given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
     )
     # random.seed(0)

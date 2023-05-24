@@ -16,7 +16,7 @@ from sklearn import metrics
 from statsmodels.stats.weightstats import DescrStatsW
 import torch
 
-from models import grid
+from models import grids
 from utils import shape_utils
 
 
@@ -145,15 +145,15 @@ def load_all_inputs(run_folder, network_folder, file_num):
     with open(f"{run_folder}{network_folder}/deeptte_formatted/train_config.json") as f:
         config = json.load(f)
     train_data = load_all_data(f"{run_folder}{network_folder}deeptte_formatted/", f"train{file_num}")
+    train_grid = load_pkl(f"{run_folder}{network_folder}train{file_num}_grid.pkl")
     train_grid_ffill = load_pkl(f"{run_folder}{network_folder}train{file_num}_grid_ffill.pkl")
     return {
         "train_traces": train_traces,
         "test_traces": test_traces,
         "config": config,
         "train_data": train_data,
-        # "test_data": test_data,
+        "train_grid": train_grid,
         "train_grid_ffill": train_grid_ffill,
-        # "test_grid_ffill": test_grid_ffill
     }
 
 def combine_config_files(cfg_folder, n_save_files, train_or_test):
@@ -220,7 +220,30 @@ def combine_pkl_data(folder, file_list, given_names):
     data = data.sort_values(['file','trip_id','locationtime'], ascending=True)
     return data, no_data_list
 
-def calculate_trace_df(data, timezone, epsg, data_dropout=.10, remove_stopped_pts=True):
+def shingle(trace_df, min_len, max_len):
+    """
+    Split a df into even chunks randomly between min and max length.
+    Each split comes from a group representing a trajectory in the dataframe.
+    trace_df: dataframe of raw bus data
+    min_len: minimum number of chunks to split a trajectory into
+    max_lan: maximum number of chunks to split a trajectory into
+    Returns: A copy of trace_df with a new index, traces with <=2 points removed.
+    """
+    shingle_groups = trace_df.groupby(['file','trip_id']).count()['lat'].values
+    idx = 0
+    new_idx = []
+    for num_pts in shingle_groups:
+        dummy = np.array([0 for i in range(0,num_pts)])
+        dummy = np.array_split(dummy, np.random.randint(min_len, max_len))
+        dummy = [len(x) for x in dummy]
+        for x in dummy:
+            [new_idx.append(idx) for y in range(0,x)]
+            idx += 1
+    z = trace_df.copy()
+    z['shingle_id'] = new_idx
+    return z
+
+def calculate_trace_df(data, timezone, epsg, grid_x_bounds, grid_y_bounds, data_dropout=.10, remove_stopped_pts=True):
     """
     Calculate difference in metrics between two consecutive trip points.
     This is the only place where points are filtered rather than entire shingles.
@@ -241,6 +264,11 @@ def calculate_trace_df(data, timezone, epsg, data_dropout=.10, remove_stopped_pt
     proj_crs = pyproj.CRS.from_epsg(epsg)
     transformer = pyproj.Transformer.from_crs(default_crs, proj_crs, always_xy=True)
     data['x'], data['y'] = transformer.transform(data['lon'], data['lat'])
+    # Drop points outside of the network/grid bounding box
+    data = data[data['x']>grid_x_bounds[0]]
+    data = data[data['x']<grid_x_bounds[1]]
+    data = data[data['y']>grid_y_bounds[0]]
+    data = data[data['y']<grid_y_bounds[1]]
     # Calculate feature values between consecutive points, assign to the latter point
     data['speed_m_s'], data['dist_calc_m'], data['time_calc_s'], data['bearing'] = calculate_trip_speeds(data)
     # Remove first point of every trip (not shingle), since its features are based on a different trip
@@ -417,7 +445,7 @@ def remap_ids(df_list, id_col):
         df[f"{id_col}_recode"] = recode
     return (df_list, len(pd.unique(all_ids)), mapping)
 
-def map_to_deeptte(trace_data, deeptte_formatted_path, grid_s_res, grid_t_res):
+def map_to_deeptte(trace_data, deeptte_formatted_path, grid_x_bounds, grid_y_bounds, grid_s_res, grid_t_res, grid_n_res):
     """
     Reshape pandas dataframe to the json format needed to use deeptte.
     trace_data: dataframe with bus trajectories
@@ -435,8 +463,9 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, grid_s_res, grid_t_res):
     trace_data['lngs'] = trace_data['lon']
 
     # Calculate and add grid features
-    grid_normal, tbin_idxs, xbin_idxs, ybin_idxs = grid.traces_to_grid(trace_data, resolution=grid_s_res, timestep=grid_t_res)
-    grid.fill_grid_forward(grid_normal)
+    n_grid, tbin_idxs, xbin_idxs, ybin_idxs = grids.traces_to_ngrid(trace_data, grid_x_bounds, grid_y_bounds, grid_s_res=grid_s_res, grid_t_res=grid_t_res, grid_n_res=grid_n_res)
+    fill_grid, tbin_idxs, xbin_idxs, ybin_idxs = grids.traces_to_grid(trace_data, grid_x_bounds, grid_y_bounds, grid_s_res=grid_s_res, grid_t_res=grid_t_res)
+    grids.fill_grid_forward(fill_grid)
     trace_data['tbin_idx'] = tbin_idxs
     trace_data['xbin_idx'] = xbin_idxs
     trace_data['ybin_idx'] = ybin_idxs
@@ -486,7 +515,7 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, grid_s_res, grid_t_res):
     result_json_string = result.to_json(orient='records', lines=True)
     with open(deeptte_formatted_path, mode='w+') as out_file:
         out_file.write(result_json_string)
-    return trace_data, grid_normal
+    return trace_data, n_grid, fill_grid
 
 def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg):
     """
@@ -735,29 +764,6 @@ def extract_deeptte_results(city, run_folder, network_folder, generalization_fla
     all_run_data['Fold'] = all_run_data['Fold'].astype(int)
     all_run_data['Epoch'] = all_run_data['Epoch'].astype(int)
     return all_run_data.sort_values(['Fold','Epoch'])
-
-def shingle(trace_df, min_len, max_len):
-    """
-    Split a df into even chunks randomly between min and max length.
-    Each split comes from a group representing a trajectory in the dataframe.
-    trace_df: dataframe of raw bus data
-    min_len: minimum number of chunks to split a trajectory into
-    max_lan: maximum number of chunks to split a trajectory into
-    Returns: A copy of trace_df with a new index, traces with <=2 points removed.
-    """
-    shingle_groups = trace_df.groupby(['file','trip_id']).count()['lat'].values
-    idx = 0
-    new_idx = []
-    for num_pts in shingle_groups:
-        dummy = np.array([0 for i in range(0,num_pts)])
-        dummy = np.array_split(dummy, np.random.randint(min_len, max_len))
-        dummy = [len(x) for x in dummy]
-        for x in dummy:
-            [new_idx.append(idx) for y in range(0,x)]
-            idx += 1
-    z = trace_df.copy()
-    z['shingle_id'] = new_idx
-    return z
 
 def extract_all_dataloader(dataloader, sequential_flag=False):
     """
