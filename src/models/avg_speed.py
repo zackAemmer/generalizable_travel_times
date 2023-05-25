@@ -9,7 +9,7 @@ class AvgHourlySpeedModel:
         self.model_name = model_name
         self.speed_lookup = {}
         return None
-    def fit(self, dataloader, config):
+    def train(self, dataloader, config):
         context, X, y = data_utils.extract_all_dataloader(dataloader)
         speeds = X[:,8].numpy()
         speeds = data_utils.de_normalize(speeds, config['speed_m_s_mean'], config['speed_m_s_std'])
@@ -17,7 +17,7 @@ class AvgHourlySpeedModel:
         # Calculate average speed grouped by time of day
         self.speed_lookup = pd.DataFrame({"hour":hours, "speed":speeds}).groupby("hour").mean().to_dict()
         return None
-    def predict(self, dataloader, config):
+    def evaluate(self, dataloader, config):
         context, X, y = data_utils.extract_all_dataloader(dataloader)
         hours = context[:,0].numpy() // 60
         speeds = [self.get_speed_if_available(x) for x in hours]

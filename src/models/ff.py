@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from models import transformer
+from models import pos_encodings
 from utils import data_utils, model_utils
 
 
@@ -93,9 +93,9 @@ class FF_GRID(nn.Module):
         timeID_embedded = self.timeID_em(x_em[:,0])
         weekID_embedded = self.weekID_em(x_em[:,1])
         # Feed grid data through model
-        x = self.linear_relu_stack_grid(torch.flatten(x_gr, 1))
+        x_gr = self.linear_relu_stack_grid(torch.flatten(x_gr, 1))
         # Feed data through the model
-        x = torch.cat([x, x_ct, timeID_embedded, weekID_embedded], dim=1)
+        x = torch.cat([x_gr, x_ct, timeID_embedded, weekID_embedded], dim=1)
         # Make prediction
         pred = self.linear_relu_stack(x)
         return pred.squeeze()
@@ -130,7 +130,7 @@ class FF_GRID_ATTN(nn.Module):
         self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
         # 2d positional encoding
-        self.pos_enc = transformer.PositionalEncodingPermute2D(self.n_channels)
+        self.pos_enc = pos_encodings.PositionalEncodingPermute2D(self.n_channels)
         # Grid attention
         encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_grid_features, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)

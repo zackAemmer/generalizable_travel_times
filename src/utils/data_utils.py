@@ -122,6 +122,7 @@ def get_date_list(start, n_days):
 
 def load_fold_data(data_folder, filename, fold_num, total_folds):
     grid = load_pkl(f"{data_folder}/../{filename}_grid_ffill.pkl")
+    ngrid = load_pkl(f"{data_folder}/../{filename}_grid.pkl")
     train_data = []
     contents = open(f"{data_folder}{filename}", "r").read()
     train_data.append([json.loads(str(item)) for item in contents.strip().split('\n')])
@@ -130,7 +131,7 @@ def load_fold_data(data_folder, filename, fold_num, total_folds):
     n_per_fold = len(train_data) // total_folds
     mask = np.ones(len(train_data), bool)
     mask[fold_num*n_per_fold:(fold_num+1)*n_per_fold] = 0
-    return ([item for item, keep in zip(train_data, mask) if keep], [item for item, keep in zip(train_data, mask) if not keep], grid)
+    return ([item for item, keep in zip(train_data, mask) if keep], [item for item, keep in zip(train_data, mask) if not keep], grid, ngrid)
 
 def load_all_data(data_folder, valid_file):
     valid_data = []

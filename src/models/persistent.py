@@ -9,9 +9,9 @@ from utils import data_utils
 #         self.config = config
 #         self.min_speed = min_speed
 #         return None
-#     def fit(self, dataloader, config):
+#     def train(self, dataloader, config):
 #         return None
-#     def predict(self, dataloader, config):
+#     def evaluate(self, dataloader, config):
 #         context, X, y, seq_lens = data_utils.extract_all_dataloader(dataloader, sequential_flag=True)
 #         max_len = max(seq_lens)
 #         # Carry the starting speeds through full sequences
@@ -30,9 +30,9 @@ class PersistentTimeSeqModel:
     def __init__(self, model_name):
         self.model_name = model_name
         return None
-    def fit(self, dataloader, config):
+    def train(self, dataloader, config):
         return None
-    def predict(self, dataloader, config):
+    def evaluate(self, dataloader, config):
         context, X, y, seq_lens = data_utils.extract_all_dataloader(dataloader, sequential_flag=True)
         max_len = max(seq_lens)
         # Predict 30 seconds for all sequence points

@@ -7,16 +7,20 @@ from utils import data_utils, shape_utils
 
 
 class GenericDataset(Dataset):
-    def __init__(self, content, config, grid=None, buffer=1):
+    def __init__(self, content, config, grid=None, is_ngrid=None, buffer=1):
         self.content = content
         self.config = config
         self.grid = grid
+        self.is_ngrid = is_ngrid
         self.buffer = buffer
     def __getitem__(self, index):
         sample = self.content[index]
         if self.grid is not None:
             # Handles normalization, and selection of the specific buffered t/x/y bins
-            grid_features = grids.extract_grid_features(self.grid, sample['tbin_idx'], sample['xbin_idx'], sample['ybin_idx'], self.config, self.buffer)
+            if self.is_ngrid:
+                grid_features = grids.extract_ngrid_features(self.grid, sample['tbin_idx'], sample['xbin_idx'], sample['ybin_idx'], self.config, self.buffer)
+            else:
+                grid_features = grids.extract_grid_features(self.grid, sample['tbin_idx'], sample['xbin_idx'], sample['ybin_idx'], self.config, self.buffer)
             sample['grid_features'] = grid_features
         sample = apply_normalization(sample.copy(), self.config)
         return sample
@@ -37,8 +41,8 @@ def apply_normalization(sample, config):
             sample[var_name] = data_utils.normalize(np.array(sample[var_name]), config[f"{var_name}_mean"], config[f"{var_name}_std"])
     return sample
 
-def make_generic_dataloader(data, config, batch_size, collate_fn, num_workers, grid=None, buffer=None):
-    dataset = GenericDataset(data, config, grid, buffer)
+def make_generic_dataloader(data, config, batch_size, collate_fn, num_workers, grid=None, is_ngrid=None, buffer=None):
+    dataset = GenericDataset(data, config, grid, is_ngrid, buffer)
     if num_workers > 0:
         pin_memory=True
     else:
@@ -102,6 +106,45 @@ def basic_grid_collate(batch):
         X_ct[i,10] = batch[i]['dist']
         # Turn list of features by point into array, mean along time dimension
         X_gr[i,:,:,:] = np.mean(np.concatenate([np.expand_dims(x, 0) for x in batch[i]['grid_features']]), axis=0)
+    X_ct = torch.from_numpy(X_ct)
+    X_em = torch.from_numpy(X_em)
+    X_gr = torch.from_numpy(X_gr)
+    y = torch.from_numpy(np.array([x['time'] for x in batch]))
+    # Sort all dataloaders so that they are consistent in the results
+    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
+    sorted_slens = sorted_slens.int()
+    X_em = X_em[sorted_indices,:].int()
+    X_ct = X_ct[sorted_indices,:].float()
+    X_gr = X_gr[sorted_indices,:].float()
+    y = y[sorted_indices].float()
+    return [X_em, X_ct, X_gr], y
+
+def basic_ngrid_collate(batch):
+    # Last dimension is number of sequence variables below
+    seq_lens = [len(x['lats']) for x in batch]
+    max_len = max(seq_lens)
+    # Embedded context features
+    X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
+    # Continuous features
+    X_ct = np.zeros((len(batch), 11))
+    # Grid features
+    X_gr = np.zeros((len(batch), 4, 3, 3, 3))
+    for i in range(len(batch)):
+        # Continuous
+        X_ct[i,0] = batch[i]['x'][0]
+        X_ct[i,1] = batch[i]['y'][0]
+        X_ct[i,2] = batch[i]['x'][-1]
+        X_ct[i,3] = batch[i]['y'][-1]
+        X_ct[i,4] = batch[i]['scheduled_time_s'][-1]
+        X_ct[i,5] = batch[i]['stop_dist_km'][-1]
+        X_ct[i,6] = batch[i]['stop_x'][-1]
+        X_ct[i,7] = batch[i]['stop_y'][-1]
+        X_ct[i,8] = batch[i]['speed_m_s'][0]
+        X_ct[i,9] = batch[i]['bearing'][0]
+        X_ct[i,10] = batch[i]['dist']
+        # Turn list of features by point into array
+        z = np.concatenate([np.expand_dims(x, 0) for x in batch[i]['grid_features']])
+        X_gr[i,:,:,:,:] = np.mean(z, axis=0)
     X_ct = torch.from_numpy(X_ct)
     X_em = torch.from_numpy(X_em)
     X_gr = torch.from_numpy(X_gr)

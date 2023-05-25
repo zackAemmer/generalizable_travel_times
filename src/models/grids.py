@@ -257,9 +257,6 @@ def extract_grid_features(g, tbins, xbins, ybins, config, buffer=1):
     # All points in the sequence will have the information at the time of the starting point
     # However the starting information is shifted in space to center features on each point
     tbin_start_idx = tbins[0]
-    # Points in data correspond to final tbin
-    if tbin_start_idx==g.shape[0]:
-        tbin_start_idx = tbin_start_idx-1
     grid_features = []
     for i in range(len(tbins)):
         # Handle case where buffer goes off edge of grid (-1's)
@@ -284,9 +281,6 @@ def extract_ngrid_features(grid, tbins, xbins, ybins, config, buffer=1):
     # All points in the sequence will have the information at the time of the starting point
     # However the starting information is shifted in space to center features on each point
     tbin_start_idx = tbins[0]
-    # Points in data correspond to final tbin
-    if tbin_start_idx==grid.t_resolution:
-        tbin_start_idx = tbin_start_idx-1
     g = grid.get_content(tbin_start_idx)
     grid_features = []
     for i, tbin in enumerate(tbins):

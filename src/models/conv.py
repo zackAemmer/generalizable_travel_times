@@ -7,11 +7,10 @@ from models import masked_loss
 
 
 class CONV(nn.Module):
-    def __init__(self, model_name, input_size, output_size, hidden_size, batch_size, embed_dict, device):
+    def __init__(self, model_name, input_size, hidden_size, batch_size, embed_dict, device):
         super(CONV, self).__init__()
         self.model_name = model_name
         self.input_size = input_size
-        self.output_size = output_size
         self.hidden_size = hidden_size
         self.batch_size = batch_size
         self.embed_dict = embed_dict
@@ -29,7 +28,7 @@ class CONV(nn.Module):
         # Linear compression layer
         self.linear = nn.Linear(
             in_features=self.hidden_size + self.embed_total_dims,
-            out_features=self.output_size
+            out_features=1
         )
         self.activation = nn.ReLU()
     def forward(self, x):
