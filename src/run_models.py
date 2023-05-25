@@ -325,6 +325,7 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
         for train_file in train_file_list:
             train_data, test_data, grid, ngrid = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
             grid_content = grid.get_fill_content()
+            print(f"TEST FILE: {train_file}, {len(test_data)} test samples")
             with open(f"{data_folder}train_config.json", "r") as f:
                 config = json.load(f)
 

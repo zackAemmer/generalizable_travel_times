@@ -86,31 +86,6 @@ class NGrid:
     def get_density(self):
         c = self.get_all_content()
         return np.sum(~np.isnan(c)) / c.size
-    # def get_fill_content(self):
-    #     c = self.fill_content.toarray()
-    #     o = self.fill_counts.toarray()
-    #     c = np.reshape(c, (c.shape[0], self.c_resolution, self.y_resolution, self.x_resolution))
-    #     o = np.reshape(o, (o.shape[0], self.c_resolution, self.y_resolution, self.x_resolution))
-    #     return np.concatenate([c,o], axis=1)
-    # def get_masked_content(self):
-    #     # Same regardless if applied to fill or not
-    #     c = self.content.toarray()
-    #     m = self.mask.toarray()
-    #     return c[m==1]
-    # def get_masked_counts(self):
-    #     # Fill counts are just 0's
-    #     c = self.counts.toarray()
-    #     m = self.mask.toarray()
-    #     return c[m==1]
-    # def get_density(self):
-    #     m = self.content.toarray()
-    #     return np.sum(m!=-1) / m.size
-    # def get_fill_density(self):
-    #     m = self.fill_content.toarray()
-    #     return np.sum(m!=-1) / m.size
-    # def set_fill_content(self, fill_content, fill_counts):
-    #     self.fill_content = sparse.csr_matrix(fill_content.reshape(fill_content.shape[0],-1))
-    #     self.fill_counts = sparse.csr_matrix(fill_counts.reshape(fill_counts.shape[0],-1))
 
 def traces_to_ngrid(traces, grid_x_bounds, grid_y_bounds, grid_s_res, grid_t_res, grid_n_res):
     times = traces['locationtime'].values
