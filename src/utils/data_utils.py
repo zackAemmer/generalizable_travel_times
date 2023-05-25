@@ -133,12 +133,14 @@ def load_fold_data(data_folder, filename, fold_num, total_folds):
     mask[fold_num*n_per_fold:(fold_num+1)*n_per_fold] = 0
     return ([item for item, keep in zip(train_data, mask) if keep], [item for item, keep in zip(train_data, mask) if not keep], grid, ngrid)
 
-def load_all_data(data_folder, valid_file):
+def load_all_data(data_folder, filename):
+    grid = load_pkl(f"{data_folder}/../{filename}_grid_ffill.pkl")
+    ngrid = load_pkl(f"{data_folder}/../{filename}_grid.pkl")
     valid_data = []
-    contents = open(f"{data_folder}{valid_file}", "r").read()
+    contents = open(f"{data_folder}{filename}", "r").read()
     valid_data.append([json.loads(str(item)) for item in contents.strip().split('\n')])
     valid_data = list(itertools.chain.from_iterable(valid_data))
-    return valid_data
+    return valid_data, grid, ngrid
 
 def load_all_inputs(run_folder, network_folder, file_num):
     train_traces = load_pkl(f"{run_folder}{network_folder}train{file_num}_traces.pkl")

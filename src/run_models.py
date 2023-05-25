@@ -323,7 +323,7 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
 
         # Calculate performance metrics for fold
         for train_file in train_file_list:
-            train_data, test_data, grid = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
+            train_data, test_data, grid, ngrid = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
             grid_content = grid.get_fill_content()
             with open(f"{data_folder}train_config.json", "r") as f:
                 config = json.load(f)
@@ -388,12 +388,12 @@ if __name__=="__main__":
         run_folder="./results/debug/",
         network_folder="kcm/",
         hyperparameters={
-            "EPOCHS": 50,
+            "EPOCHS": 2,
             "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
         },
-        n_folds=5
+        n_folds=2
     )
     random.seed(0)
     np.random.seed(0)
@@ -402,12 +402,12 @@ if __name__=="__main__":
         run_folder="./results/debug/",
         network_folder="atb/",
         hyperparameters={
-            "EPOCHS": 50,
+            "EPOCHS": 2,
             "BATCH_SIZE": 512,
             "LEARN_RATE": 1e-3,
             "HIDDEN_SIZE": 32
         },
-        n_folds=5
+        n_folds=2
     )
     # random.seed(0)
     # np.random.seed(0)
