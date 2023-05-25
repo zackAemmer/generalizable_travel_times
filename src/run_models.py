@@ -132,11 +132,11 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
             device=device
         ).to(device)
         gru_grid_model1 = rnn.GRU_GRID(
-            "GRU_GRID",
+            "GRU_GRID_IND",
             n_features=8,
             n_grid_features=8*3*3,
             hidden_size=HIDDEN_SIZE,
-            grid_compression_size=4,
+            grid_compression_size=8,
             batch_size=BATCH_SIZE,
             embed_dict=embed_dict,
             device=device
@@ -147,7 +147,17 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
             n_grid_features=8*3*3,
             n_channels=8,
             hidden_size=HIDDEN_SIZE,
-            grid_compression_size=4,
+            grid_compression_size=8,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device)
+        gru_grid_model3 = rnn.GRU_GRID(
+            "GRU_NGRID_IND",
+            n_features=8,
+            n_grid_features=4*3*3*3,
+            hidden_size=HIDDEN_SIZE,
+            grid_compression_size=8,
             batch_size=BATCH_SIZE,
             embed_dict=embed_dict,
             device=device
@@ -179,11 +189,10 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
 
         # Add all models to results list
         base_model_list = []
-        nn_model_list = []
-        all_model_list = []
         base_model_list.append(avg_model)
         base_model_list.append(sch_model)
         base_model_list.append(tim_model)
+        nn_model_list = []
         nn_model_list.append(ff_model)
         nn_model_list.append(ff_grid_model1)
         nn_model_list.append(ff_grid_model2)
@@ -191,9 +200,11 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
         nn_model_list.append(gru_model)
         nn_model_list.append(gru_grid_model1)
         nn_model_list.append(gru_grid_model2)
+        nn_model_list.append(gru_grid_model3)
         # nn_model_list.append(gru_mto_model)
         # nn_model_list.append(conv1d_model)
         nn_model_list.append(trs_model)
+        all_model_list = []
         all_model_list.extend(base_model_list)
         all_model_list.extend(nn_model_list)
 
@@ -231,10 +242,11 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                 nn_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS))
                 nn_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
                 nn_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
-                nn_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_ngrid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=1))
+                nn_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=1))
                 nn_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS))
                 nn_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
                 nn_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
+                nn_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=1))
                 # nn_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS))
                 nn_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS))
 
@@ -270,20 +282,22 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                     train_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS))
                     train_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
                     train_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
-                    train_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_ngrid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=1))
+                    train_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=1))
                     train_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS))
                     train_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
                     train_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
+                    train_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=1))
                     # train_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS))
                     train_dataloaders.append(data_loader.make_generic_dataloader(train_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS))
                     test_dataloaders = []
                     test_dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS))
                     test_dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
                     test_dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
-                    test_dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_ngrid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=1))
+                    test_dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=1))
                     test_dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS))
                     test_dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
                     test_dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
+                    test_dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=1))
                     # test_dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS))
                     test_dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS))
 
@@ -321,10 +335,11 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
             dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS))
             dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
             dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
-            dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_ngrid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=1))
+            dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=1))
             dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS))
             dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
             dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
+            dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=1))
             # dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS))
             dataloaders.append(data_loader.make_generic_dataloader(test_data, config, BATCH_SIZE, data_loader.transformer_collate, NUM_WORKERS))
 
