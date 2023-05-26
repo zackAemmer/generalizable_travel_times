@@ -155,9 +155,9 @@ def decompose_and_rasterize(features, bearings, x, y, times, grid_x_bounds, grid
         count_hist, count_edges = np.histogramdd(np.column_stack([channel[:,3], channel[:,2], channel[:,1]]), bins=[tbins, ybins, xbins])
         sum_hist, edges = np.histogramdd(np.column_stack([channel[:,3], channel[:,2], channel[:,1]]), weights=channel[:,0], bins=[tbins, ybins, xbins])
         rast = sum_hist / np.maximum(1, count_hist)
-        # Mask cells with no information as -1
+        # Mask cells with no information as nan
         mask = count_hist==0
-        rast[mask] = -1
+        rast[mask] = np.nan
         # Save binned values for each channel
         grid_content[:,i,:,:] = rast
         count_content[:,i,:,:] = count_hist
@@ -236,14 +236,16 @@ def extract_grid_features(g, tbins, xbins, ybins, config, buffer=1):
     for i in range(len(tbins)):
         # Handle case where buffer goes off edge of grid (-1's)
         if xbins[i]-buffer-1 < 0 or ybins[i]-buffer-1 < 0:
-            feature = np.ones((g.shape[1], 2*buffer+1, 2*buffer+1))*-1
+            feature = np.zeros((g.shape[1], 2*buffer+1, 2*buffer+1))
+            feature[:4,:,:] = np.nan
         elif xbins[i]+buffer > g.shape[3] or ybins[i]+buffer > g.shape[2]:
-            feature = np.ones((g.shape[1], 2*buffer+1, 2*buffer+1))*-1
+            feature = np.zeros((g.shape[1], 2*buffer+1, 2*buffer+1))
+            feature[:4,:,:] = np.nan
         else:
             # Filter grid based on shingle start time, and adjacent squares to buffer (pts +/- buffer, including middle point)
             feature = g[tbin_start_idx,:,ybins[i]-buffer-1:ybins[i]+buffer,xbins[i]-buffer-1:xbins[i]+buffer].copy()
         # Fill undefined cells with global average
-        feature[:4,:,:][feature[:4,:,:]==-1] = config['speed_m_s_mean']
+        feature[:4,:,:][np.isnan(feature[:4,:,:])] = config['speed_m_s_mean']
         # Normalize all cells
         feature[:4,:,:] = data_utils.normalize(feature[:4,:,:], config['speed_m_s_mean'], config['speed_m_s_std'])
         grid_features.append(feature)
@@ -258,7 +260,7 @@ def extract_ngrid_features(grid, tbins, xbins, ybins, config, buffer=1):
     tbin_start_idx = tbins[0]
     g = grid.get_content(tbin_start_idx)
     grid_features = []
-    for i, tbin in enumerate(tbins):
+    for i in range(len(tbins)):
         # Handle case where buffer goes off edge of grid
         if xbins[i]-buffer-1 < 0 or ybins[i]-buffer-1 < 0:
             feature = np.ones((g.shape[0], g.shape[1], 2*buffer+1, 2*buffer+1))*-1

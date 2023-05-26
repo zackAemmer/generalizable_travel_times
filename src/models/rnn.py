@@ -107,10 +107,10 @@ class GRU_GRID(nn.Module):
         # Combine all variables
         x = torch.cat([x_em, x_gr, x_ct], dim=2)
         # Get recurrent pred
-        rnn_out, hidden_prev = self.rnn(x, hidden_prev)
-        rnn_out = self.activation(self.linear(self.activation(rnn_out)))
-        rnn_out = rnn_out.squeeze(2)
-        return rnn_out, hidden_prev
+        out, hidden_prev = self.rnn(x, hidden_prev)
+        out = self.activation(self.linear(self.activation(out)))
+        out = out.squeeze(2)
+        return out, hidden_prev
     def batch_step(self, data):
         inputs, labels = data
         inputs = [i.to(self.device) for i in inputs]
@@ -149,11 +149,11 @@ class GRU_GRID_ATTN(nn.Module):
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
         # 2d positional encoding
         self.pos_enc = pos_encodings.PositionalEncodingPermute2D(self.n_channels)
-        # Activation layer
-        self.activation = nn.ReLU()
         # Grid attention
         encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_grid_features, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
+        # Activation layer
+        self.activation = nn.ReLU()
         # Grid Feedforward
         self.linear_relu_stack_grid = nn.Sequential(
             nn.Linear(self.n_grid_features, self.hidden_size),
@@ -178,15 +178,15 @@ class GRU_GRID_ATTN(nn.Module):
         x_gr = torch.flatten(x_gr, 0, 1)
         x_gr = self.pos_enc(x_gr)
         x_gr = torch.flatten(x_gr, 1)
+        x_gr = self.transformer_encoder(x_gr)
         x_gr = self.linear_relu_stack_grid(x_gr)
         x_gr = torch.reshape(x_gr, (x_ct.shape[0], x_ct.shape[1], x_gr.shape[1]))
         # Combine all variables
         x = torch.cat([x_em, x_gr, x_ct], dim=2)
         # Get recurrent pred
-        rnn_out, hidden_prev = self.rnn(x, hidden_prev)
-        rnn_out = self.activation(self.linear(self.activation(rnn_out)))
-        rnn_out = rnn_out.squeeze(2)
-        return rnn_out, hidden_prev
+        out, hidden_prev = self.rnn(x, hidden_prev)
+        out = self.activation(self.linear(self.activation(out))).squeeze(2)
+        return out, hidden_prev
     def batch_step(self, data):
         inputs, labels = data
         inputs = [i.to(self.device) for i in inputs]
