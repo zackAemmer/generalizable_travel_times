@@ -23,24 +23,22 @@ class GRU(nn.Module):
         # Activation layer
         self.activation = nn.ReLU()
         # Recurrent layer
-        self.rnn = nn.GRU(input_size=self.n_features, hidden_size=self.hidden_size, num_layers=1, batch_first=True)
+        self.rnn = nn.GRU(input_size=self.n_features + self.embed_total_dims, hidden_size=self.hidden_size, num_layers=1, batch_first=True)
         # Linear compression layer
-        self.linear = nn.Linear(in_features=self.hidden_size + self.embed_total_dims, out_features=1)
+        self.linear = nn.Linear(in_features=self.hidden_size, out_features=1)
     def forward(self, x, hidden_prev):
         x_em = x[0]
         x_ct = x[1]
         # Embed categorical variables
         timeID_embedded = self.timeID_em(x_em[:,0])
         weekID_embedded = self.weekID_em(x_em[:,1])
-        # Get recurrent pred
-        rnn_out, hidden_prev = self.rnn(x_ct, hidden_prev)
-        rnn_out = self.activation(rnn_out)
-        # Add context, combine in linear layer
         x_em = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
-        x_em = x_em.repeat(1,rnn_out.shape[1],1)
-        out = torch.cat((rnn_out, x_em), dim=2)
-        out = self.linear(self.activation(out))
-        out = out.squeeze(2)
+        x_em = x_em.repeat(1,x_ct.shape[1],1)
+        # Combine all variables
+        x = torch.cat([x_em, x_ct], dim=2)
+        # Get recurrent pred
+        out, hidden_prev = self.rnn(x_ct, hidden_prev)
+        out = self.linear(self.activation(out)).squeeze(2)
         return out, hidden_prev
     def batch_step(self, data):
         inputs, labels = data
