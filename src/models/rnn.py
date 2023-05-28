@@ -37,7 +37,7 @@ class GRU(nn.Module):
         # Combine all variables
         x = torch.cat([x_em, x_ct], dim=2)
         # Get recurrent pred
-        out, hidden_prev = self.rnn(x_ct, hidden_prev)
+        out, hidden_prev = self.rnn(x, hidden_prev)
         out = self.linear(self.activation(out)).squeeze(2)
         return out, hidden_prev
     def batch_step(self, data):
