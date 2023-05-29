@@ -131,31 +131,31 @@ if __name__=="__main__":
         grid_n_res=3,
         given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
     )
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
-    # prepare_run(
-    #     overwrite=True,
-    #     run_name="debug",
-    #     network_name="atb",
-    #     train_dates=data_utils.get_date_list("2023_03_01", 30),
-    #     test_dates=data_utils.get_date_list("2023_04_01", 7),
-    #     num_train_files=5,
-    #     num_test_files=5,
-    #     n_jobs=5,
-    #     n_trace_splits=5,
-    #     data_dropout=0.2,
-    #     gtfs_folder="./data/atb_gtfs/",
-    #     raw_data_folder="./data/atb_all_new/",
-    #     timezone="Europe/Oslo",
-    #     epsg="32632",
-    #     grid_x_bounds=[482000, 738000],
-    #     grid_y_bounds=[6936000, 7208900],
-    #     grid_s_res=500,
-    #     grid_t_res=120,
-    #     grid_n_res=3,
-    #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
-    # )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    prepare_run(
+        overwrite=True,
+        run_name="debug",
+        network_name="atb",
+        train_dates=data_utils.get_date_list("2023_03_01", 30),
+        test_dates=data_utils.get_date_list("2023_04_01", 7),
+        num_train_files=2,
+        num_test_files=2,
+        n_jobs=2,
+        n_trace_splits=2,
+        data_dropout=0.2,
+        gtfs_folder="./data/atb_gtfs/",
+        raw_data_folder="./data/atb_all_new/",
+        timezone="Europe/Oslo",
+        epsg="32632",
+        grid_x_bounds=[482000, 738000],
+        grid_y_bounds=[6936000, 7208900],
+        grid_s_res=5000,
+        grid_t_res=120,
+        grid_n_res=3,
+        given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
+    )
     # random.seed(0)
     # np.random.seed(0)
     # torch.manual_seed(0)
