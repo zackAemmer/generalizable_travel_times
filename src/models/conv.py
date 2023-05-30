@@ -15,6 +15,7 @@ class CONV(nn.Module):
         self.batch_size = batch_size
         self.embed_dict = embed_dict
         self.device = device
+        self.train_time = 0.0
         self.loss_fn = masked_loss.MaskedHuberLoss()
         # Embeddings
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')

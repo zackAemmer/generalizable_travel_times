@@ -6,6 +6,7 @@ import itertools
 import json
 import os
 import random
+import time
 
 import numpy as np
 import torch
@@ -290,10 +291,14 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
                 # Train all models
                 for model, loader in zip(base_model_list, base_dataloaders):
                     print(f"Training: {model.model_name}")
+                    t0 = time.time()
                     model.train(loader, config)
+                    model.train_time += (time.time() - t0)
                 for model, loader in zip(nn_model_list, nn_dataloaders):
                     print(f"Training: {model.model_name}")
+                    t0 = time.time()
                     avg_batch_loss = model_utils.train(model, loader, LEARN_RATE)
+                    model.train_time += (time.time() - t0)
 
             if epoch % EPOCH_EVAL_FREQ == 0:
                 # Save current model states
@@ -402,7 +407,8 @@ def run_models(run_folder, network_folder, hyperparameters, **kwargs):
             "Model Names": [x.model_name for x in all_model_list],
             "Fold": fold_num,
             "All Losses": [],
-            "Loss Curves": [{model: curve_dict} for model, curve_dict in zip(model_fold_curves.keys(), list(model_fold_curves.values()))]
+            "Loss Curves": [{model: curve_dict} for model, curve_dict in zip(model_fold_curves.keys(), list(model_fold_curves.values()))],
+            "Train Times": [x.train_time for x in all_model_list]
         }
         for mname in fold_results["Model Names"]:
             _ = [mname]

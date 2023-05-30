@@ -710,7 +710,9 @@ def extract_results(city, model_results):
                     })
                     loss_df.append(df)
     loss_df = pd.concat(loss_df)
-    return result_df, loss_df
+    # Extract train times
+    train_time_df = [x['Train Times'] for x in model_results]
+    return result_df, loss_df, train_time_df
 
 def extract_deeptte_results(city, run_folder, network_folder, generalization_flag=False):
     # Extract all fold and epoch losses from deeptte run

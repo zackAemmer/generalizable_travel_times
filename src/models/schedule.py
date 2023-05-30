@@ -6,6 +6,7 @@ from utils import data_utils
 class TimeTableModel:
     def __init__(self, model_name):
         self.model_name = model_name
+        self.train_time = 0.0
     def train(self, dataloader, config):
         return None
     def evaluate(self, dataloader, config):

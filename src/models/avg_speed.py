@@ -8,6 +8,7 @@ class AvgHourlySpeedModel:
     def __init__(self, model_name):
         self.model_name = model_name
         self.speed_lookup = {}
+        self.train_time = 0.0
         return None
     def train(self, dataloader, config):
         context, X, y = data_utils.extract_all_dataloader(dataloader)
