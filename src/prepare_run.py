@@ -124,7 +124,7 @@ if __name__=="__main__":
         raw_data_folder="./data/kcm_all/",
         timezone="America/Los_Angeles",
         epsg="32148",
-        grid_bounds = [369903.9072,37911.1361,409618.5313,87758.0559]
+        grid_bounds = [369903.9072,37911.1361,409618.5313,87758.0559],
         grid_s_res=500,
         grid_t_res=120,
         grid_n_res=3,
