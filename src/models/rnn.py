@@ -176,9 +176,9 @@ class GRU_GRID_ATTN(nn.Module):
         x_gr = torch.flatten(x_gr, 0, 1)
         x_gr = self.pos_enc(x_gr)
         x_gr = torch.flatten(x_gr, 1)
+        x_gr = torch.reshape(x_gr, (x_ct.shape[0], x_ct.shape[1], x_gr.shape[1]))
         x_gr = self.transformer_encoder(x_gr)
         x_gr = self.linear_relu_stack_grid(x_gr)
-        x_gr = torch.reshape(x_gr, (x_ct.shape[0], x_ct.shape[1], x_gr.shape[1]))
         # Combine all variables
         x = torch.cat([x_em, x_gr, x_ct], dim=2)
         # Get recurrent pred

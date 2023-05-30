@@ -246,7 +246,7 @@ def shingle(trace_df, min_len, max_len):
     z['shingle_id'] = new_idx
     return z
 
-def calculate_trace_df(data, timezone, epsg, grid_x_bounds, grid_y_bounds, data_dropout=.10, remove_stopped_pts=True):
+def calculate_trace_df(data, timezone, epsg, grid_bounds, data_dropout=.10, remove_stopped_pts=True):
     """
     Calculate difference in metrics between two consecutive trip points.
     This is the only place where points are filtered rather than entire shingles.
@@ -268,10 +268,10 @@ def calculate_trace_df(data, timezone, epsg, grid_x_bounds, grid_y_bounds, data_
     transformer = pyproj.Transformer.from_crs(default_crs, proj_crs, always_xy=True)
     data['x'], data['y'] = transformer.transform(data['lon'], data['lat'])
     # Drop points outside of the network/grid bounding box
-    data = data[data['x']>grid_x_bounds[0]]
-    data = data[data['x']<grid_x_bounds[1]]
-    data = data[data['y']>grid_y_bounds[0]]
-    data = data[data['y']<grid_y_bounds[1]]
+    data = data[data['x']>grid_bounds[0]]
+    data = data[data['y']>grid_bounds[1]]
+    data = data[data['x']<grid_bounds[2]]
+    data = data[data['y']<grid_bounds[3]]
     # Calculate feature values between consecutive points, assign to the latter point
     data['speed_m_s'], data['dist_calc_m'], data['time_calc_s'], data['bearing'] = calculate_trip_speeds(data)
     # Remove first point of every trip (not shingle), since its features are based on a different trip
