@@ -26,7 +26,7 @@ class TRSF(nn.Module):
         # Activation layer
         self.activation = nn.ReLU()
         # Positional encoding layer
-        self.pos_encoder = pos_encodings.PositionalEncodingPermute1D(self.n_features + self.embed_total_dims)
+        self.pos_encoder = pos_encodings.PositionalEncoding1D(self.n_features + self.embed_total_dims)
         # Encoder layer
         encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features + self.embed_total_dims, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
@@ -90,7 +90,7 @@ class TRSF_GRID(nn.Module):
             nn.ReLU()
         )
         # Positional encoding layer
-        self.pos_encoder = pos_encodings.PositionalEncodingPermute1D(self.n_features + self.embed_total_dims + self.grid_compression_size)
+        self.pos_encoder = pos_encodings.PositionalEncoding1D(self.n_features + self.embed_total_dims + self.grid_compression_size)
         # Encoder layer
         encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features + self.embed_total_dims + self.grid_compression_size, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
@@ -167,7 +167,7 @@ class TRSF_GRID_ATTN(nn.Module):
             nn.ReLU()
         )
         # 1d sequence positional encoding layer
-        self.seq_pos_encoder = pos_encodings.PositionalEncodingPermute1D(self.n_features + self.embed_total_dims + self.grid_compression_size)
+        self.seq_pos_encoder = pos_encodings.PositionalEncoding1D(self.n_features + self.embed_total_dims + self.grid_compression_size)
         # Encoder layer
         seq_encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features + self.embed_total_dims + self.grid_compression_size, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
         self.seq_transformer_encoder = nn.TransformerEncoder(seq_encoder_layer, num_layers=2)
