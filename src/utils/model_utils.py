@@ -69,6 +69,7 @@ def make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_conte
     nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=buffer))
     nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=buffer))
     if combine:
-        return base_dataloaders.extend(nn_dataloaders)
+        base_dataloaders.extend(nn_dataloaders)
+        return base_dataloaders
     else:
         return base_dataloaders, nn_dataloaders

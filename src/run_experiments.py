@@ -42,7 +42,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, **kwa
     embed_dict = {
         'timeID': {
             'vocab_size': 1440,
-            'embed_dims': 24
+            'embed_dims': 27
         },
         'weekID': {
             'vocab_size': 7,
@@ -66,174 +66,141 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, **kwa
     for fold_num in range(kwargs['n_folds']):
 
         # Declare baseline models
-        avg_model = data_utils.load_pkl(f"{run_folder}{train_network_folder}models/AVG_{fold_num}.pkl")
-        sch_model = data_utils.load_pkl(f"{run_folder}{train_network_folder}models/SCH_{fold_num}.pkl")
-        tim_model = data_utils.load_pkl(f"{run_folder}{train_network_folder}models/PER_TIM_{fold_num}.pkl")
+        base_model_list = []
+        base_model_list.append(avg_speed.AvgHourlySpeedModel("AVG"))
+        base_model_list.append(schedule.TimeTableModel("SCH"))
+        base_model_list.append(persistent.PersistentTimeSeqModel("PER_TIM"))
 
         # Declare neural network models
-        ff_model = ff.FF(
-            "FF",
-            n_features=11,
-            hidden_size=HIDDEN_SIZE,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device)
-        ff_grid_model1 = ff.FF_GRID(
-            "FF_GRID_IND",
-            n_features=11,
-            n_grid_features=8*3*3,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device)
-        ff_grid_model2 = ff.FF_GRID_ATTN(
-            "FF_GRID_ATTN",
-            n_features=11,
-            n_grid_features=8*3*3,
-            n_channels=8,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device)
-        ff_grid_model3 = ff.FF_GRID(
-            "FF_NGRID_IND",
-            n_features=11,
-            n_grid_features=4*3*3*3,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device)
-        gru_model = rnn.GRU(
-            "GRU",
-            n_features=8,
-            hidden_size=HIDDEN_SIZE,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device)
-        gru_grid_model1 = rnn.GRU_GRID(
-            "GRU_GRID_IND",
-            n_features=8,
-            n_grid_features=8*3*3,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device)
-        gru_grid_model2 = rnn.GRU_GRID_ATTN(
-            "GRU_GRID_ATTN",
-            n_features=8,
-            n_grid_features=8*3*3,
-            n_channels=8,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device)
-        gru_grid_model3 = rnn.GRU_GRID(
-            "GRU_NGRID_IND",
-            n_features=8,
-            n_grid_features=4*3*3*3,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device)
-        # gru_mto_model = rnn.GRU_RNN_MTO(
-        #     "GRU_RNN_MTO",
-        #     n_features=8,
-        #     hidden_size=HIDDEN_SIZE,
-        #     batch_size=BATCH_SIZE,
-        #     embed_dict=embed_dict,
-        #     device=device
-        # ).to(device)
-        # conv1d_model = conv.CONV(
-        #     "CONV1D",
-        #     n_features=8,
-        #     hidden_size=HIDDEN_SIZE,
-        #     batch_size=BATCH_SIZE,
-        #     embed_dict=embed_dict,
-        #     device=device
-        # ).to(device)
-        trs_model = transformer.TRSF(
-            "TRSF",
-            n_features=8,
-            hidden_size=HIDDEN_SIZE,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device)
-        trs_grid_model1 = transformer.TRSF_GRID(
-            "TRSF_IND",
-            n_features=8,
-            n_grid_features=8*3*3,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device)
-        trs_grid_model2 = transformer.TRSF_GRID_ATTN(
-            "TRSF_GRID_ATTN",
-            n_features=8,
-            n_grid_features=8*3*3,
-            n_channels=8,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device)
-        trs_grid_model3 = transformer.TRSF_GRID(
-            "TRSF_NGRID_IND",
-            n_features=8,
-            n_grid_features=4*3*3*3,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device)
-
-        # Add all models to results list
-        base_model_list = []
-        base_model_list.append(avg_model)
-        base_model_list.append(sch_model)
-        base_model_list.append(tim_model)
         nn_model_list = []
-        nn_model_list.append(ff_model)
-        nn_model_list.append(ff_grid_model1)
-        nn_model_list.append(ff_grid_model2)
-        nn_model_list.append(ff_grid_model3)
-        nn_model_list.append(gru_model)
-        nn_model_list.append(gru_grid_model1)
-        nn_model_list.append(gru_grid_model2)
-        nn_model_list.append(gru_grid_model3)
-        # nn_model_list.append(gru_mto_model)
-        # nn_model_list.append(conv1d_model)
-        nn_model_list.append(trs_model)
-        nn_model_list.append(trs_grid_model1)
-        nn_model_list.append(trs_grid_model2)
-        nn_model_list.append(trs_grid_model3)
+        nn_model_list.append(ff.FF(
+            "FF",
+            n_features=12,
+            hidden_size=HIDDEN_SIZE,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device))
+        nn_model_list.append(ff.FF_GRID(
+            "FF_GRID_IND",
+            n_features=12,
+            n_grid_features=8*3*3,
+            hidden_size=HIDDEN_SIZE,
+            grid_compression_size=8,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device))
+        nn_model_list.append(ff.FF_GRID_ATTN(
+            "FF_GRID_ATTN",
+            n_features=12,
+            n_grid_features=8*3*3,
+            n_channels=8,
+            hidden_size=HIDDEN_SIZE,
+            grid_compression_size=8,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device))
+        nn_model_list.append(ff.FF_GRID(
+            "FF_NGRID_IND",
+            n_features=12,
+            n_grid_features=4*3*3*3,
+            hidden_size=HIDDEN_SIZE,
+            grid_compression_size=8,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device))
+        nn_model_list.append(rnn.GRU(
+            "GRU",
+            n_features=9,
+            hidden_size=HIDDEN_SIZE,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device))
+        nn_model_list.append(rnn.GRU_GRID(
+            "GRU_GRID_IND",
+            n_features=9,
+            n_grid_features=8*3*3,
+            hidden_size=HIDDEN_SIZE,
+            grid_compression_size=8,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device))
+        nn_model_list.append(rnn.GRU_GRID_ATTN(
+            "GRU_GRID_ATTN",
+            n_features=9,
+            n_grid_features=8*3*3,
+            n_channels=8,
+            hidden_size=HIDDEN_SIZE,
+            grid_compression_size=8,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device))
+        nn_model_list.append(rnn.GRU_GRID(
+            "GRU_NGRID_IND",
+            n_features=9,
+            n_grid_features=4*3*3*3,
+            hidden_size=HIDDEN_SIZE,
+            grid_compression_size=8,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device))
+        nn_model_list.append(transformer.TRSF(
+            "TRSF",
+            n_features=9,
+            hidden_size=HIDDEN_SIZE,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device))
+        nn_model_list.append(transformer.TRSF_GRID(
+            "TRSF_IND",
+            n_features=9,
+            n_grid_features=8*3*3,
+            hidden_size=HIDDEN_SIZE,
+            grid_compression_size=8,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device))
+        nn_model_list.append(transformer.TRSF_GRID_ATTN(
+            "TRSF_GRID_ATTN",
+            n_features=9,
+            n_grid_features=8*3*3,
+            n_channels=8,
+            hidden_size=HIDDEN_SIZE,
+            grid_compression_size=8,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device))
+        nn_model_list.append(transformer.TRSF_GRID(
+            "TRSF_NGRID_IND",
+            n_features=9,
+            n_grid_features=4*3*3*3,
+            hidden_size=HIDDEN_SIZE,
+            grid_compression_size=8,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device))
+
         all_model_list = []
         all_model_list.extend(base_model_list)
         all_model_list.extend(nn_model_list)
 
+        print(f"Model names: {[m.model_name for m in nn_model_list]}")
+        print(f"Model total parameters: {[sum(p.numel() for p in m.parameters()) for m in nn_model_list]}")
+
         # Load all model weights
         for m in nn_model_list:
             m = m.load_state_dict(torch.load(f"{run_folder}{train_network_folder}models/{m.model_name}_{fold_num}.pt"))
-        print(f"Model names: {[m.model_name for m in nn_model_list]}")
-        print(f"Model total parameters: {[sum(p.numel() for p in m.parameters()) for m in nn_model_list]}")
 
         # Test models on different networks
         model_fold_results = {}

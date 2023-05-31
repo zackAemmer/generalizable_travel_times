@@ -212,16 +212,14 @@ def run_models(run_folder, network_folder, **kwargs):
         print(f"Model names: {[m.model_name for m in nn_model_list]}")
         print(f"Model total parameters: {[sum(p.numel() for p in m.parameters()) for m in nn_model_list]}")
 
-        # Keep track of train/test curves during training for network models
-        model_fold_curves = {}
-        for x in nn_model_list:
-            if hasattr(x, "hidden_size"):
-                model_fold_curves[x.model_name] = {"Train":[], "Test":[]}
-
         # Keep track of all model performances
         model_fold_results = {}
         for x in all_model_list:
             model_fold_results[x.model_name] = {"Labels":[], "Preds":[]}
+        # Keep track of train/test curves during training for network models
+        model_fold_curves = {}
+        for x in nn_model_list:
+            model_fold_curves[x.model_name] = {"Train":[], "Test":[]}
 
         for epoch in range(EPOCHS):
             print(f"FOLD: {fold_num}, EPOCH: {epoch}")
@@ -347,11 +345,11 @@ if __name__=="__main__":
     # run_models(
     #     run_folder="./results/debug/",
     #     network_folder="kcm/",
-    #     EPOCHS=50,
+    #     EPOCHS=5,
     #     BATCH_SIZE=512,
     #     LEARN_RATE=1e-3,
     #     HIDDEN_SIZE=32,
-    #     n_folds=5
+    #     n_folds=2
     # )
     # random.seed(0)
     # np.random.seed(0)
@@ -359,11 +357,11 @@ if __name__=="__main__":
     # run_models(
     #     run_folder="./results/debug/",
     #     network_folder="atb/",
-    #     EPOCHS=50,
+    #     EPOCHS=5,
     #     BATCH_SIZE=512,
     #     LEARN_RATE=1e-3,
     #     HIDDEN_SIZE=32,
-    #     n_folds=5
+    #     n_folds=2
     # )
     random.seed(0)
     np.random.seed(0)
