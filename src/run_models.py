@@ -87,7 +87,7 @@ def run_models(run_folder, network_folder, **kwargs):
         # Declare neural network models
         ff_model = ff.FF(
             "FF",
-            n_features=11,
+            n_features=12,
             hidden_size=HIDDEN_SIZE,
             batch_size=BATCH_SIZE,
             embed_dict=embed_dict,
@@ -95,7 +95,7 @@ def run_models(run_folder, network_folder, **kwargs):
         ).to(device)
         ff_grid_model1 = ff.FF_GRID(
             "FF_GRID_IND",
-            n_features=11,
+            n_features=12,
             n_grid_features=8*3*3,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
@@ -105,7 +105,7 @@ def run_models(run_folder, network_folder, **kwargs):
         ).to(device)
         ff_grid_model2 = ff.FF_GRID_ATTN(
             "FF_GRID_ATTN",
-            n_features=11,
+            n_features=12,
             n_grid_features=8*3*3,
             n_channels=8,
             hidden_size=HIDDEN_SIZE,
@@ -116,7 +116,7 @@ def run_models(run_folder, network_folder, **kwargs):
         ).to(device)
         ff_grid_model3 = ff.FF_GRID(
             "FF_NGRID_IND",
-            n_features=11,
+            n_features=12,
             n_grid_features=4*3*3*3,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
@@ -126,7 +126,7 @@ def run_models(run_folder, network_folder, **kwargs):
         ).to(device)
         gru_model = rnn.GRU(
             "GRU",
-            n_features=8,
+            n_features=9,
             hidden_size=HIDDEN_SIZE,
             batch_size=BATCH_SIZE,
             embed_dict=embed_dict,
@@ -134,7 +134,7 @@ def run_models(run_folder, network_folder, **kwargs):
         ).to(device)
         gru_grid_model1 = rnn.GRU_GRID(
             "GRU_GRID_IND",
-            n_features=8,
+            n_features=9,
             n_grid_features=8*3*3,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
@@ -144,7 +144,7 @@ def run_models(run_folder, network_folder, **kwargs):
         ).to(device)
         gru_grid_model2 = rnn.GRU_GRID_ATTN(
             "GRU_GRID_ATTN",
-            n_features=8,
+            n_features=9,
             n_grid_features=8*3*3,
             n_channels=8,
             hidden_size=HIDDEN_SIZE,
@@ -155,7 +155,7 @@ def run_models(run_folder, network_folder, **kwargs):
         ).to(device)
         gru_grid_model3 = rnn.GRU_GRID(
             "GRU_NGRID_IND",
-            n_features=8,
+            n_features=9,
             n_grid_features=4*3*3*3,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
@@ -165,7 +165,7 @@ def run_models(run_folder, network_folder, **kwargs):
         ).to(device)
         # gru_mto_model = rnn.GRU_RNN_MTO(
         #     "GRU_RNN_MTO",
-        #     n_features=8,
+        #     n_features=9,
         #     hidden_size=HIDDEN_SIZE,
         #     batch_size=BATCH_SIZE,
         #     embed_dict=embed_dict,
@@ -173,7 +173,7 @@ def run_models(run_folder, network_folder, **kwargs):
         # ).to(device)
         # conv1d_model = conv.CONV(
         #     "CONV1D",
-        #     n_features=8,
+        #     n_features=9,
         #     hidden_size=HIDDEN_SIZE,
         #     batch_size=BATCH_SIZE,
         #     embed_dict=embed_dict,
@@ -181,7 +181,7 @@ def run_models(run_folder, network_folder, **kwargs):
         # ).to(device)
         trs_model = transformer.TRSF(
             "TRSF",
-            n_features=8,
+            n_features=9,
             hidden_size=HIDDEN_SIZE,
             batch_size=BATCH_SIZE,
             embed_dict=embed_dict,
@@ -189,7 +189,7 @@ def run_models(run_folder, network_folder, **kwargs):
         ).to(device)
         trs_grid_model1 = transformer.TRSF_GRID(
             "TRSF_IND",
-            n_features=8,
+            n_features=9,
             n_grid_features=8*3*3,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
@@ -199,7 +199,7 @@ def run_models(run_folder, network_folder, **kwargs):
         ).to(device)
         trs_grid_model2 = transformer.TRSF_GRID_ATTN(
             "TRSF_GRID_ATTN",
-            n_features=8,
+            n_features=9,
             n_grid_features=8*3*3,
             n_channels=8,
             hidden_size=HIDDEN_SIZE,
@@ -210,7 +210,7 @@ def run_models(run_folder, network_folder, **kwargs):
         ).to(device)
         trs_grid_model3 = transformer.TRSF_GRID(
             "TRSF_NGRID_IND",
-            n_features=8,
+            n_features=9,
             n_grid_features=4*3*3*3,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
