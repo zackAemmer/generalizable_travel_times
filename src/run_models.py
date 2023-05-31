@@ -55,7 +55,7 @@ def run_models(run_folder, network_folder, **kwargs):
     embed_dict = {
         'timeID': {
             'vocab_size': 1440,
-            'embed_dims': 24
+            'embed_dims': 27
         },
         'weekID': {
             'vocab_size': 7,

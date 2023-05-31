@@ -69,8 +69,8 @@ def basic_collate(batch):
     X_ct[:,8] = [torch.tensor(x['speed_m_s'][0]) for x in batch]
     X_ct[:,9] = [torch.tensor(x['bearing'][0]) for x in batch]
     X_ct[:,10] = [torch.tensor(x['dist']) for x in batch]
-    X_ct[:,11] = [torch.tensor(x['passed_stops_n']) for x in batch]
-    # Target feature
+    X_ct[:,11] = [torch.sum(torch.tensor(x['passed_stops_n'])) for x in batch]
+    # Target featurex
     y = torch.from_numpy(np.array([x['time'] for x in batch]))
     # Sort all dataloaders so that they are consistent in the results
     X_em = torch.from_numpy(X_em)
@@ -101,7 +101,7 @@ def basic_grid_collate(batch):
     X_ct[:,8] = [torch.tensor(x['speed_m_s'][0]) for x in batch]
     X_ct[:,9] = [torch.tensor(x['bearing'][0]) for x in batch]
     X_ct[:,10] = [torch.tensor(x['dist']) for x in batch]
-    X_ct[:,11] = [torch.tensor(x['passed_stops_n']) for x in batch]
+    X_ct[:,11] = [torch.sum(torch.tensor(x['passed_stops_n'])) for x in batch]
     # Grid features
     X_gr = np.zeros((len(batch), 8, 3, 3))
     X_gr = np.array([np.mean(np.concatenate([np.expand_dims(x, 0) for x in batch[i]['grid_features']]), axis=0) for i in range(len(batch))])
