@@ -335,3 +335,29 @@ if __name__=="__main__":
         HIDDEN_SIZE=32,
         n_folds=5,
     )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_experiments(
+    #     run_folder="./results/small/",
+    #     train_network_folder="kcm/",
+    #     test_network_folder="atb/",
+    #     EPOCHS=50,
+    #     BATCH_SIZE=512,
+    #     LEARN_RATE=1e-3,
+    #     HIDDEN_SIZE=32,
+    #     n_folds=5,
+    # )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_experiments(
+    #     run_folder="./results/small/",
+    #     train_network_folder="atb/",
+    #     test_network_folder="kcm/",
+    #     EPOCHS=50,
+    #     BATCH_SIZE=512,
+    #     LEARN_RATE=1e-3,
+    #     HIDDEN_SIZE=32,
+    #     n_folds=5,
+    # )

@@ -381,12 +381,10 @@ if __name__=="__main__":
     # run_models(
     #     run_folder="./results/debug/",
     #     network_folder="kcm/",
-    #     hyperparameters={
-    #         "EPOCHS": 50,
-    #         "BATCH_SIZE": 512,
-    #         "LEARN_RATE": 1e-3,
-    #         "HIDDEN_SIZE": 32
-    #     },
+    #     EPOCHS=50,
+    #     BATCH_SIZE=512,
+    #     LEARN_RATE=1e-3,
+    #     HIDDEN_SIZE=32,
     #     n_folds=5
     # )
     # random.seed(0)
@@ -395,12 +393,10 @@ if __name__=="__main__":
     # run_models(
     #     run_folder="./results/debug/",
     #     network_folder="atb/",
-    #     hyperparameters={
-    #         "EPOCHS": 50,
-    #         "BATCH_SIZE": 512,
-    #         "LEARN_RATE": 1e-3,
-    #         "HIDDEN_SIZE": 32
-    #     },
+    #     EPOCHS=50,
+    #     BATCH_SIZE=512,
+    #     LEARN_RATE=1e-3,
+    #     HIDDEN_SIZE=32,
     #     n_folds=5
     # )
     random.seed(0)

@@ -322,6 +322,9 @@ def calculate_cumulative_values(data):
     Calculate values that accumulate across each trajectory.
     """
     unique_traj = data.groupby('shingle_id')
+    # Get number of passed stops
+    data['passed_stops_n'] = unique_traj['stop_sequence'].diff()
+    data['passed_stops_n'] = data['passed_stops_n'].fillna(0)
     # Get cumulative values from trip start
     data['time_cumulative_s'] = unique_traj['time_calc_s'].cumsum()
     data['dist_cumulative_km'] = unique_traj['dist_calc_km'].cumsum()
@@ -351,10 +354,11 @@ def apply_gtfs_timetables(data, gtfs_data, gtfs_folder_date):
         data['y'].values,
         gtfs_data
     )
-    data = data.assign(stop_dist_km=closest_stops[0]/1000)
-    data = data.assign(stop_arrival_s=closest_stops[1])
-    data = data.assign(stop_x=closest_stops[2])
-    data = data.assign(stop_y=closest_stops[3])
+    data = data.assign(stop_x=closest_stops[:,0])
+    data = data.assign(stop_y=closest_stops[:,1])
+    data = data.assign(stop_arrival_s=closest_stops[:,3])
+    data = data.assign(stop_sequence=closest_stops[:,4])
+    data = data.assign(stop_dist_km=closest_stops[:,5]/1000)
     # Get the timeID_s (for the first point of each trajectory)
     data = pd.merge(data, first_points, on='shingle_id')
     # Calculate the scheduled travel time from the first to each point in the shingle
@@ -364,6 +368,34 @@ def apply_gtfs_timetables(data, gtfs_data, gtfs_folder_date):
     valid_trips = data.groupby('shingle_id').filter(lambda x: x['scheduled_time_s'].max() <= 10000)['shingle_id'].unique()
     data = data[data['shingle_id'].isin(valid_trips)]
     return data
+
+def get_scheduled_arrival(trip_ids, x, y, gtfs_data):
+    """
+    Find the nearest stop to a set of trip-coordinates, and return the scheduled arrival time.
+    trip_ids: list of trip_ids
+    lons/lats: lists of places where the bus will be arriving (end point of traj)
+    gtfs_data: merged GTFS files
+    Returns: (distance to closest stop in km, scheduled arrival time at that stop).
+    """
+    data = np.column_stack([x, y, trip_ids])
+    gtfs_data_ary = gtfs_data[['stop_x','stop_y','trip_id','arrival_s','stop_sequence']].values
+
+    # Create dictionary mapping trip_ids to lists of points in gtfs
+    id_to_points = {}
+    for point in gtfs_data_ary:
+        id_to_points.setdefault(point[2],[]).append(point)
+
+    # For each point find the closest stop that shares the trip_id
+    results = np.zeros((len(data), 6), dtype=object)
+    for i, point in enumerate(data):
+        corresponding_points = np.vstack(id_to_points.get(point[2], []))
+        point = np.expand_dims(point, 0)
+        # Find closest point and add to results
+        closest_point_dist, closest_point_idx = shape_utils.get_closest_point(corresponding_points[:,0:2], point[:,0:2])
+        closest_point = corresponding_points[closest_point_idx]
+        closest_point = np.append(closest_point, closest_point_dist)
+        results[i,:] = closest_point
+    return results
 
 def get_best_gtfs_lookup(traces, gtfs_folder):
     # Get the most recent GTFS files available corresponding to each unique file in the traces
@@ -400,34 +432,6 @@ def clean_trace_df_w_timetables(traces, gtfs_folder, epsg):
     result = pd.concat(result)
     result = result.sort_values(["file","shingle_id","locationtime"], ascending=True)
     return result
-
-def get_scheduled_arrival(trip_ids, x, y, gtfs_data):
-    """
-    Find the nearest stop to a set of trip-coordinates, and return the scheduled arrival time.
-    trip_ids: list of trip_ids
-    lons/lats: lists of places where the bus will be arriving (end point of traj)
-    gtfs_data: merged GTFS files
-    Returns: (distance to closest stop in km, scheduled arrival time at that stop).
-    """
-    data = np.column_stack([x, y, trip_ids])
-    gtfs_data_ary = gtfs_data[['stop_x','stop_y','trip_id','arrival_s']].values
-
-    # Create dictionary mapping trip_ids to lists of points in gtfs
-    id_to_points = {}
-    for point in gtfs_data_ary:
-        id_to_points.setdefault(point[2],[]).append(point)
-
-    # For each point find the closest stop that shares the trip_id
-    results = np.zeros((len(data), 5), dtype=object)
-    for i, point in enumerate(data):
-        corresponding_points = np.vstack(id_to_points.get(point[2], []))
-        point = np.expand_dims(point, 0)
-        # Find closest point and add to results
-        closest_point_dist, closest_point_idx = shape_utils.get_closest_point(corresponding_points[:,0:2], point[:,0:2])
-        closest_point = corresponding_points[closest_point_idx]
-        closest_point = np.append(closest_point, closest_point_dist)
-        results[i,:] = closest_point
-    return results[:,4], results[:,3], results[:,0], results[:,1]
 
 def remap_ids(df_list, id_col):
     """
@@ -504,6 +508,7 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, grid_bounds, grid_s_res, 
         'stop_y': lambda x: x.tolist(),
         'stop_dist_km': lambda x: x.tolist(),
         'scheduled_time_s': lambda x: x.tolist(),
+        'passed_stops_n': lambda x: x.tolist(),
         # Grid
         'tbin_idx': lambda x: x.tolist(),
         'xbin_idx': lambda x: x.tolist(),
@@ -567,6 +572,8 @@ def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg):
         "stop_dist_km_std": np.std(trace_data['stop_dist_km']),
         "scheduled_time_s_mean": np.mean(grouped.max()[['scheduled_time_s']].values.flatten()),
         "scheduled_time_s_std": np.std(grouped.max()[['scheduled_time_s']].values.flatten()),
+        "passed_stops_n_mean": np.mean(trace_data['passed_stops_n']),
+        "passed_stops_n_std": np.std(trace_data['passed_stops_n']),
         # Not variables
         "n_points": len(trace_data),
         "n_samples": len(grouped),
@@ -623,6 +630,8 @@ def merge_gtfs_files(gtfs_folder, epsg):
     # Calculate stop arrival from midnight
     gtfs_data = z.sort_values(['trip_id','stop_sequence'])
     gtfs_data['arrival_s'] = [int(x[0])*60*60 + int(x[1])*60 + int(x[2]) for x in gtfs_data['arrival_time'].str.split(":")]
+    # Resequence stops from 0 with increment of 1
+    gtfs_data['stop_sequence'] = gtfs_data.groupby('trip_id').cumcount()
     # Project stop locations to local coordinate system
     default_crs = pyproj.CRS.from_epsg(4326)
     proj_crs = pyproj.CRS.from_epsg(epsg)
