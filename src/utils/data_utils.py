@@ -143,20 +143,16 @@ def load_all_data(data_folder, filename):
     return valid_data, grid, ngrid
 
 def load_all_inputs(run_folder, network_folder, file_num):
-    train_traces = load_pkl(f"{run_folder}{network_folder}train{file_num}_traces.pkl")
-    test_traces = load_pkl(f"{run_folder}{network_folder}test{file_num}_traces.pkl")
     with open(f"{run_folder}{network_folder}/deeptte_formatted/train_config.json") as f:
         config = json.load(f)
-    train_data = load_all_data(f"{run_folder}{network_folder}deeptte_formatted/", f"train{file_num}")
-    train_grid = load_pkl(f"{run_folder}{network_folder}train{file_num}_grid.pkl")
-    train_grid_ffill = load_pkl(f"{run_folder}{network_folder}train{file_num}_grid_ffill.pkl")
+    train_traces = load_pkl(f"{run_folder}{network_folder}train{file_num}_traces.pkl")
+    train_data, train_grid_ffill, train_grid = load_all_data(f"{run_folder}{network_folder}deeptte_formatted/", f"train{file_num}")
     return {
-        "train_traces": train_traces,
-        "test_traces": test_traces,
         "config": config,
+        "train_traces": train_traces,
         "train_data": train_data,
         "train_grid": train_grid,
-        "train_grid_ffill": train_grid_ffill,
+        "train_grid_ffill": train_grid_ffill
     }
 
 def combine_config_files(cfg_folder, n_save_files, train_or_test):
@@ -448,7 +444,7 @@ def remap_ids(df_list, id_col):
         df[f"{id_col}_recode"] = recode
     return (df_list, len(pd.unique(all_ids)), mapping)
 
-def map_to_deeptte(trace_data, deeptte_formatted_path, grid_x_bounds, grid_y_bounds, grid_s_res, grid_t_res, grid_n_res):
+def map_to_deeptte(trace_data, deeptte_formatted_path, grid_bounds, grid_s_res, grid_t_res, grid_n_res):
     """
     Reshape pandas dataframe to the json format needed to use deeptte.
     trace_data: dataframe with bus trajectories
@@ -466,8 +462,8 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, grid_x_bounds, grid_y_bou
     trace_data['lngs'] = trace_data['lon']
 
     # Calculate and add grid features
-    n_grid, tbin_idxs, xbin_idxs, ybin_idxs = grids.traces_to_ngrid(trace_data, grid_x_bounds, grid_y_bounds, grid_s_res=grid_s_res, grid_t_res=grid_t_res, grid_n_res=grid_n_res)
-    fill_grid, tbin_idxs, xbin_idxs, ybin_idxs = grids.traces_to_grid(trace_data, grid_x_bounds, grid_y_bounds, grid_s_res=grid_s_res, grid_t_res=grid_t_res)
+    n_grid, tbin_idxs, xbin_idxs, ybin_idxs = grids.traces_to_ngrid(trace_data, grid_bounds, grid_s_res=grid_s_res, grid_t_res=grid_t_res, grid_n_res=grid_n_res)
+    fill_grid, tbin_idxs, xbin_idxs, ybin_idxs = grids.traces_to_grid(trace_data, grid_bounds, grid_s_res=grid_s_res, grid_t_res=grid_t_res)
     grids.fill_grid_forward(fill_grid)
     trace_data['tbin_idx'] = tbin_idxs
     trace_data['xbin_idx'] = xbin_idxs
@@ -711,7 +707,8 @@ def extract_results(city, model_results):
                     loss_df.append(df)
     loss_df = pd.concat(loss_df)
     # Extract train times
-    train_time_df = [x['Train Times'] for x in model_results]
+    # train_time_df = [x['Train Times'] for x in model_results]
+    train_time_df = []
     return result_df, loss_df, train_time_df
 
 def extract_deeptte_results(city, run_folder, network_folder, generalization_flag=False):

@@ -87,14 +87,14 @@ class NGrid:
         c = self.get_all_content()
         return np.sum(~np.isnan(c)) / c.size
 
-def traces_to_ngrid(traces, grid_x_bounds, grid_y_bounds, grid_s_res, grid_t_res, grid_n_res):
+def traces_to_ngrid(traces, grid_bounds, grid_s_res, grid_t_res, grid_n_res):
     times = traces['locationtime'].values
     # Create grid boundaries and cells
-    y_resolution = (grid_y_bounds[1] - grid_y_bounds[0]) // grid_s_res
-    x_resolution = (grid_x_bounds[1] - grid_x_bounds[0]) // grid_s_res
-    ybins = np.linspace(grid_y_bounds[0], grid_y_bounds[1], y_resolution)
+    y_resolution = (grid_bounds[3] - grid_bounds[1]) // grid_s_res
+    x_resolution = (grid_bounds[2] - grid_bounds[0]) // grid_s_res
+    ybins = np.linspace(grid_bounds[1], grid_bounds[3], y_resolution)
     ybins = np.append(ybins, ybins[-1]+.0000001)
-    xbins = np.linspace(grid_x_bounds[0], grid_x_bounds[1], x_resolution)
+    xbins = np.linspace(grid_bounds[0], grid_bounds[2], x_resolution)
     xbins = np.append(xbins, xbins[-1]+.0000001)
     tbins = np.arange(np.min(times),np.max(times),grid_t_res)
     tbins = np.append(tbins, tbins[-1]+1)
@@ -113,9 +113,9 @@ def traces_to_ngrid(traces, grid_x_bounds, grid_y_bounds, grid_s_res, grid_t_res
     ngrid = NGrid(content=obs, c_resolution=4, x_resolution=x_resolution, y_resolution=y_resolution, t_resolution=len(tbins), n_resolution=grid_n_res)
     return ngrid, tbin_idxs, xbin_idxs, ybin_idxs
 
-def traces_to_grid(traces, grid_x_bounds, grid_y_bounds, grid_s_res, grid_t_res):
+def traces_to_grid(traces, grid_bounds, grid_s_res, grid_t_res):
     # Create grid
-    grid, tbins, xbins, ybins = decompose_and_rasterize(traces['speed_m_s'].values, traces['bearing'].values, traces['x'].values, traces['y'].values, traces['locationtime'].values, grid_x_bounds, grid_y_bounds, grid_s_res, grid_t_res)
+    grid, tbins, xbins, ybins = decompose_and_rasterize(traces['speed_m_s'].values, traces['bearing'].values, traces['x'].values, traces['y'].values, traces['locationtime'].values, grid_bounds, grid_s_res, grid_t_res)
     # Get tbins for each trace. No overlap between current trip and grid values.
     # Grid assigned values: binedge[i-1] <= x < binedge[i]
     # Trace values: binedge[i-1] < x <= binedge[i]
@@ -131,15 +131,15 @@ def traces_to_grid(traces, grid_x_bounds, grid_y_bounds, grid_s_res, grid_t_res)
     ybin_idxs = np.maximum(0,ybin_idxs)
     return grid, tbin_idxs, xbin_idxs, ybin_idxs
 
-def decompose_and_rasterize(features, bearings, x, y, times, grid_x_bounds, grid_y_bounds, grid_s_res, grid_t_res):
+def decompose_and_rasterize(features, bearings, x, y, times, grid_bounds, grid_s_res, grid_t_res):
     # Get regularly spaced bins at given resolution/timestep across bbox for all collected points
     # Need to flip bins for latitude because it should decrease downward through array
     # Add a bin to the upper end; all obs are assigned such that bin_edge[i-1] <= x < bin_edge[i]
-    y_resolution = (grid_y_bounds[1] - grid_y_bounds[0]) // grid_s_res
-    x_resolution = (grid_x_bounds[1] - grid_x_bounds[0]) // grid_s_res
-    ybins = np.linspace(grid_y_bounds[0], grid_y_bounds[1], y_resolution)
+    y_resolution = (grid_bounds[3] - grid_bounds[1]) // grid_s_res
+    x_resolution = (grid_bounds[2] - grid_bounds[0]) // grid_s_res
+    ybins = np.linspace(grid_bounds[1], grid_bounds[3], y_resolution)
     ybins = np.append(ybins, ybins[-1]+.0000001)
-    xbins = np.linspace(grid_x_bounds[0], grid_x_bounds[1], x_resolution)
+    xbins = np.linspace(grid_bounds[0], grid_bounds[2], x_resolution)
     xbins = np.append(xbins, xbins[-1]+.0000001)
     tbins = np.arange(np.min(times),np.max(times),grid_t_res)
     tbins = np.append(tbins, tbins[-1]+1)

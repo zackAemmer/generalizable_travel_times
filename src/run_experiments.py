@@ -16,7 +16,7 @@ from models import avg_speed, conv, ff, persistent, rnn, schedule, transformer
 from utils import data_loader, data_utils, model_utils
 
 
-def run_experiments(run_folder, train_network_folder, test_network_folder, hyperparameters, **kwargs):
+def run_experiments(run_folder, train_network_folder, test_network_folder, **kwargs):
     print("="*30)
     print(f"RUN EXPERIMENTS: '{run_folder}'")
     print(f"TRAINED ON NETWORK: '{train_network_folder}'")
@@ -35,8 +35,8 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, hyper
     print(f"WORKERS: {NUM_WORKERS}")
 
     # Set hyperparameters
-    BATCH_SIZE = hyperparameters['BATCH_SIZE']
-    HIDDEN_SIZE = hyperparameters['HIDDEN_SIZE']
+    BATCH_SIZE = kwargs['BATCH_SIZE']
+    HIDDEN_SIZE = kwargs['HIDDEN_SIZE']
 
     # Define embedded variables for network models
     embed_dict = {
@@ -58,7 +58,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, hyper
     train_file_list.sort()
     test_file_list = list(filter(lambda x: x[:4]=="test" and len(x)==5, os.listdir(test_data_folder)))
     test_file_list.sort()
-    print(f"VALID FILES: {train_file_list}")
+    print(f"TRAIN FILES: {train_file_list}")
     print(f"TEST FILES: {test_file_list}")
     print("="*30)
 
@@ -235,96 +235,63 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, hyper
         print(f"Model names: {[m.model_name for m in nn_model_list]}")
         print(f"Model total parameters: {[sum(p.numel() for p in m.parameters()) for m in nn_model_list]}")
 
-        # Test models on the network they trained on
-        print(f"Evaluating {train_data_folder} on {train_data_folder}")
-        train_results = []
+        # Test models on different networks
         model_fold_results = {}
         for x in all_model_list:
-            model_fold_results[x.model_name] = {"Labels":[], "Preds":[]}
-        for valid_file in train_file_list:
+            model_fold_results[x.model_name] = {"Train_Labels":[], "Train_Preds":[], "Test_Labels":[], "Test_Preds":[]}
+
+        print(f"Evaluating {run_folder}{train_network_folder} on {train_data_folder}")
+        for valid_file in test_file_list:
+            print(f"VALIDATE FILE: {valid_file}")
             valid_data, grid, ngrid = data_utils.load_all_data(train_data_folder, valid_file)
-            print(f"Successfully loaded {len(valid_data)} testing samples.")
             grid_content = grid.get_fill_content()
-            print(f"VALIDATE FILE: {valid_file}")
             with open(f"{train_data_folder}train_config.json", "r") as f:
                 config = json.load(f)
+            print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = []
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=1))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=1))
-            # dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=1))
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid)
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
                 print(f"Evaluating: {model.model_name}")
                 labels, preds = model.evaluate(loader, config)
-                model_fold_results[model.model_name]["Labels"].extend(list(labels))
-                model_fold_results[model.model_name]["Preds"].extend(list(preds))
-            train_results.append(model_fold_results)
+                model_fold_results[model.model_name]["Train_Labels"].extend(list(labels))
+                model_fold_results[model.model_name]["Train_Preds"].extend(list(preds))
 
-        # Test models on network they did not train on
-        print(f"Evaluating {train_data_folder} on {test_data_folder}")
-        test_results = []
-        model_fold_results = {}
-        for x in all_model_list:
-            model_fold_results[x.model_name] = {"Labels":[], "Preds":[]}
-        for valid_file in train_file_list:
+        print(f"Evaluating {run_folder}{train_network_folder} on {test_data_folder}")
+        for valid_file in test_file_list:
+            print(f"VALIDATE FILE: {valid_file}")
             valid_data, grid, ngrid = data_utils.load_all_data(test_data_folder, valid_file)
-            print(f"Successfully loaded {len(valid_data)} testing samples.")
             grid_content = grid.get_fill_content()
-            print(f"VALIDATE FILE: {valid_file}")
             with open(f"{train_data_folder}train_config.json", "r") as f:
                 config = json.load(f)
+            print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = []
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=1))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=1))
-            # dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_mto_collate, NUM_WORKERS))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=1))
-            dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=ngrid, is_ngrid=True, buffer=1))
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid)
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
                 print(f"Evaluating: {model.model_name}")
                 labels, preds = model.evaluate(loader, config)
-                model_fold_results[model.model_name]["Labels"].extend(list(labels))
-                model_fold_results[model.model_name]["Preds"].extend(list(preds))
-            test_results.append(model_fold_results)
+                model_fold_results[model.model_name]["Test_Labels"].extend(list(labels))
+                model_fold_results[model.model_name]["Test_Preds"].extend(list(preds))
 
-            # Calculate various losses:
-            fold_results = {
-                "Model Names": [x.model_name for x in all_model_list],
-                "Fold": fold_num,
-                "All Losses": [],
-            }
-            for mname in fold_results["Model Names"]:
-                _ = [mname]
-                _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Labels"], model_fold_results[mname]["Preds"]), 2))
-                _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Labels"], model_fold_results[mname]["Preds"])), 2))
-                _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Labels"], model_fold_results[mname]["Preds"]), 2))
-                fold_results['All Losses'].append(_)
+        # Calculate various losses:
+        fold_results = {
+            "Model_Names": [x.model_name for x in all_model_list],
+            "Fold": fold_num,
+            "Train_Losses": [],
+            "Test_Losses": []
+        }
+        for mname in fold_results["Model_Names"]:
+            _ = [mname]
+            _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Train_Labels"], model_fold_results[mname]["Train_Preds"]), 2))
+            _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Train_Labels"], model_fold_results[mname]["Train_Preds"])), 2))
+            _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Train_Labels"], model_fold_results[mname]["Train_Preds"]), 2))
+            fold_results['Train_Losses'].append(_)
+            _ = [mname]
+            _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Test_Labels"], model_fold_results[mname]["Test_Preds"]), 2))
+            _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Test_Labels"], model_fold_results[mname]["Test_Preds"])), 2))
+            _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Test_Labels"], model_fold_results[mname]["Test_Preds"]), 2))
+            fold_results['Test_Losses'].append(_)
 
         # Save fold
         run_results.append(fold_results)
@@ -336,7 +303,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, hyper
 
     # Save run results
     data_utils.write_pkl(run_results, f"{run_folder}{train_network_folder}model_generalization_results.pkl")
-    print(f"MODEL RUN COMPLETED '{run_folder}{train_network_folder}'")
+    print(f"EXPERIMENTS COMPLETED '{run_folder}{train_network_folder}'")
 
 
 if __name__=="__main__":
@@ -349,14 +316,11 @@ if __name__=="__main__":
         run_folder="./results/debug/",
         train_network_folder="kcm/",
         test_network_folder="atb/",
-        hyperparameters={
-            "EPOCHS": 50,
-            "BATCH_SIZE": 512,
-            "LEARN_RATE": 1e-3,
-            "HIDDEN_SIZE": 32
-        },
+        EPOCHS=50,
+        BATCH_SIZE=512,
+        LEARN_RATE=1e-3,
+        HIDDEN_SIZE=32,
         n_folds=5,
-        fold_model=0
     )
     random.seed(0)
     np.random.seed(0)
@@ -365,12 +329,9 @@ if __name__=="__main__":
         run_folder="./results/debug/",
         train_network_folder="atb/",
         test_network_folder="kcm/",
-        hyperparameters={
-            "EPOCHS": 50,
-            "BATCH_SIZE": 512,
-            "LEARN_RATE": 1e-3,
-            "HIDDEN_SIZE": 32
-        },
+        EPOCHS=50,
+        BATCH_SIZE=512,
+        LEARN_RATE=1e-3,
+        HIDDEN_SIZE=32,
         n_folds=5,
-        fold_model=0
     )

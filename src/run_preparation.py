@@ -61,7 +61,7 @@ def clean_data(dates, n_save_files, train_or_test, base_folder, **kwargs):
             continue
         print(f"Saving {len(traces)} samples to run folder, retained {np.round(len(traces)/num_raw_points, 2)*100}% of original data points...")
         deeptte_formatted_path = f"{base_folder}deeptte_formatted/{train_or_test}{file_num}"
-        traces, train_n_grid, train_fill_grid = data_utils.map_to_deeptte(traces, deeptte_formatted_path, grid_x_bounds=kwargs['grid_x_bounds'], grid_y_bounds=kwargs['grid_y_bounds'], grid_s_res=kwargs['grid_s_res'], grid_t_res=kwargs['grid_t_res'], grid_n_res=kwargs['grid_n_res'])
+        traces, train_n_grid, train_fill_grid = data_utils.map_to_deeptte(traces, deeptte_formatted_path, grid_bounds=kwargs['grid_bounds'], grid_s_res=kwargs['grid_s_res'], grid_t_res=kwargs['grid_t_res'], grid_n_res=kwargs['grid_n_res'])
         summary_config = data_utils.get_summary_config(traces, kwargs['gtfs_folder'], n_save_files, kwargs['epsg'])
         # Save config, and traces to file for notebook analyses
         with open(f"{deeptte_formatted_path}_config.json", mode="a") as out_file:
@@ -106,25 +106,73 @@ def prepare_run(overwrite, run_name, network_name, train_dates, test_dates, **kw
     print(f"RUN PREPARATION COMPLETED '{run_name}/{network_name}'")
 
 if __name__=="__main__":
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # prepare_run(
+    #     overwrite=True,
+    #     run_name="debug",
+    #     network_name="kcm",
+    #     train_dates=data_utils.get_date_list("2023_03_15", 3),
+    #     test_dates=data_utils.get_date_list("2023_04_01", 3),
+    #     num_train_files=2,
+    #     num_test_files=2,
+    #     n_jobs=2,
+    #     n_trace_splits=2,
+    #     data_dropout=0.2,
+    #     gtfs_folder="./data/kcm_gtfs/",
+    #     raw_data_folder="./data/kcm_all/",
+    #     timezone="America/Los_Angeles",
+    #     epsg="32148",
+    #     grid_bounds = [369903,37911,409618,87758],
+    #     grid_s_res=500,
+    #     grid_t_res=120,
+    #     grid_n_res=3,
+    #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
+    # )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # prepare_run(
+    #     overwrite=True,
+    #     run_name="debug",
+    #     network_name="atb",
+    #     train_dates=data_utils.get_date_list("2023_03_15", 3),
+    #     test_dates=data_utils.get_date_list("2023_04_01", 3),
+    #     num_train_files=2,
+    #     num_test_files=2,
+    #     n_jobs=2,
+    #     n_trace_splits=2,
+    #     data_dropout=0.2,
+    #     gtfs_folder="./data/atb_gtfs/",
+    #     raw_data_folder="./data/atb_all_new/",
+    #     timezone="Europe/Oslo",
+    #     epsg="32632",
+    #     grid_bounds = [527069,6970957,606659,7099381],
+    #     grid_s_res=5000,
+    #     grid_t_res=120,
+    #     grid_n_res=3,
+    #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']
+    # )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     prepare_run(
         overwrite=True,
-        run_name="debug",
+        run_name="small",
         network_name="kcm",
-        train_dates=data_utils.get_date_list("2023_03_15", 3),
-        test_dates=data_utils.get_date_list("2023_04_01", 3),
-        num_train_files=2,
+        train_dates=data_utils.get_date_list("2023_03_15", 30),
+        test_dates=data_utils.get_date_list("2023_04_16", 7),
+        num_train_files=4,
         num_test_files=2,
-        n_jobs=2,
-        n_trace_splits=2,
+        n_jobs=4,
+        n_trace_splits=4,
         data_dropout=0.2,
         gtfs_folder="./data/kcm_gtfs/",
         raw_data_folder="./data/kcm_all/",
         timezone="America/Los_Angeles",
         epsg="32148",
-        grid_bounds = [369903.9072,37911.1361,409618.5313,87758.0559],
+        grid_bounds = [369903,37911,409618,87758],
         grid_s_res=500,
         grid_t_res=120,
         grid_n_res=3,
@@ -135,20 +183,20 @@ if __name__=="__main__":
     torch.manual_seed(0)
     prepare_run(
         overwrite=True,
-        run_name="debug",
+        run_name="small",
         network_name="atb",
-        train_dates=data_utils.get_date_list("2023_03_15", 3),
-        test_dates=data_utils.get_date_list("2023_04_01", 3),
-        num_train_files=2,
+        train_dates=data_utils.get_date_list("2023_03_15", 30),
+        test_dates=data_utils.get_date_list("2023_04_16", 7),
+        num_train_files=4,
         num_test_files=2,
-        n_jobs=2,
-        n_trace_splits=2,
+        n_jobs=4,
+        n_trace_splits=4,
         data_dropout=0.2,
         gtfs_folder="./data/atb_gtfs/",
         raw_data_folder="./data/atb_all_new/",
         timezone="Europe/Oslo",
         epsg="32632",
-        grid_bounds = [527069.4914,6970957.8167,606659.4223,7099381.7861],
+        grid_bounds = [527069,6970957,606659,7099381],
         grid_s_res=5000,
         grid_t_res=120,
         grid_n_res=3,
