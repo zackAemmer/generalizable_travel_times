@@ -28,8 +28,9 @@ class FF(nn.Module):
             nn.Linear(self.hidden_size, self.hidden_size),
             nn.ReLU(),
             nn.Dropout(p=0.1),
-            nn.Linear(self.hidden_size, 1),
         )
+        self.feature_extract = nn.Linear(self.hidden_size, 1)
+        self.feature_extract_activation = nn.ReLU()
     def forward(self, x):
         x_em = x[0]
         x_ct = x[1]
@@ -39,7 +40,8 @@ class FF(nn.Module):
         # Feed data through the model
         x = torch.cat([x_ct, timeID_embedded, weekID_embedded], dim=1)
         # Make prediction
-        pred = self.linear_relu_stack(x)
+        x = self.linear_relu_stack(x)
+        pred = self.feature_extract(self.feature_extract_activation(x))
         return pred.squeeze()
     def batch_step(self, data):
         inputs, labels = data
@@ -85,8 +87,9 @@ class FF_GRID(nn.Module):
             nn.Linear(self.hidden_size, self.hidden_size),
             nn.ReLU(),
             nn.Dropout(p=0.1),
-            nn.Linear(self.hidden_size, 1),
         )
+        self.feature_extract = nn.Linear(self.hidden_size, 1)
+        self.feature_extract_activation = nn.ReLU()
     def forward(self, x):
         x_em = x[0]
         x_ct = x[1]
@@ -99,7 +102,8 @@ class FF_GRID(nn.Module):
         # Feed data through the model
         x = torch.cat([x_gr, x_ct, timeID_embedded, weekID_embedded], dim=1)
         # Make prediction
-        pred = self.linear_relu_stack(x)
+        x = self.linear_relu_stack(x)
+        pred = self.feature_extract(self.feature_extract_activation(x))
         return pred.squeeze()
     def batch_step(self, data):
         inputs, labels = data
@@ -151,8 +155,9 @@ class FF_GRID_ATTN(nn.Module):
             nn.Linear(self.hidden_size, self.hidden_size),
             nn.ReLU(),
             nn.Dropout(p=0.1),
-            nn.Linear(self.hidden_size, 1),
         )
+        self.feature_extract = nn.Linear(self.hidden_size, 1)
+        self.feature_extract_activation = nn.ReLU()
     def forward(self, x):
         x_em = x[0]
         x_ct = x[1]
@@ -168,7 +173,8 @@ class FF_GRID_ATTN(nn.Module):
         # Feed data through the model
         x = torch.cat([x, x_ct, timeID_embedded, weekID_embedded], dim=1)
         # Make prediction
-        pred = self.linear_relu_stack(x)
+        x = self.linear_relu_stack(x)
+        pred = self.feature_extract(self.feature_extract_activation(x))
         return pred.squeeze()
     def batch_step(self, data):
         inputs, labels = data

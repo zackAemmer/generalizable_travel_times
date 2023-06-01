@@ -14,7 +14,7 @@ from models import avg_speed, conv, ff, persistent, rnn, schedule, transformer
 from utils import data_utils, model_utils
 
 
-def run_experiments(run_folder, train_network_folder, test_network_folder, **kwargs):
+def run_experiments(run_folder, train_network_folder, test_network_folder, tune_network_folder, **kwargs):
     print("="*30)
     print(f"RUN EXPERIMENTS: '{run_folder}'")
     print(f"TRAINED ON NETWORK: '{train_network_folder}'")
@@ -51,13 +51,16 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, **kwa
     # Get list of available test files
     train_data_folder = f"{run_folder}{train_network_folder}deeptte_formatted/"
     test_data_folder = f"{run_folder}{test_network_folder}deeptte_formatted/"
-    print(f"DATA: Train '{train_data_folder}', Test '{test_data_folder}'")
+    tune_data_folder = f"{run_folder}{tune_network_folder}deeptte_formatted/"
     train_file_list = list(filter(lambda x: x[:4]=="test" and len(x)==5, os.listdir(train_data_folder)))
     train_file_list.sort()
     test_file_list = list(filter(lambda x: x[:4]=="test" and len(x)==5, os.listdir(test_data_folder)))
     test_file_list.sort()
-    print(f"TRAIN FILES: {train_file_list}")
-    print(f"TEST FILES: {test_file_list}")
+    tune_file_list = list(filter(lambda x: x[:5]=="train" and len(x)==6, os.listdir(tune_data_folder)))
+    tune_file_list.sort()
+    print(f"TRAIN FILES: {train_data_folder} {train_file_list}")
+    print(f"TEST FILES: {test_data_folder} {test_file_list}")
+    print(f"TUNE FILES: {tune_data_folder} {tune_file_list}")
     print("="*30)
 
     run_results = []
@@ -205,8 +208,141 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, **kwa
         # Test models on different networks
         model_fold_results = {}
         for x in all_model_list:
-            model_fold_results[x.model_name] = {"Train_Labels":[], "Train_Preds":[], "Test_Labels":[], "Test_Preds":[]}
+            model_fold_results[x.model_name] = {
+                "Train_Labels":[],
+                "Train_Preds":[],
+                "Test_Labels":[],
+                "Test_Preds":[],
+                "Tune_Train_Labels":[],
+                "Tune_Train_Preds":[],
+                "Tune_Test_Labels":[],
+                "Tune_Test_Preds":[],
+                "Extract_Train_Labels":[],
+                "Extract_Train_Preds":[],
+                "Extract_Test_Labels":[],
+                "Extract_Test_Preds":[]
+            }
 
+        # # Test each model on a holdout validation set from the original training network
+        # print(f"EXPERIMENT: SAME NETWORK")
+        # print(f"Evaluating {run_folder}{train_network_folder} on {train_data_folder}")
+        # for valid_file in train_file_list:
+        #     print(f"VALIDATE FILE: {valid_file}")
+        #     valid_data, grid, ngrid = data_utils.load_all_data(train_data_folder, valid_file)
+        #     grid_content = grid.get_fill_content()
+        #     with open(f"{train_data_folder}train_config.json", "r") as f:
+        #         config = json.load(f)
+        #     print(f"Successfully loaded {len(valid_data)} testing samples.")
+        #     # Construct dataloaders for all models
+        #     dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
+        #     # Test all models
+        #     for model, loader in zip(all_model_list, dataloaders):
+        #         labels, preds = model.evaluate(loader, config)
+        #         model_fold_results[model.model_name]["Train_Labels"].extend(list(labels))
+        #         model_fold_results[model.model_name]["Train_Preds"].extend(list(preds))
+
+        # # Test each model on a set from a different network
+        # print(f"EXPERIMENT: DIFFERENT NETWORK")
+        # print(f"Evaluating {run_folder}{train_network_folder} on {test_data_folder}")
+        # for valid_file in test_file_list:
+        #     print(f"VALIDATE FILE: {valid_file}")
+        #     valid_data, grid, ngrid = data_utils.load_all_data(test_data_folder, valid_file)
+        #     grid_content = grid.get_fill_content()
+        #     with open(f"{train_data_folder}train_config.json", "r") as f:
+        #         config = json.load(f)
+        #     print(f"Successfully loaded {len(valid_data)} testing samples.")
+        #     # Construct dataloaders for all models
+        #     dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
+        #     # Test all models
+        #     for model, loader in zip(all_model_list, dataloaders):
+        #         labels, preds = model.evaluate(loader, config)
+        #         model_fold_results[model.model_name]["Test_Labels"].extend(list(labels))
+        #         model_fold_results[model.model_name]["Test_Preds"].extend(list(preds))
+
+        # # Fine-tune each model, then test on a set from a different network
+        # print(f"EXPERIMENT: FINE TUNING")
+        # for epoch in range(kwargs['TUNE_EPOCHS']):
+        #     print(f"FOLD: {fold_num}, FINE TUNING EPOCH: {epoch}")
+        #     # Train all models on each training file; split samples in each file by fold
+        #     for tune_file in list(tune_file_list):
+        #         # Load data and config for this training fold/file
+        #         tune_data, _, grid, ngrid = data_utils.load_fold_data(tune_data_folder, tune_file, fold_num, kwargs['n_folds'])
+        #         grid_content = grid.get_fill_content()
+        #         print(f"TUNE FILE: {tune_file}, {len(tune_data)} tune samples")
+        #         with open(f"{train_data_folder}train_config.json", "r") as f:
+        #             config = json.load(f)
+        #         # Construct dataloaders
+        #         base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(tune_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, combine=False, data_subset=kwargs['n_tune_samples'])
+        #         # Train all models
+        #         for model, loader in zip(base_model_list, base_dataloaders):
+        #             model.train(loader, config)
+        #         for model, loader in zip(nn_model_list, nn_dataloaders):
+        #             avg_batch_loss = model_utils.train(model, loader, kwargs['LEARN_RATE'])
+        # # Save tuned models
+        # print(f"Fold {fold_num} fine tuning complete, saving model states and metrics...")
+        # for model in base_model_list:
+        #     model.save_to(f"{run_folder}{train_network_folder}models/{model.model_name}_tuned_{fold_num}.pkl")
+        # for model in nn_model_list:
+        #     torch.save(model.state_dict(), f"{run_folder}{train_network_folder}models/{model.model_name}_tuned_{fold_num}.pt")
+        # # Retest each model on the original and generalization networks
+        # print(f"Evaluating {run_folder}{train_network_folder} on {train_data_folder}")
+        # for valid_file in train_file_list:
+        #     print(f"VALIDATE FILE: {valid_file}")
+        #     valid_data, grid, ngrid = data_utils.load_all_data(train_data_folder, valid_file)
+        #     grid_content = grid.get_fill_content()
+        #     with open(f"{train_data_folder}train_config.json", "r") as f:
+        #         config = json.load(f)
+        #     print(f"Successfully loaded {len(valid_data)} testing samples.")
+        #     # Construct dataloaders for all models
+        #     dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
+        #     # Test all models
+        #     for model, loader in zip(all_model_list, dataloaders):
+        #         labels, preds = model.evaluate(loader, config)
+        #         model_fold_results[model.model_name]["Tune_Train_Labels"].extend(list(labels))
+        #         model_fold_results[model.model_name]["Tune_Train_Preds"].extend(list(preds))
+        # print(f"Evaluating {run_folder}{train_network_folder} on {test_data_folder}")
+        # for valid_file in test_file_list:
+        #     print(f"VALIDATE FILE: {valid_file}")
+        #     valid_data, grid, ngrid = data_utils.load_all_data(test_data_folder, valid_file)
+        #     grid_content = grid.get_fill_content()
+        #     with open(f"{train_data_folder}train_config.json", "r") as f:
+        #         config = json.load(f)
+        #     print(f"Successfully loaded {len(valid_data)} testing samples.")
+        #     # Construct dataloaders for all models
+        #     dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
+        #     # Test all models
+        #     for model, loader in zip(all_model_list, dataloaders):
+        #         labels, preds = model.evaluate(loader, config)
+        #         model_fold_results[model.model_name]["Tune_Test_Labels"].extend(list(labels))
+        #         model_fold_results[model.model_name]["Tune_Test_Preds"].extend(list(preds))
+
+        # Fine-tune each model, then test on a set from a different network
+        print(f"EXPERIMENT: FEATURE EXTRACTION")
+        for epoch in range(kwargs['TUNE_EPOCHS']):
+            print(f"FOLD: {fold_num}, FEATURE EXTRACTION EPOCH: {epoch}")
+            # Train all models on each training file; split samples in each file by fold
+            for tune_file in list(tune_file_list):
+                # Load data and config for this training fold/file
+                tune_data, _, grid, ngrid = data_utils.load_fold_data(tune_data_folder, tune_file, fold_num, kwargs['n_folds'])
+                grid_content = grid.get_fill_content()
+                print(f"TUNE FILE: {tune_file}, {len(tune_data)} tune samples")
+                with open(f"{train_data_folder}train_config.json", "r") as f:
+                    config = json.load(f)
+                # Construct dataloaders
+                base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(tune_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, combine=False, data_subset=kwargs['n_tune_samples'])
+                # Train all models
+                for model, loader in zip(base_model_list, base_dataloaders):
+                    model.train(loader, config)
+                for model, loader in zip(nn_model_list, nn_dataloaders):
+                    model_utils.set_feature_extraction(model)
+                    avg_batch_loss = model_utils.train(model, loader, kwargs['LEARN_RATE'])
+        # Save tuned models
+        print(f"Fold {fold_num} feature extraction complete, saving model states and metrics...")
+        for model in base_model_list:
+            model.save_to(f"{run_folder}{train_network_folder}models/{model.model_name}_extracted_{fold_num}.pkl")
+        for model in nn_model_list:
+            torch.save(model.state_dict(), f"{run_folder}{train_network_folder}models/{model.model_name}_extracted_{fold_num}.pt")
+        # Retest each model on the original and generalization networks
         print(f"Evaluating {run_folder}{train_network_folder} on {train_data_folder}")
         for valid_file in train_file_list:
             print(f"VALIDATE FILE: {valid_file}")
@@ -219,11 +355,9 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, **kwa
             dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
-                print(f"Evaluating: {model.model_name}")
                 labels, preds = model.evaluate(loader, config)
-                model_fold_results[model.model_name]["Train_Labels"].extend(list(labels))
-                model_fold_results[model.model_name]["Train_Preds"].extend(list(preds))
-
+                model_fold_results[model.model_name]["Extract_Train_Labels"].extend(list(labels))
+                model_fold_results[model.model_name]["Extract_Train_Preds"].extend(list(preds))
         print(f"Evaluating {run_folder}{train_network_folder} on {test_data_folder}")
         for valid_file in test_file_list:
             print(f"VALIDATE FILE: {valid_file}")
@@ -236,17 +370,20 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, **kwa
             dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
-                print(f"Evaluating: {model.model_name}")
                 labels, preds = model.evaluate(loader, config)
-                model_fold_results[model.model_name]["Test_Labels"].extend(list(labels))
-                model_fold_results[model.model_name]["Test_Preds"].extend(list(preds))
+                model_fold_results[model.model_name]["Extract_Test_Labels"].extend(list(labels))
+                model_fold_results[model.model_name]["Extract_Test_Preds"].extend(list(preds))
 
         # Calculate various losses:
         fold_results = {
             "Model_Names": [x.model_name for x in all_model_list],
             "Fold": fold_num,
             "Train_Losses": [],
-            "Test_Losses": []
+            "Test_Losses": [],
+            "Tune_Train_Losses": [],
+            "Tune_Test_Losses": [],
+            "Extract_Train_Losses": [],
+            "Extract_Test_Losses": []
         }
         for mname in fold_results["Model_Names"]:
             _ = [mname]
@@ -259,6 +396,26 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, **kwa
             _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Test_Labels"], model_fold_results[mname]["Test_Preds"])), 2))
             _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Test_Labels"], model_fold_results[mname]["Test_Preds"]), 2))
             fold_results['Test_Losses'].append(_)
+            _ = [mname]
+            _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Tune_Train_Labels"], model_fold_results[mname]["Tune_Train_Preds"]), 2))
+            _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Tune_Train_Labels"], model_fold_results[mname]["Tune_Train_Preds"])), 2))
+            _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Tune_Train_Labels"], model_fold_results[mname]["Tune_Train_Preds"]), 2))
+            fold_results['Tune_Train_Losses'].append(_)
+            _ = [mname]
+            _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Tune_Test_Labels"], model_fold_results[mname]["Tune_Test_Preds"]), 2))
+            _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Tune_Test_Labels"], model_fold_results[mname]["Tune_Test_Preds"])), 2))
+            _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Tune_Test_Labels"], model_fold_results[mname]["Tune_Test_Preds"]), 2))
+            fold_results['Tune_Test_Losses'].append(_)
+            _ = [mname]
+            _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Extract_Train_Labels"], model_fold_results[mname]["Extract_Train_Preds"]), 2))
+            _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Extract_Train_Labels"], model_fold_results[mname]["Extract_Train_Preds"])), 2))
+            _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Extract_Train_Labels"], model_fold_results[mname]["Extract_Train_Preds"]), 2))
+            fold_results['Extract_Train_Losses'].append(_)
+            _ = [mname]
+            _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Extract_Test_Labels"], model_fold_results[mname]["Extract_Test_Preds"]), 2))
+            _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Extract_Test_Labels"], model_fold_results[mname]["Extract_Test_Preds"])), 2))
+            _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Extract_Test_Labels"], model_fold_results[mname]["Extract_Test_Preds"]), 2))
+            fold_results['Extract_Test_Losses'].append(_)
 
         # Save fold
         run_results.append(fold_results)
@@ -283,11 +440,13 @@ if __name__=="__main__":
         run_folder="./results/debug/",
         train_network_folder="kcm/",
         test_network_folder="atb/",
-        EPOCHS=50,
+        tune_network_folder="atb/",
+        TUNE_EPOCHS=10,
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
         data_subset=.1,
+        n_tune_samples=500,
         n_folds=2,
     )
     random.seed(0)
@@ -297,11 +456,13 @@ if __name__=="__main__":
         run_folder="./results/debug/",
         train_network_folder="atb/",
         test_network_folder="kcm/",
-        EPOCHS=50,
+        tune_network_folder="kcm/",
+        TUNE_EPOCHS=10,
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
         data_subset=.1,
+        n_tune_samples=500,
         n_folds=2,
     )
     # random.seed(0)

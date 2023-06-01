@@ -26,7 +26,8 @@ class GRU(nn.Module):
         # Recurrent layer
         self.rnn = nn.GRU(input_size=self.n_features + self.embed_total_dims, hidden_size=self.hidden_size, num_layers=1, batch_first=True)
         # Linear compression layer
-        self.linear = nn.Linear(in_features=self.hidden_size, out_features=1)
+        self.feature_extract = nn.Linear(in_features=self.hidden_size, out_features=1)
+        self.feature_extract_activation = nn.ReLU()
     def forward(self, x, hidden_prev):
         x_em = x[0]
         x_ct = x[1]
@@ -39,7 +40,7 @@ class GRU(nn.Module):
         x = torch.cat([x_em, x_ct], dim=2)
         # Get recurrent pred
         out, hidden_prev = self.rnn(x, hidden_prev)
-        out = self.linear(self.activation(out)).squeeze(2)
+        out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
         return out, hidden_prev
     def batch_step(self, data):
         inputs, labels = data
@@ -89,7 +90,8 @@ class GRU_GRID(nn.Module):
         # Recurrent layer
         self.rnn = nn.GRU(input_size=self.n_features + self.embed_total_dims + self.grid_compression_size, hidden_size=self.hidden_size, num_layers=1, batch_first=True)
         # Linear compression layer
-        self.linear = nn.Linear(in_features=self.hidden_size, out_features=1)
+        self.feature_extract = nn.Linear(in_features=self.hidden_size, out_features=1)
+        self.feature_extract_activation = nn.ReLU()
     def forward(self, x, hidden_prev):
         x_em = x[0]
         x_ct = x[1]
@@ -108,7 +110,7 @@ class GRU_GRID(nn.Module):
         x = torch.cat([x_em, x_gr, x_ct], dim=2)
         # Get recurrent pred
         out, hidden_prev = self.rnn(x, hidden_prev)
-        out = self.activation(self.linear(self.activation(out)))
+        out = self.feature_extract(self.feature_extract_activation(out))
         out = out.squeeze(2)
         return out, hidden_prev
     def batch_step(self, data):
@@ -165,7 +167,8 @@ class GRU_GRID_ATTN(nn.Module):
         # Recurrent layer
         self.rnn = nn.GRU(input_size=self.n_features + self.embed_total_dims + self.grid_compression_size, hidden_size=self.hidden_size, num_layers=1, batch_first=True)
         # Linear compression layer
-        self.linear = nn.Linear(in_features=self.hidden_size, out_features=1)
+        self.feature_extract = nn.Linear(in_features=self.hidden_size, out_features=1)
+        self.feature_extract_activation = nn.ReLU()
     def forward(self, x, hidden_prev):
         x_em = x[0]
         x_ct = x[1]
@@ -186,7 +189,7 @@ class GRU_GRID_ATTN(nn.Module):
         x = torch.cat([x_em, x_gr, x_ct], dim=2)
         # Get recurrent pred
         out, hidden_prev = self.rnn(x, hidden_prev)
-        out = self.activation(self.linear(self.activation(out))).squeeze(2)
+        out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
         return out, hidden_prev
     def batch_step(self, data):
         inputs, labels = data

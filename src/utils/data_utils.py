@@ -730,55 +730,35 @@ def extract_results(city, model_results):
 
 def extract_gen_results(city, gen_results):
     # Extract generalization results
-    fold_results = [x['Train_Losses'] for x in gen_results]
-    cities = []
-    models = []
-    mapes = []
-    rmses = []
-    maes = []
-    fold_nums = []
-    for fold_num in range(0,len(fold_results)):
-        for value in range(0,len(fold_results[0])):
-            cities.append(city)
-            fold_nums.append(fold_num)
-            models.append(fold_results[fold_num][value][0])
-            mapes.append(fold_results[fold_num][value][1])
-            rmses.append(fold_results[fold_num][value][2])
-            maes.append(fold_results[fold_num][value][3])
-    train_gen_df = pd.DataFrame({
-        "Model": models,
-        "City": cities,
-        "Loss": "Train",
-        "Fold": fold_nums,
-        "MAPE": mapes,
-        "RMSE": rmses,
-        "MAE": maes
-    })
-    fold_results = [x['Test_Losses'] for x in gen_results]
-    cities = []
-    models = []
-    mapes = []
-    rmses = []
-    maes = []
-    fold_nums = []
-    for fold_num in range(0,len(fold_results)):
-        for value in range(0,len(fold_results[0])):
-            cities.append(city)
-            fold_nums.append(fold_num)
-            models.append(fold_results[fold_num][value][0])
-            mapes.append(fold_results[fold_num][value][1])
-            rmses.append(fold_results[fold_num][value][2])
-            maes.append(fold_results[fold_num][value][3])
-    test_gen_df = pd.DataFrame({
-        "Model": models,
-        "City": cities,
-        "Loss": "Test",
-        "Fold": fold_nums,
-        "MAPE": mapes,
-        "RMSE": rmses,
-        "MAE": maes
-    })
-    return pd.concat([train_gen_df, test_gen_df], axis=0)
+    res = []
+    experiments = ["Train_Losses","Test_Losses","Tune_Train_Losses","Tune_Test_Losses"]
+    for ex in experiments:
+        fold_results = [x[ex] for x in gen_results]
+        cities = []
+        models = []
+        mapes = []
+        rmses = []
+        maes = []
+        fold_nums = []
+        for fold_num in range(0,len(fold_results)):
+            for value in range(0,len(fold_results[0])):
+                cities.append(city)
+                fold_nums.append(fold_num)
+                models.append(fold_results[fold_num][value][0])
+                mapes.append(fold_results[fold_num][value][1])
+                rmses.append(fold_results[fold_num][value][2])
+                maes.append(fold_results[fold_num][value][3])
+        gen_df = pd.DataFrame({
+            "Model": models,
+            "City": cities,
+            "Loss": ex,
+            "Fold": fold_nums,
+            "MAPE": mapes,
+            "RMSE": rmses,
+            "MAE": maes
+        })
+        res.append(gen_df)
+    return pd.concat(res, axis=0)
 
 def extract_deeptte_results(city, run_folder, network_folder, generalization_flag=False):
     # Extract all fold and epoch losses from deeptte run

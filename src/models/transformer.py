@@ -31,7 +31,8 @@ class TRSF(nn.Module):
         encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features + self.embed_total_dims, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
         # Linear compression layer
-        self.linear = nn.Linear(self.n_features + self.embed_total_dims, 1)
+        self.feature_extract = nn.Linear(self.n_features + self.embed_total_dims, 1)
+        self.feature_extract_activation = nn.ReLU()
     def forward(self, x):
         x_em = x[0]
         x_ct = x[1]
@@ -44,7 +45,7 @@ class TRSF(nn.Module):
         # Get transformer prediction
         out = self.pos_encoder(x)
         out = self.transformer_encoder(out)
-        out = self.linear(self.activation(out)).squeeze(2)
+        out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
         return out
     def batch_step(self, data):
         inputs, labels = data
@@ -95,7 +96,8 @@ class TRSF_GRID(nn.Module):
         encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features + self.embed_total_dims + self.grid_compression_size, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
         # Linear compression layer
-        self.linear = nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, 1)
+        self.feature_extract = nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, 1)
+        self.feature_extract_activation = nn.ReLU()
     def forward(self, x):
         x_em = x[0]
         x_ct = x[1]
@@ -115,7 +117,7 @@ class TRSF_GRID(nn.Module):
         # Get transformer prediction
         out = self.pos_encoder(x)
         out = self.transformer_encoder(out)
-        out = self.activation(self.linear(self.activation(out))).squeeze(2)
+        out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
         return out
     def batch_step(self, data):
         inputs, labels = data
@@ -172,7 +174,8 @@ class TRSF_GRID_ATTN(nn.Module):
         seq_encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features + self.embed_total_dims + self.grid_compression_size, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
         self.seq_transformer_encoder = nn.TransformerEncoder(seq_encoder_layer, num_layers=2)
         # Linear compression layer
-        self.linear = nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, 1)
+        self.feature_extract = nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, 1)
+        self.feature_extract_activation = nn.ReLU()
     def forward(self, x):
         x_em = x[0]
         x_ct = x[1]
@@ -194,7 +197,7 @@ class TRSF_GRID_ATTN(nn.Module):
         # Get transformer prediction
         out = self.seq_pos_encoder(x)
         out = self.seq_transformer_encoder(out)
-        out = self.activation(self.linear(self.activation(out))).squeeze(2)
+        out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
         return out
     def batch_step(self, data):
         inputs, labels = data

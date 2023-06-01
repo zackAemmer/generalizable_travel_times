@@ -51,7 +51,10 @@ def predict(model, dataloader, sequential_flag=False):
 def make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, combine=True, data_subset=None):
     # Subset data if applicable
     if data_subset is not None:
-        valid_data = np.random.choice(valid_data, int(data_subset*len(valid_data)))
+        if data_subset < 1:
+            valid_data = np.random.choice(valid_data, int(data_subset*len(valid_data)))
+        else:
+            valid_data = np.random.choice(valid_data, data_subset)
     # Construct dataloaders for all models
     buffer = 1
     base_dataloaders = []
@@ -76,3 +79,16 @@ def make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_conte
         return base_dataloaders
     else:
         return base_dataloaders, nn_dataloaders
+
+def set_feature_extraction(model, feature_extraction=True):
+    if feature_extraction==False:
+        for param in model.parameters():
+            param.requires_grad = True
+    else:
+        for param in model.parameters():
+            param.requires_grad = False
+        # Each model must have a final named feature extraction layer
+        for param in model.feature_extract.parameters():
+            param.requires_grad = True
+        for param in model.feature_extract_activation.parameters():
+            param.requires_grad = True
