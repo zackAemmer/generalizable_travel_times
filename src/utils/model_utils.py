@@ -48,7 +48,10 @@ def predict(model, dataloader, sequential_flag=False):
         avg_batch_loss = running_vloss / num_batches
         return labels, preds, avg_batch_loss
 
-def make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, combine=True):
+def make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, combine=True, data_subset=None):
+    # Subset data if applicable
+    if data_subset is not None:
+        valid_data = np.random.choice(valid_data, int(data_subset*len(valid_data)))
     # Construct dataloaders for all models
     buffer = 1
     base_dataloaders = []

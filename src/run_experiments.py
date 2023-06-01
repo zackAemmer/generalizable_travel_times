@@ -2,7 +2,6 @@
 
 
 import gc
-import itertools
 import json
 import os
 import random
@@ -10,10 +9,9 @@ import random
 import numpy as np
 import torch
 from sklearn import metrics
-from tabulate import tabulate
 
 from models import avg_speed, conv, ff, persistent, rnn, schedule, transformer
-from utils import data_loader, data_utils, model_utils
+from utils import data_utils, model_utils
 
 
 def run_experiments(run_folder, train_network_folder, test_network_folder, **kwargs):
@@ -64,12 +62,14 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, **kwa
 
     run_results = []
     for fold_num in range(kwargs['n_folds']):
+        print("="*30)
+        print(f"BEGIN FOLD: {fold_num}")
 
         # Declare baseline models
         base_model_list = []
-        base_model_list.append(avg_speed.AvgHourlySpeedModel("AVG"))
-        base_model_list.append(schedule.TimeTableModel("SCH"))
-        base_model_list.append(persistent.PersistentTimeSeqModel("PER_TIM"))
+        base_model_list.append(data_utils.load_pkl(f"{run_folder}{train_network_folder}models/AVG_{fold_num}.pkl"))
+        base_model_list.append(data_utils.load_pkl(f"{run_folder}{train_network_folder}models/SCH_{fold_num}.pkl"))
+        base_model_list.append(data_utils.load_pkl(f"{run_folder}{train_network_folder}models/PER_TIM_{fold_num}.pkl"))
 
         # Declare neural network models
         nn_model_list = []
@@ -208,7 +208,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, **kwa
             model_fold_results[x.model_name] = {"Train_Labels":[], "Train_Preds":[], "Test_Labels":[], "Test_Preds":[]}
 
         print(f"Evaluating {run_folder}{train_network_folder} on {train_data_folder}")
-        for valid_file in test_file_list:
+        for valid_file in train_file_list:
             print(f"VALIDATE FILE: {valid_file}")
             valid_data, grid, ngrid = data_utils.load_all_data(train_data_folder, valid_file)
             grid_content = grid.get_fill_content()
@@ -216,7 +216,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, **kwa
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid)
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
                 print(f"Evaluating: {model.model_name}")
@@ -233,7 +233,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, **kwa
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid)
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
                 print(f"Evaluating: {model.model_name}")
@@ -287,7 +287,8 @@ if __name__=="__main__":
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
-        n_folds=5,
+        data_subset=.1,
+        n_folds=2,
     )
     random.seed(0)
     np.random.seed(0)
@@ -300,7 +301,8 @@ if __name__=="__main__":
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
-        n_folds=5,
+        data_subset=.1,
+        n_folds=2,
     )
     # random.seed(0)
     # np.random.seed(0)
