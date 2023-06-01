@@ -223,98 +223,98 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 "Extract_Test_Preds":[]
             }
 
-        # # Test each model on a holdout validation set from the original training network
-        # print(f"EXPERIMENT: SAME NETWORK")
-        # print(f"Evaluating {run_folder}{train_network_folder} on {train_data_folder}")
-        # for valid_file in train_file_list:
-        #     print(f"VALIDATE FILE: {valid_file}")
-        #     valid_data, grid, ngrid = data_utils.load_all_data(train_data_folder, valid_file)
-        #     grid_content = grid.get_fill_content()
-        #     with open(f"{train_data_folder}train_config.json", "r") as f:
-        #         config = json.load(f)
-        #     print(f"Successfully loaded {len(valid_data)} testing samples.")
-        #     # Construct dataloaders for all models
-        #     dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
-        #     # Test all models
-        #     for model, loader in zip(all_model_list, dataloaders):
-        #         labels, preds = model.evaluate(loader, config)
-        #         model_fold_results[model.model_name]["Train_Labels"].extend(list(labels))
-        #         model_fold_results[model.model_name]["Train_Preds"].extend(list(preds))
+        # Test each model on a holdout validation set from the original training network
+        print(f"EXPERIMENT: SAME NETWORK")
+        print(f"Evaluating {run_folder}{train_network_folder} on {train_data_folder}")
+        for valid_file in train_file_list:
+            print(f"VALIDATE FILE: {valid_file}")
+            valid_data, grid, ngrid = data_utils.load_all_data(train_data_folder, valid_file)
+            grid_content = grid.get_fill_content()
+            with open(f"{train_data_folder}train_config.json", "r") as f:
+                config = json.load(f)
+            print(f"Successfully loaded {len(valid_data)} testing samples.")
+            # Construct dataloaders for all models
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
+            # Test all models
+            for model, loader in zip(all_model_list, dataloaders):
+                labels, preds = model.evaluate(loader, config)
+                model_fold_results[model.model_name]["Train_Labels"].extend(list(labels))
+                model_fold_results[model.model_name]["Train_Preds"].extend(list(preds))
 
-        # # Test each model on a set from a different network
-        # print(f"EXPERIMENT: DIFFERENT NETWORK")
-        # print(f"Evaluating {run_folder}{train_network_folder} on {test_data_folder}")
-        # for valid_file in test_file_list:
-        #     print(f"VALIDATE FILE: {valid_file}")
-        #     valid_data, grid, ngrid = data_utils.load_all_data(test_data_folder, valid_file)
-        #     grid_content = grid.get_fill_content()
-        #     with open(f"{train_data_folder}train_config.json", "r") as f:
-        #         config = json.load(f)
-        #     print(f"Successfully loaded {len(valid_data)} testing samples.")
-        #     # Construct dataloaders for all models
-        #     dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
-        #     # Test all models
-        #     for model, loader in zip(all_model_list, dataloaders):
-        #         labels, preds = model.evaluate(loader, config)
-        #         model_fold_results[model.model_name]["Test_Labels"].extend(list(labels))
-        #         model_fold_results[model.model_name]["Test_Preds"].extend(list(preds))
+        # Test each model on a set from a different network
+        print(f"EXPERIMENT: DIFFERENT NETWORK")
+        print(f"Evaluating {run_folder}{train_network_folder} on {test_data_folder}")
+        for valid_file in test_file_list:
+            print(f"VALIDATE FILE: {valid_file}")
+            valid_data, grid, ngrid = data_utils.load_all_data(test_data_folder, valid_file)
+            grid_content = grid.get_fill_content()
+            with open(f"{train_data_folder}train_config.json", "r") as f:
+                config = json.load(f)
+            print(f"Successfully loaded {len(valid_data)} testing samples.")
+            # Construct dataloaders for all models
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
+            # Test all models
+            for model, loader in zip(all_model_list, dataloaders):
+                labels, preds = model.evaluate(loader, config)
+                model_fold_results[model.model_name]["Test_Labels"].extend(list(labels))
+                model_fold_results[model.model_name]["Test_Preds"].extend(list(preds))
 
-        # # Fine-tune each model, then test on a set from a different network
-        # print(f"EXPERIMENT: FINE TUNING")
-        # for epoch in range(kwargs['TUNE_EPOCHS']):
-        #     print(f"FOLD: {fold_num}, FINE TUNING EPOCH: {epoch}")
-        #     # Train all models on each training file; split samples in each file by fold
-        #     for tune_file in list(tune_file_list):
-        #         # Load data and config for this training fold/file
-        #         tune_data, _, grid, ngrid = data_utils.load_fold_data(tune_data_folder, tune_file, fold_num, kwargs['n_folds'])
-        #         grid_content = grid.get_fill_content()
-        #         print(f"TUNE FILE: {tune_file}, {len(tune_data)} tune samples")
-        #         with open(f"{train_data_folder}train_config.json", "r") as f:
-        #             config = json.load(f)
-        #         # Construct dataloaders
-        #         base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(tune_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, combine=False, data_subset=kwargs['n_tune_samples'])
-        #         # Train all models
-        #         for model, loader in zip(base_model_list, base_dataloaders):
-        #             model.train(loader, config)
-        #         for model, loader in zip(nn_model_list, nn_dataloaders):
-        #             avg_batch_loss = model_utils.train(model, loader, kwargs['LEARN_RATE'])
-        # # Save tuned models
-        # print(f"Fold {fold_num} fine tuning complete, saving model states and metrics...")
-        # for model in base_model_list:
-        #     model.save_to(f"{run_folder}{train_network_folder}models/{model.model_name}_tuned_{fold_num}.pkl")
-        # for model in nn_model_list:
-        #     torch.save(model.state_dict(), f"{run_folder}{train_network_folder}models/{model.model_name}_tuned_{fold_num}.pt")
-        # # Retest each model on the original and generalization networks
-        # print(f"Evaluating {run_folder}{train_network_folder} on {train_data_folder}")
-        # for valid_file in train_file_list:
-        #     print(f"VALIDATE FILE: {valid_file}")
-        #     valid_data, grid, ngrid = data_utils.load_all_data(train_data_folder, valid_file)
-        #     grid_content = grid.get_fill_content()
-        #     with open(f"{train_data_folder}train_config.json", "r") as f:
-        #         config = json.load(f)
-        #     print(f"Successfully loaded {len(valid_data)} testing samples.")
-        #     # Construct dataloaders for all models
-        #     dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
-        #     # Test all models
-        #     for model, loader in zip(all_model_list, dataloaders):
-        #         labels, preds = model.evaluate(loader, config)
-        #         model_fold_results[model.model_name]["Tune_Train_Labels"].extend(list(labels))
-        #         model_fold_results[model.model_name]["Tune_Train_Preds"].extend(list(preds))
-        # print(f"Evaluating {run_folder}{train_network_folder} on {test_data_folder}")
-        # for valid_file in test_file_list:
-        #     print(f"VALIDATE FILE: {valid_file}")
-        #     valid_data, grid, ngrid = data_utils.load_all_data(test_data_folder, valid_file)
-        #     grid_content = grid.get_fill_content()
-        #     with open(f"{train_data_folder}train_config.json", "r") as f:
-        #         config = json.load(f)
-        #     print(f"Successfully loaded {len(valid_data)} testing samples.")
-        #     # Construct dataloaders for all models
-        #     dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
-        #     # Test all models
-        #     for model, loader in zip(all_model_list, dataloaders):
-        #         labels, preds = model.evaluate(loader, config)
-        #         model_fold_results[model.model_name]["Tune_Test_Labels"].extend(list(labels))
-        #         model_fold_results[model.model_name]["Tune_Test_Preds"].extend(list(preds))
+        # Fine-tune each model, then test on a set from a different network
+        print(f"EXPERIMENT: FINE TUNING")
+        for epoch in range(kwargs['TUNE_EPOCHS']):
+            print(f"FOLD: {fold_num}, FINE TUNING EPOCH: {epoch}")
+            # Train all models on each training file; split samples in each file by fold
+            for tune_file in list(tune_file_list):
+                # Load data and config for this training fold/file
+                tune_data, _, grid, ngrid = data_utils.load_fold_data(tune_data_folder, tune_file, fold_num, kwargs['n_folds'])
+                grid_content = grid.get_fill_content()
+                print(f"TUNE FILE: {tune_file}, {len(tune_data)} tune samples")
+                with open(f"{train_data_folder}train_config.json", "r") as f:
+                    config = json.load(f)
+                # Construct dataloaders
+                base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(tune_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, combine=False, data_subset=kwargs['n_tune_samples'])
+                # Train all models
+                for model, loader in zip(base_model_list, base_dataloaders):
+                    model.train(loader, config)
+                for model, loader in zip(nn_model_list, nn_dataloaders):
+                    avg_batch_loss = model_utils.train(model, loader, kwargs['LEARN_RATE'])
+        # Save tuned models
+        print(f"Fold {fold_num} fine tuning complete, saving model states and metrics...")
+        for model in base_model_list:
+            model.save_to(f"{run_folder}{train_network_folder}models/{model.model_name}_tuned_{fold_num}.pkl")
+        for model in nn_model_list:
+            torch.save(model.state_dict(), f"{run_folder}{train_network_folder}models/{model.model_name}_tuned_{fold_num}.pt")
+        # Retest each model on the original and generalization networks
+        print(f"Evaluating {run_folder}{train_network_folder} on {train_data_folder}")
+        for valid_file in train_file_list:
+            print(f"VALIDATE FILE: {valid_file}")
+            valid_data, grid, ngrid = data_utils.load_all_data(train_data_folder, valid_file)
+            grid_content = grid.get_fill_content()
+            with open(f"{train_data_folder}train_config.json", "r") as f:
+                config = json.load(f)
+            print(f"Successfully loaded {len(valid_data)} testing samples.")
+            # Construct dataloaders for all models
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
+            # Test all models
+            for model, loader in zip(all_model_list, dataloaders):
+                labels, preds = model.evaluate(loader, config)
+                model_fold_results[model.model_name]["Tune_Train_Labels"].extend(list(labels))
+                model_fold_results[model.model_name]["Tune_Train_Preds"].extend(list(preds))
+        print(f"Evaluating {run_folder}{train_network_folder} on {test_data_folder}")
+        for valid_file in test_file_list:
+            print(f"VALIDATE FILE: {valid_file}")
+            valid_data, grid, ngrid = data_utils.load_all_data(test_data_folder, valid_file)
+            grid_content = grid.get_fill_content()
+            with open(f"{train_data_folder}train_config.json", "r") as f:
+                config = json.load(f)
+            print(f"Successfully loaded {len(valid_data)} testing samples.")
+            # Construct dataloaders for all models
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
+            # Test all models
+            for model, loader in zip(all_model_list, dataloaders):
+                labels, preds = model.evaluate(loader, config)
+                model_fold_results[model.model_name]["Tune_Test_Labels"].extend(list(labels))
+                model_fold_results[model.model_name]["Tune_Test_Preds"].extend(list(preds))
 
         # Fine-tune each model, then test on a set from a different network
         print(f"EXPERIMENT: FEATURE EXTRACTION")
@@ -330,16 +330,12 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                     config = json.load(f)
                 # Construct dataloaders
                 base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(tune_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, combine=False, data_subset=kwargs['n_tune_samples'])
-                # Train all models
-                for model, loader in zip(base_model_list, base_dataloaders):
-                    model.train(loader, config)
+                # Train nn models
                 for model, loader in zip(nn_model_list, nn_dataloaders):
                     model_utils.set_feature_extraction(model)
                     avg_batch_loss = model_utils.train(model, loader, kwargs['LEARN_RATE'])
         # Save tuned models
         print(f"Fold {fold_num} feature extraction complete, saving model states and metrics...")
-        for model in base_model_list:
-            model.save_to(f"{run_folder}{train_network_folder}models/{model.model_name}_extracted_{fold_num}.pkl")
         for model in nn_model_list:
             torch.save(model.state_dict(), f"{run_folder}{train_network_folder}models/{model.model_name}_extracted_{fold_num}.pt")
         # Retest each model on the original and generalization networks
@@ -442,11 +438,11 @@ if __name__=="__main__":
         test_network_folder="atb/",
         tune_network_folder="atb/",
         TUNE_EPOCHS=10,
-        BATCH_SIZE=512,
+        BATCH_SIZE=64,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
         data_subset=.1,
-        n_tune_samples=500,
+        n_tune_samples=100,
         n_folds=2,
     )
     random.seed(0)
@@ -458,36 +454,10 @@ if __name__=="__main__":
         test_network_folder="kcm/",
         tune_network_folder="kcm/",
         TUNE_EPOCHS=10,
-        BATCH_SIZE=512,
+        BATCH_SIZE=64,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
         data_subset=.1,
-        n_tune_samples=500,
+        n_tune_samples=100,
         n_folds=2,
     )
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
-    # run_experiments(
-    #     run_folder="./results/small/",
-    #     train_network_folder="kcm/",
-    #     test_network_folder="atb/",
-    #     EPOCHS=50,
-    #     BATCH_SIZE=512,
-    #     LEARN_RATE=1e-3,
-    #     HIDDEN_SIZE=32,
-    #     n_folds=5,
-    # )
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
-    # run_experiments(
-    #     run_folder="./results/small/",
-    #     train_network_folder="atb/",
-    #     test_network_folder="kcm/",
-    #     EPOCHS=50,
-    #     BATCH_SIZE=512,
-    #     LEARN_RATE=1e-3,
-    #     HIDDEN_SIZE=32,
-    #     n_folds=5,
-    # )
