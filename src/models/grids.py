@@ -69,11 +69,12 @@ class NGrid:
             c[:,counter_state,y,x] = obs
             counter[y,x] += 1
         return c
+    def get_fill_content(self):
+        c = self.fill_content.toarray()
+        c = np.reshape(c, (c.shape[0], self.c_resolution+1, self.n_resolution, self.y_resolution, self.x_resolution))
+        return c
     def get_all_content(self):
         c = np.array([self.get_content(t) for t in range(self.t_resolution-1)])
-        return c
-    def get_range_content(self, tbin_idx_start, tbin_idx_end):
-        c = np.array([self.get_content(t) for t in range(0, (tbin_idx_end-tbin_idx_start)-1, 1)])
         return c
     def get_masked_content(self):
         feature_content = []
@@ -86,6 +87,8 @@ class NGrid:
     def get_density(self):
         c = self.get_all_content()
         return np.sum(~np.isnan(c)) / c.size
+    def set_fill_content(self, fill_content):
+        self.fill_content = sparse.csr_matrix(fill_content.reshape(fill_content.shape[0],-1))
 
 def traces_to_ngrid(traces, grid_bounds, grid_s_res, grid_t_res, grid_n_res):
     times = traces['locationtime'].values
@@ -189,10 +192,41 @@ def decompose_vector(scalars, bearings, data_to_attach=None):
     y_neg[:,0] = np.abs(y_neg[:,0])
     return (x_pos, x_neg, y_pos, y_neg)
 
+def fill_ngrid_forward(ngrid):
+    """
+    Fill forward (in time) the grid for timesteps w/o complete observations.
+    """
+    arr = ngrid.get_all_content()
+    timesteps, features, n_obs, rows, cols = arr.shape
+    filled_arr = np.copy(arr)
+    # Initialize age for all obs to 0
+    # Any sample that has nan for any feature should have nan for its age
+    mask = np.isnan(arr.sum(axis=1))
+    age = np.where(mask, np.nan, 0)
+    age = np.expand_dims(age, 1)
+    filled_arr = np.concatenate([filled_arr, age], axis=1)
+    for t in range(1, timesteps):
+        # Get all obs for current timestep, and previous
+        current_obs = filled_arr[t].copy()
+        prev_obs = filled_arr[t-1].copy()
+        # Increment age for all previous obs that will potentially be filled forwards to this timestep
+        prev_obs[4,:,:,:] += 1
+        # Concatenate current obs to prev
+        result = np.concatenate([current_obs, prev_obs], axis=1)
+        # Sort by age lowest to highest, nan's last
+        sidx = result[4,:,:,:]
+        sidx = np.argsort(sidx, axis=0)
+        # Take first 3
+        sidx = sidx[:3,:,:] 
+        sidx = np.expand_dims(sidx, axis=0)
+        sidx = np.repeat(sidx, result.shape[0], axis=0)
+        result = np.take_along_axis(result, sidx, axis=1)
+        filled_arr[t] = result
+    ngrid.set_fill_content(filled_arr)
+
 def fill_grid_forward(grid_normal):
     """
     Fill forward (in time) each channel in the grid for timesteps w/o an observation.
-    Returns: copy of grid with filled forward values, and 4 new channels holding fill counts.
     """
     grid_content = grid_normal.get_content()
     filled_channels = np.zeros(grid_content.shape)
@@ -234,7 +268,7 @@ def extract_grid_features(g, tbins, xbins, ybins, config, buffer=1):
     tbin_start_idx = tbins[0]
     grid_features = []
     for i in range(len(tbins)):
-        # Handle case where buffer goes off edge of grid (-1's)
+        # Handle case where buffer goes off edge of grid
         if xbins[i]-buffer-1 < 0 or ybins[i]-buffer-1 < 0:
             feature = np.zeros((g.shape[1], 2*buffer+1, 2*buffer+1))
             feature[:4,:,:] = np.nan
@@ -258,15 +292,14 @@ def extract_ngrid_features(g, tbins, xbins, ybins, config, buffer=1):
     # All points in the sequence will have the information at the time of the starting point
     # However the starting information is shifted in space to center features on each point
     tbin_start_idx = tbins[0]
-    # g = grid.get_content(tbin_start_idx)
     grid_features = []
     for i in range(len(tbins)):
         # Handle case where buffer goes off edge of grid
         if xbins[i]-buffer-1 < 0 or ybins[i]-buffer-1 < 0:
-            feature = np.ones((g.shape[1], g.shape[2], 2*buffer+1, 2*buffer+1))
+            feature = np.zeros((g.shape[1], g.shape[2], 2*buffer+1, 2*buffer+1))
             feature[:,:,:,:] = np.nan
-        elif xbins[i]+buffer > g.shape[3] or ybins[i]+buffer > g.shape[2]:
-            feature = np.ones((g.shape[1], g.shape[2], 2*buffer+1, 2*buffer+1))
+        elif xbins[i]+buffer > g.shape[4] or ybins[i]+buffer > g.shape[3]:
+            feature = np.zeros((g.shape[1], g.shape[2], 2*buffer+1, 2*buffer+1))
             feature[:,:,:,:] = np.nan
         else:
             # Filter grid based on adjacent squares to buffer (pts +/- buffer, including middle point)
@@ -276,16 +309,18 @@ def extract_ngrid_features(g, tbins, xbins, ybins, config, buffer=1):
         feature[1,:,:,:][np.isnan(feature[1,:,:,:])] = config['y_mean']
         feature[2,:,:,:][np.isnan(feature[2,:,:,:])] = config['bearing_mean']
         feature[3,:,:,:][np.isnan(feature[3,:,:,:])] = config['speed_m_s_mean']
+        feature[4,:,:,:][np.isnan(feature[4,:,:,:])] = np.nanmean(g[:,4,:,:,:])
         # Normalize all cells
         feature[0,:,:,:] = data_utils.normalize(feature[0,:,:,:], config['x_mean'], config['x_std'])
         feature[1,:,:,:] = data_utils.normalize(feature[1,:,:,:], config['y_mean'], config['y_std'])
         feature[2,:,:,:] = data_utils.normalize(feature[2,:,:,:], config['bearing_mean'], config['bearing_std'])
         feature[3,:,:,:] = data_utils.normalize(feature[3,:,:,:], config['speed_m_s_mean'], config['speed_m_s_std'])
+        feature[4,:,:,:] = data_utils.normalize(feature[4,:,:,:], np.nanmean(g[:,4,:,:,:]), np.nanstd(g[:,4,:,:,:]))
         grid_features.append(feature)
     return grid_features
 
 def save_grid_anim(data, file_name, vmin, vmax):
-    # Plot all channels (first 4 of axis=0, second 4 are times)
+    # Plot first 4 channels of second axis
     fig, axes = plt.subplots(2,2)
     axes = axes.reshape(-1)
     fig.tight_layout()

@@ -108,7 +108,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
         nn_model_list.append(ff.FF_GRID(
             "FF_NGRID_IND",
             n_features=12,
-            n_grid_features=4*3*3*3,
+            n_grid_features=5*3*3*3,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
             batch_size=BATCH_SIZE,
@@ -147,7 +147,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
         nn_model_list.append(rnn.GRU_GRID(
             "GRU_NGRID_IND",
             n_features=9,
-            n_grid_features=4*3*3*3,
+            n_grid_features=5*3*3*3,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
             batch_size=BATCH_SIZE,
@@ -186,7 +186,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
         nn_model_list.append(transformer.TRSF_GRID(
             "TRSF_NGRID_IND",
             n_features=9,
-            n_grid_features=4*3*3*3,
+            n_grid_features=5*3*3*3,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
             batch_size=BATCH_SIZE,
@@ -230,11 +230,12 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             print(f"VALIDATE FILE: {valid_file}")
             valid_data, grid, ngrid = data_utils.load_all_data(train_data_folder, valid_file)
             grid_content = grid.get_fill_content()
+            ngrid_content = ngrid.get_all_content()
             with open(f"{train_data_folder}train_config.json", "r") as f:
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid_content, data_subset=kwargs['data_subset'])
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
                 labels, preds = model.evaluate(loader, config)
@@ -248,11 +249,12 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             print(f"VALIDATE FILE: {valid_file}")
             valid_data, grid, ngrid = data_utils.load_all_data(test_data_folder, valid_file)
             grid_content = grid.get_fill_content()
+            ngrid_content = ngrid.get_all_content()
             with open(f"{train_data_folder}train_config.json", "r") as f:
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid_content, data_subset=kwargs['data_subset'])
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
                 labels, preds = model.evaluate(loader, config)
@@ -268,11 +270,12 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 # Load data and config for this training fold/file
                 tune_data, _, grid, ngrid = data_utils.load_fold_data(tune_data_folder, tune_file, fold_num, kwargs['n_folds'])
                 grid_content = grid.get_fill_content()
+                ngrid_content = ngrid.get_all_content()
                 print(f"TUNE FILE: {tune_file}, {len(tune_data)} tune samples")
                 with open(f"{train_data_folder}train_config.json", "r") as f:
                     config = json.load(f)
                 # Construct dataloaders
-                base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(tune_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, combine=False, data_subset=kwargs['n_tune_samples'])
+                base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(tune_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid_content, combine=False, data_subset=kwargs['n_tune_samples'])
                 # Train all models
                 for model, loader in zip(base_model_list, base_dataloaders):
                     model.train(loader, config)
@@ -290,11 +293,12 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             print(f"VALIDATE FILE: {valid_file}")
             valid_data, grid, ngrid = data_utils.load_all_data(train_data_folder, valid_file)
             grid_content = grid.get_fill_content()
+            ngrid_content = ngrid.get_all_content()
             with open(f"{train_data_folder}train_config.json", "r") as f:
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid_content, data_subset=kwargs['data_subset'])
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
                 labels, preds = model.evaluate(loader, config)
@@ -305,11 +309,12 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             print(f"VALIDATE FILE: {valid_file}")
             valid_data, grid, ngrid = data_utils.load_all_data(test_data_folder, valid_file)
             grid_content = grid.get_fill_content()
+            ngrid_content = ngrid.get_all_content()
             with open(f"{train_data_folder}train_config.json", "r") as f:
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid_content, data_subset=kwargs['data_subset'])
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
                 labels, preds = model.evaluate(loader, config)
@@ -325,11 +330,12 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 # Load data and config for this training fold/file
                 tune_data, _, grid, ngrid = data_utils.load_fold_data(tune_data_folder, tune_file, fold_num, kwargs['n_folds'])
                 grid_content = grid.get_fill_content()
+                ngrid_content = ngrid.get_all_content()
                 print(f"TUNE FILE: {tune_file}, {len(tune_data)} tune samples")
                 with open(f"{train_data_folder}train_config.json", "r") as f:
                     config = json.load(f)
                 # Construct dataloaders
-                base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(tune_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, combine=False, data_subset=kwargs['n_tune_samples'])
+                base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(tune_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid_content, combine=False, data_subset=kwargs['n_tune_samples'])
                 # Train nn models
                 for model, loader in zip(nn_model_list, nn_dataloaders):
                     model_utils.set_feature_extraction(model)
@@ -344,11 +350,12 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             print(f"VALIDATE FILE: {valid_file}")
             valid_data, grid, ngrid = data_utils.load_all_data(train_data_folder, valid_file)
             grid_content = grid.get_fill_content()
+            ngrid_content = ngrid.get_all_content()
             with open(f"{train_data_folder}train_config.json", "r") as f:
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid_content, data_subset=kwargs['data_subset'])
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
                 labels, preds = model.evaluate(loader, config)
@@ -359,11 +366,12 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             print(f"VALIDATE FILE: {valid_file}")
             valid_data, grid, ngrid = data_utils.load_all_data(test_data_folder, valid_file)
             grid_content = grid.get_fill_content()
+            ngrid_content = ngrid.get_all_content()
             with open(f"{train_data_folder}train_config.json", "r") as f:
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid, data_subset=kwargs['data_subset'])
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid_content, data_subset=kwargs['data_subset'])
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
                 labels, preds = model.evaluate(loader, config)
@@ -443,7 +451,7 @@ if __name__=="__main__":
         HIDDEN_SIZE=32,
         data_subset=.1,
         n_tune_samples=100,
-        n_folds=2,
+        n_folds=5,
     )
     random.seed(0)
     np.random.seed(0)
@@ -459,5 +467,5 @@ if __name__=="__main__":
         HIDDEN_SIZE=32,
         data_subset=.1,
         n_tune_samples=100,
-        n_folds=2,
+        n_folds=5,
     )

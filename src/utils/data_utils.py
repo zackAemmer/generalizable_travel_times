@@ -121,8 +121,8 @@ def get_date_list(start, n_days):
     return [f"{date.strftime('%Y_%m_%d')}.pkl" for date in date_list]
 
 def load_fold_data(data_folder, filename, fold_num, total_folds):
-    grid = load_pkl(f"{data_folder}/../{filename}_grid_ffill.pkl")
-    ngrid = load_pkl(f"{data_folder}/../{filename}_grid.pkl")
+    grid = load_pkl(f"{data_folder}/../{filename}_grid.pkl")
+    ngrid = load_pkl(f"{data_folder}/../{filename}_ngrid.pkl")
     train_data = []
     contents = open(f"{data_folder}{filename}", "r").read()
     train_data.append([json.loads(str(item)) for item in contents.strip().split('\n')])
@@ -134,8 +134,8 @@ def load_fold_data(data_folder, filename, fold_num, total_folds):
     return ([item for item, keep in zip(train_data, mask) if keep], [item for item, keep in zip(train_data, mask) if not keep], grid, ngrid)
 
 def load_all_data(data_folder, filename):
-    grid = load_pkl(f"{data_folder}/../{filename}_grid_ffill.pkl")
-    ngrid = load_pkl(f"{data_folder}/../{filename}_grid.pkl")
+    grid = load_pkl(f"{data_folder}/../{filename}_grid.pkl")
+    ngrid = load_pkl(f"{data_folder}/../{filename}_ngrid.pkl")
     valid_data = []
     contents = open(f"{data_folder}{filename}", "r").read()
     valid_data.append([json.loads(str(item)) for item in contents.strip().split('\n')])
@@ -146,13 +146,13 @@ def load_all_inputs(run_folder, network_folder, file_num):
     with open(f"{run_folder}{network_folder}/deeptte_formatted/train_config.json") as f:
         config = json.load(f)
     train_traces = load_pkl(f"{run_folder}{network_folder}train{file_num}_traces.pkl")
-    train_data, train_grid_ffill, train_grid = load_all_data(f"{run_folder}{network_folder}deeptte_formatted/", f"train{file_num}")
+    train_data, train_grid, train_ngrid = load_all_data(f"{run_folder}{network_folder}deeptte_formatted/", f"train{file_num}")
     return {
         "config": config,
         "train_traces": train_traces,
         "train_data": train_data,
-        "train_grid": train_grid,
-        "train_grid_ffill": train_grid_ffill
+        "train_ngrid": train_ngrid,
+        "train_grid": train_grid
     }
 
 def combine_config_files(cfg_folder, n_save_files, train_or_test):
@@ -466,9 +466,10 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, grid_bounds, grid_s_res, 
     trace_data['lngs'] = trace_data['lon']
 
     # Calculate and add grid features
-    n_grid, tbin_idxs, xbin_idxs, ybin_idxs = grids.traces_to_ngrid(trace_data, grid_bounds, grid_s_res=grid_s_res, grid_t_res=grid_t_res, grid_n_res=grid_n_res)
-    fill_grid, tbin_idxs, xbin_idxs, ybin_idxs = grids.traces_to_grid(trace_data, grid_bounds, grid_s_res=grid_s_res, grid_t_res=grid_t_res)
-    grids.fill_grid_forward(fill_grid)
+    ngrid, tbin_idxs, xbin_idxs, ybin_idxs = grids.traces_to_ngrid(trace_data, grid_bounds, grid_s_res=grid_s_res, grid_t_res=grid_t_res, grid_n_res=grid_n_res)
+    grid, tbin_idxs, xbin_idxs, ybin_idxs = grids.traces_to_grid(trace_data, grid_bounds, grid_s_res=grid_s_res, grid_t_res=grid_t_res)
+    grids.fill_ngrid_forward(ngrid)
+    grids.fill_grid_forward(grid)
     trace_data['tbin_idx'] = tbin_idxs
     trace_data['xbin_idx'] = xbin_idxs
     trace_data['ybin_idx'] = ybin_idxs
@@ -519,7 +520,7 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, grid_bounds, grid_s_res, 
     result_json_string = result.to_json(orient='records', lines=True)
     with open(deeptte_formatted_path, mode='w+') as out_file:
         out_file.write(result_json_string)
-    return trace_data, n_grid, fill_grid
+    return trace_data, ngrid, grid
 
 def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg):
     """

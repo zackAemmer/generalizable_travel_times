@@ -119,7 +119,7 @@ def run_models(run_folder, network_folder, **kwargs):
         nn_model_list.append(ff.FF_GRID(
             "FF_NGRID_IND",
             n_features=12,
-            n_grid_features=4*3*3*3,
+            n_grid_features=5*3*3*3,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
             batch_size=BATCH_SIZE,
@@ -158,7 +158,7 @@ def run_models(run_folder, network_folder, **kwargs):
         nn_model_list.append(rnn.GRU_GRID(
             "GRU_NGRID_IND",
             n_features=9,
-            n_grid_features=4*3*3*3,
+            n_grid_features=5*3*3*3,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
             batch_size=BATCH_SIZE,
@@ -197,7 +197,7 @@ def run_models(run_folder, network_folder, **kwargs):
         nn_model_list.append(transformer.TRSF_GRID(
             "TRSF_NGRID_IND",
             n_features=9,
-            n_grid_features=4*3*3*3,
+            n_grid_features=5*3*3*3,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
             batch_size=BATCH_SIZE,
@@ -352,7 +352,7 @@ if __name__=="__main__":
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
-        n_folds=2
+        n_folds=5
     )
     random.seed(0)
     np.random.seed(0)
@@ -364,7 +364,7 @@ if __name__=="__main__":
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
-        n_folds=2
+        n_folds=5
     )
     # random.seed(0)
     # np.random.seed(0)

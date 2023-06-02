@@ -61,14 +61,14 @@ def clean_data(dates, n_save_files, train_or_test, base_folder, **kwargs):
             continue
         print(f"Saving {len(traces)} samples to run folder, retained {np.round(len(traces)/num_raw_points, 2)*100}% of original data points...")
         deeptte_formatted_path = f"{base_folder}deeptte_formatted/{train_or_test}{file_num}"
-        traces, train_n_grid, train_fill_grid = data_utils.map_to_deeptte(traces, deeptte_formatted_path, grid_bounds=kwargs['grid_bounds'], grid_s_res=kwargs['grid_s_res'], grid_t_res=kwargs['grid_t_res'], grid_n_res=kwargs['grid_n_res'])
+        traces, train_ngrid, train_grid = data_utils.map_to_deeptte(traces, deeptte_formatted_path, grid_bounds=kwargs['grid_bounds'], grid_s_res=kwargs['grid_s_res'], grid_t_res=kwargs['grid_t_res'], grid_n_res=kwargs['grid_n_res'])
         summary_config = data_utils.get_summary_config(traces, kwargs['gtfs_folder'], n_save_files, kwargs['epsg'])
         # Save config, and traces to file for notebook analyses
         with open(f"{deeptte_formatted_path}_config.json", mode="a") as out_file:
             json.dump(summary_config, out_file)
         data_utils.write_pkl(traces, f"{base_folder}{train_or_test}{file_num}_traces.pkl")
-        data_utils.write_pkl(train_n_grid, f"{base_folder}{train_or_test}{file_num}_grid.pkl")
-        data_utils.write_pkl(train_fill_grid, f"{base_folder}{train_or_test}{file_num}_grid_ffill.pkl")
+        data_utils.write_pkl(train_ngrid, f"{base_folder}{train_or_test}{file_num}_ngrid.pkl")
+        data_utils.write_pkl(train_grid, f"{base_folder}{train_or_test}{file_num}_grid.pkl")
     # Combine normalization metrics and other values across all files
     data_utils.combine_config_files(f"{base_folder}deeptte_formatted/", n_save_files, train_or_test)
 
