@@ -39,10 +39,10 @@ class Grid:
         return c[m==1]
     def get_density(self):
         m = self.content.toarray()
-        return np.sum(m!=-1) / m.size
+        return np.sum(~np.isnan(m)) / m.size
     def get_fill_density(self):
         m = self.fill_content.toarray()
-        return np.sum(m!=-1) / m.size
+        return np.sum(~np.isnan(m)) / m.size
     def set_fill_content(self, fill_content, fill_counts):
         self.fill_content = sparse.csr_matrix(fill_content.reshape(fill_content.shape[0],-1))
         self.fill_counts = sparse.csr_matrix(fill_counts.reshape(fill_counts.shape[0],-1))
@@ -105,7 +105,7 @@ def traces_to_ngrid(traces, grid_bounds, grid_s_res, grid_t_res, grid_n_res):
     xbin_idxs = np.maximum(0,xbin_idxs)
     ybin_idxs = np.digitize(traces['y'].values, ybins, right=False)
     ybin_idxs = np.maximum(0,ybin_idxs)
-    # For every grid cell, collect the most recent 3 observations, mask with -1 if unavailable
+    # For every grid cell, collect the most recent observations
     traces['tbin_idx'] = tbin_idxs
     traces['xbin_idx'] = xbin_idxs
     traces['ybin_idx'] = ybin_idxs
@@ -206,7 +206,7 @@ def fill_grid_forward(grid_normal):
 
 def fill_channel_forward(grid_channel):
     tsteps, rows, cols = grid_channel.shape
-    mask = grid_channel==-1
+    mask = np.isnan(grid_channel)
     ffilled = np.copy(grid_channel)
     channel_counts = np.zeros(grid_channel.shape)
     # For each cell, fill the value at this timestep w/previous value if it is masked
@@ -251,26 +251,26 @@ def extract_grid_features(g, tbins, xbins, ybins, config, buffer=1):
         grid_features.append(feature)
     return grid_features
 
-def extract_ngrid_features(grid, tbins, xbins, ybins, config, buffer=1):
+def extract_ngrid_features(g, tbins, xbins, ybins, config, buffer=1):
     """
     Given sequence of bins from a trip, reconstruct grid features.
     """
     # All points in the sequence will have the information at the time of the starting point
     # However the starting information is shifted in space to center features on each point
     tbin_start_idx = tbins[0]
-    g = grid.get_content(tbin_start_idx)
+    # g = grid.get_content(tbin_start_idx)
     grid_features = []
     for i in range(len(tbins)):
         # Handle case where buffer goes off edge of grid
         if xbins[i]-buffer-1 < 0 or ybins[i]-buffer-1 < 0:
-            feature = np.ones((g.shape[0], g.shape[1], 2*buffer+1, 2*buffer+1))*-1
+            feature = np.ones((g.shape[1], g.shape[2], 2*buffer+1, 2*buffer+1))
             feature[:,:,:,:] = np.nan
         elif xbins[i]+buffer > g.shape[3] or ybins[i]+buffer > g.shape[2]:
-            feature = np.ones((g.shape[0], g.shape[1], 2*buffer+1, 2*buffer+1))*-1
+            feature = np.ones((g.shape[1], g.shape[2], 2*buffer+1, 2*buffer+1))
             feature[:,:,:,:] = np.nan
         else:
             # Filter grid based on adjacent squares to buffer (pts +/- buffer, including middle point)
-            feature = g[:,:,ybins[i]-buffer-1:ybins[i]+buffer,xbins[i]-buffer-1:xbins[i]+buffer].copy()
+            feature = g[tbin_start_idx,:,:,ybins[i]-buffer-1:ybins[i]+buffer,xbins[i]-buffer-1:xbins[i]+buffer].copy()
         # Fill undefined cells with global averages (per variable)
         feature[0,:,:,:][np.isnan(feature[0,:,:,:])] = config['x_mean']
         feature[1,:,:,:][np.isnan(feature[1,:,:,:])] = config['y_mean']
