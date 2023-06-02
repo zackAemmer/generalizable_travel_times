@@ -230,7 +230,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             print(f"VALIDATE FILE: {valid_file}")
             valid_data, grid, ngrid = data_utils.load_all_data(train_data_folder, valid_file)
             grid_content = grid.get_fill_content()
-            ngrid_content = ngrid.get_all_content()
+            ngrid_content = ngrid.get_fill_content()
             with open(f"{train_data_folder}train_config.json", "r") as f:
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
@@ -249,7 +249,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             print(f"VALIDATE FILE: {valid_file}")
             valid_data, grid, ngrid = data_utils.load_all_data(test_data_folder, valid_file)
             grid_content = grid.get_fill_content()
-            ngrid_content = ngrid.get_all_content()
+            ngrid_content = ngrid.get_fill_content()
             with open(f"{train_data_folder}train_config.json", "r") as f:
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
@@ -270,7 +270,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 # Load data and config for this training fold/file
                 tune_data, _, grid, ngrid = data_utils.load_fold_data(tune_data_folder, tune_file, fold_num, kwargs['n_folds'])
                 grid_content = grid.get_fill_content()
-                ngrid_content = ngrid.get_all_content()
+                ngrid_content = ngrid.get_fill_content()
                 print(f"TUNE FILE: {tune_file}, {len(tune_data)} tune samples")
                 with open(f"{train_data_folder}train_config.json", "r") as f:
                     config = json.load(f)
@@ -293,7 +293,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             print(f"VALIDATE FILE: {valid_file}")
             valid_data, grid, ngrid = data_utils.load_all_data(train_data_folder, valid_file)
             grid_content = grid.get_fill_content()
-            ngrid_content = ngrid.get_all_content()
+            ngrid_content = ngrid.get_fill_content()
             with open(f"{train_data_folder}train_config.json", "r") as f:
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
@@ -309,7 +309,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             print(f"VALIDATE FILE: {valid_file}")
             valid_data, grid, ngrid = data_utils.load_all_data(test_data_folder, valid_file)
             grid_content = grid.get_fill_content()
-            ngrid_content = ngrid.get_all_content()
+            ngrid_content = ngrid.get_fill_content()
             with open(f"{train_data_folder}train_config.json", "r") as f:
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
@@ -330,7 +330,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 # Load data and config for this training fold/file
                 tune_data, _, grid, ngrid = data_utils.load_fold_data(tune_data_folder, tune_file, fold_num, kwargs['n_folds'])
                 grid_content = grid.get_fill_content()
-                ngrid_content = ngrid.get_all_content()
+                ngrid_content = ngrid.get_fill_content()
                 print(f"TUNE FILE: {tune_file}, {len(tune_data)} tune samples")
                 with open(f"{train_data_folder}train_config.json", "r") as f:
                     config = json.load(f)
@@ -350,7 +350,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             print(f"VALIDATE FILE: {valid_file}")
             valid_data, grid, ngrid = data_utils.load_all_data(train_data_folder, valid_file)
             grid_content = grid.get_fill_content()
-            ngrid_content = ngrid.get_all_content()
+            ngrid_content = ngrid.get_fill_content()
             with open(f"{train_data_folder}train_config.json", "r") as f:
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
@@ -366,7 +366,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             print(f"VALIDATE FILE: {valid_file}")
             valid_data, grid, ngrid = data_utils.load_all_data(test_data_folder, valid_file)
             grid_content = grid.get_fill_content()
-            ngrid_content = ngrid.get_all_content()
+            ngrid_content = ngrid.get_fill_content()
             with open(f"{train_data_folder}train_config.json", "r") as f:
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
@@ -437,11 +437,43 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
 
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_experiments(
+    #     run_folder="./results/debug/",
+    #     train_network_folder="kcm/",
+    #     test_network_folder="atb/",
+    #     tune_network_folder="atb/",
+    #     TUNE_EPOCHS=10,
+    #     BATCH_SIZE=64,
+    #     LEARN_RATE=1e-3,
+    #     HIDDEN_SIZE=32,
+    #     data_subset=.1,
+    #     n_tune_samples=100,
+    #     n_folds=5,
+    # )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_experiments(
+    #     run_folder="./results/debug/",
+    #     train_network_folder="atb/",
+    #     test_network_folder="kcm/",
+    #     tune_network_folder="kcm/",
+    #     TUNE_EPOCHS=10,
+    #     BATCH_SIZE=64,
+    #     LEARN_RATE=1e-3,
+    #     HIDDEN_SIZE=32,
+    #     data_subset=.1,
+    #     n_tune_samples=100,
+    #     n_folds=5,
+    # )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_experiments(
-        run_folder="./results/debug/",
+        run_folder="./results/small/",
         train_network_folder="kcm/",
         test_network_folder="atb/",
         tune_network_folder="atb/",
@@ -457,7 +489,7 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_experiments(
-        run_folder="./results/debug/",
+        run_folder="./results/small/",
         train_network_folder="atb/",
         test_network_folder="kcm/",
         tune_network_folder="kcm/",

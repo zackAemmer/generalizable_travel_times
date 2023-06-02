@@ -56,7 +56,7 @@ def make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_conte
         else:
             valid_data = np.random.choice(valid_data, data_subset)
     # Construct dataloaders for all models
-    buffer = 1
+    buffer = 2
     base_dataloaders = []
     nn_dataloaders = []
     base_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS))

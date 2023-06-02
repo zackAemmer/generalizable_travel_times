@@ -98,7 +98,7 @@ def run_models(run_folder, network_folder, **kwargs):
         nn_model_list.append(ff.FF_GRID(
             "FF_GRID_IND",
             n_features=12,
-            n_grid_features=8*3*3,
+            n_grid_features=8*5*5,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
             batch_size=BATCH_SIZE,
@@ -108,7 +108,7 @@ def run_models(run_folder, network_folder, **kwargs):
         nn_model_list.append(ff.FF_GRID_ATTN(
             "FF_GRID_ATTN",
             n_features=12,
-            n_grid_features=8*3*3,
+            n_grid_features=8*5*5,
             n_channels=8,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
@@ -119,7 +119,7 @@ def run_models(run_folder, network_folder, **kwargs):
         nn_model_list.append(ff.FF_GRID(
             "FF_NGRID_IND",
             n_features=12,
-            n_grid_features=5*3*3*3,
+            n_grid_features=5*3*5*5,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
             batch_size=BATCH_SIZE,
@@ -137,7 +137,7 @@ def run_models(run_folder, network_folder, **kwargs):
         nn_model_list.append(rnn.GRU_GRID(
             "GRU_GRID_IND",
             n_features=9,
-            n_grid_features=8*3*3,
+            n_grid_features=8*5*5,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
             batch_size=BATCH_SIZE,
@@ -147,7 +147,7 @@ def run_models(run_folder, network_folder, **kwargs):
         nn_model_list.append(rnn.GRU_GRID_ATTN(
             "GRU_GRID_ATTN",
             n_features=9,
-            n_grid_features=8*3*3,
+            n_grid_features=8*5*5,
             n_channels=8,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
@@ -158,7 +158,7 @@ def run_models(run_folder, network_folder, **kwargs):
         nn_model_list.append(rnn.GRU_GRID(
             "GRU_NGRID_IND",
             n_features=9,
-            n_grid_features=5*3*3*3,
+            n_grid_features=5*3*5*5,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
             batch_size=BATCH_SIZE,
@@ -176,7 +176,7 @@ def run_models(run_folder, network_folder, **kwargs):
         nn_model_list.append(transformer.TRSF_GRID(
             "TRSF_IND",
             n_features=9,
-            n_grid_features=8*3*3,
+            n_grid_features=8*5*5,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
             batch_size=BATCH_SIZE,
@@ -186,7 +186,7 @@ def run_models(run_folder, network_folder, **kwargs):
         nn_model_list.append(transformer.TRSF_GRID_ATTN(
             "TRSF_GRID_ATTN",
             n_features=9,
-            n_grid_features=8*3*3,
+            n_grid_features=8*5*5,
             n_channels=8,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
@@ -197,7 +197,7 @@ def run_models(run_folder, network_folder, **kwargs):
         nn_model_list.append(transformer.TRSF_GRID(
             "TRSF_NGRID_IND",
             n_features=9,
-            n_grid_features=5*3*3*3,
+            n_grid_features=5*3*5*5,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=8,
             batch_size=BATCH_SIZE,
@@ -342,37 +342,13 @@ def run_models(run_folder, network_folder, **kwargs):
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
 
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/debug/",
-        network_folder="kcm/",
-        EPOCHS=10,
-        BATCH_SIZE=512,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
-        n_folds=5
-    )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/debug/",
-        network_folder="atb/",
-        EPOCHS=10,
-        BATCH_SIZE=512,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
-        n_folds=5
-    )
     # random.seed(0)
     # np.random.seed(0)
     # torch.manual_seed(0)
     # run_models(
-    #     run_folder="./results/small/",
+    #     run_folder="./results/debug/",
     #     network_folder="kcm/",
-    #     EPOCHS=50,
+    #     EPOCHS=10,
     #     BATCH_SIZE=512,
     #     LEARN_RATE=1e-3,
     #     HIDDEN_SIZE=32,
@@ -382,11 +358,35 @@ if __name__=="__main__":
     # np.random.seed(0)
     # torch.manual_seed(0)
     # run_models(
-    #     run_folder="./results/small/",
+    #     run_folder="./results/debug/",
     #     network_folder="atb/",
-    #     EPOCHS=50,
+    #     EPOCHS=10,
     #     BATCH_SIZE=512,
     #     LEARN_RATE=1e-3,
     #     HIDDEN_SIZE=32,
     #     n_folds=5
     # )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_models(
+        run_folder="./results/small/",
+        network_folder="kcm/",
+        EPOCHS=50,
+        BATCH_SIZE=512,
+        LEARN_RATE=1e-3,
+        HIDDEN_SIZE=32,
+        n_folds=5
+    )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_models(
+        run_folder="./results/small/",
+        network_folder="atb/",
+        EPOCHS=50,
+        BATCH_SIZE=512,
+        LEARN_RATE=1e-3,
+        HIDDEN_SIZE=32,
+        n_folds=5
+    )
