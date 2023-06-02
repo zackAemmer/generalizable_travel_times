@@ -309,13 +309,12 @@ def extract_ngrid_features(g, tbins, xbins, ybins, config, buffer=1):
         feature[1,:,:,:][np.isnan(feature[1,:,:,:])] = config['y_mean']
         feature[2,:,:,:][np.isnan(feature[2,:,:,:])] = config['bearing_mean']
         feature[3,:,:,:][np.isnan(feature[3,:,:,:])] = config['speed_m_s_mean']
-        feature[4,:,:,:][np.isnan(feature[4,:,:,:])] = np.nanmean(g[:,4,:,:,:])
+        feature[4,:,:,:][np.isnan(feature[4,:,:,:])] = 100
         # Normalize all cells
         feature[0,:,:,:] = data_utils.normalize(feature[0,:,:,:], config['x_mean'], config['x_std'])
         feature[1,:,:,:] = data_utils.normalize(feature[1,:,:,:], config['y_mean'], config['y_std'])
         feature[2,:,:,:] = data_utils.normalize(feature[2,:,:,:], config['bearing_mean'], config['bearing_std'])
         feature[3,:,:,:] = data_utils.normalize(feature[3,:,:,:], config['speed_m_s_mean'], config['speed_m_s_std'])
-        feature[4,:,:,:] = data_utils.normalize(feature[4,:,:,:], np.nanmean(g[:,4,:,:,:]), np.nanstd(g[:,4,:,:,:]))
         grid_features.append(feature)
     return grid_features
 
