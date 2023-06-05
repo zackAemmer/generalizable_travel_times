@@ -75,7 +75,14 @@ def run_models(run_folder, network_folder, **kwargs):
 
     # Run full training process for each model during each validation fold
     run_results = []
-    for fold_num in range(0, kwargs['n_folds']):
+    start_fold = kwargs['n_folds']
+    if 'start_fold' in kwargs:
+        print(f"STARTING ON FOLD: {kwargs['start_fold']}")
+        run_results = data_utils.load_pkl(f"{run_folder}{network_folder}model_results_temp.pkl")
+        start_fold = kwargs['start_fold']
+    else:
+        start_fold = 0
+    for fold_num in range(start_fold, kwargs['n_folds']):
         print("="*30)
         print(f"BEGIN FOLD: {fold_num}")
 
@@ -328,6 +335,9 @@ def run_models(run_folder, network_folder, **kwargs):
         # Print results of this fold
         print(tabulate(fold_results['All_Losses'], headers=["Model", "MAPE", "RMSE", "MAE"]))
         run_results.append(fold_results)
+
+        # Save temp run results after each fold
+        data_utils.write_pkl(run_results, f"{run_folder}{network_folder}model_results_temp.pkl")
 
         # Clean memory at end of each fold
         gc.collect()
