@@ -159,7 +159,7 @@ if __name__=="__main__":
     torch.manual_seed(0)
     prepare_run(
         overwrite=True,
-        run_name="small",
+        run_name="par_hi",
         network_name="kcm",
         train_dates=data_utils.get_date_list("2023_03_15", 30),
         test_dates=data_utils.get_date_list("2023_04_15", 7),
@@ -183,7 +183,7 @@ if __name__=="__main__":
     torch.manual_seed(0)
     prepare_run(
         overwrite=True,
-        run_name="small",
+        run_name="par_hi",
         network_name="atb",
         train_dates=data_utils.get_date_list("2023_03_15", 30),
         test_dates=data_utils.get_date_list("2023_04_15", 7),

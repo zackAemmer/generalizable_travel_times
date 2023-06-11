@@ -94,45 +94,45 @@ def run_models(run_folder, network_folder, **kwargs):
 
         # Declare neural network models
         nn_model_list = []
-        nn_model_list.append(ff.FF(
-            "FF",
-            n_features=12,
-            hidden_size=HIDDEN_SIZE,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(ff.FF_GRID(
-            "FF_GRID_IND",
-            n_features=12,
-            n_grid_features=8*5*5,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(ff.FF_GRID_ATTN(
-            "FF_GRID_ATTN",
-            n_features=12,
-            n_grid_features=8*5*5,
-            n_channels=8,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(ff.FF_GRID(
-            "FF_NGRID_IND",
-            n_features=12,
-            n_grid_features=5*3*5*5,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
+        # nn_model_list.append(ff.FF(
+        #     "FF",
+        #     n_features=12,
+        #     hidden_size=HIDDEN_SIZE,
+        #     batch_size=BATCH_SIZE,
+        #     embed_dict=embed_dict,
+        #     device=device
+        # ).to(device))
+        # nn_model_list.append(ff.FF_GRID(
+        #     "FF_GRID_IND",
+        #     n_features=12,
+        #     n_grid_features=8*5*5,
+        #     hidden_size=HIDDEN_SIZE,
+        #     grid_compression_size=8,
+        #     batch_size=BATCH_SIZE,
+        #     embed_dict=embed_dict,
+        #     device=device
+        # ).to(device))
+        # nn_model_list.append(ff.FF_GRID_ATTN(
+        #     "FF_GRID_ATTN",
+        #     n_features=12,
+        #     n_grid_features=8*5*5,
+        #     n_channels=8,
+        #     hidden_size=HIDDEN_SIZE,
+        #     grid_compression_size=8,
+        #     batch_size=BATCH_SIZE,
+        #     embed_dict=embed_dict,
+        #     device=device
+        # ).to(device))
+        # nn_model_list.append(ff.FF_GRID(
+        #     "FF_NGRID_IND",
+        #     n_features=12,
+        #     n_grid_features=5*3*5*5,
+        #     hidden_size=HIDDEN_SIZE,
+        #     grid_compression_size=8,
+        #     batch_size=BATCH_SIZE,
+        #     embed_dict=embed_dict,
+        #     device=device
+        # ).to(device))
         nn_model_list.append(rnn.GRU(
             "GRU",
             n_features=9,
@@ -146,7 +146,7 @@ def run_models(run_folder, network_folder, **kwargs):
             n_features=9,
             n_grid_features=8*5*5,
             hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
+            grid_compression_size=7,
             batch_size=BATCH_SIZE,
             embed_dict=embed_dict,
             device=device
@@ -157,7 +157,7 @@ def run_models(run_folder, network_folder, **kwargs):
             n_grid_features=8*5*5,
             n_channels=8,
             hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
+            grid_compression_size=7,
             batch_size=BATCH_SIZE,
             embed_dict=embed_dict,
             device=device
@@ -167,25 +167,25 @@ def run_models(run_folder, network_folder, **kwargs):
             n_features=9,
             n_grid_features=5*3*5*5,
             hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
+            grid_compression_size=7,
             batch_size=BATCH_SIZE,
             embed_dict=embed_dict,
             device=device
         ).to(device))
-        nn_model_list.append(transformer.TRSF(
-            "TRSF",
-            n_features=9,
-            hidden_size=HIDDEN_SIZE,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
+        # nn_model_list.append(transformer.TRSF(
+        #     "TRSF",
+        #     n_features=9,
+        #     hidden_size=HIDDEN_SIZE,
+        #     batch_size=BATCH_SIZE,
+        #     embed_dict=embed_dict,
+        #     device=device
+        # ).to(device))
         nn_model_list.append(transformer.TRSF_GRID(
             "TRSF_IND",
             n_features=9,
             n_grid_features=8*5*5,
             hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
+            grid_compression_size=7,
             batch_size=BATCH_SIZE,
             embed_dict=embed_dict,
             device=device
@@ -196,7 +196,7 @@ def run_models(run_folder, network_folder, **kwargs):
             n_grid_features=8*5*5,
             n_channels=8,
             hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
+            grid_compression_size=7,
             batch_size=BATCH_SIZE,
             embed_dict=embed_dict,
             device=device
@@ -206,7 +206,7 @@ def run_models(run_folder, network_folder, **kwargs):
             n_features=9,
             n_grid_features=5*3*5*5,
             hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
+            grid_compression_size=7,
             batch_size=BATCH_SIZE,
             embed_dict=embed_dict,
             device=device
@@ -380,7 +380,7 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/small/",
+        run_folder="./results/debug/",
         network_folder="kcm/",
         EPOCHS=50,
         BATCH_SIZE=512,
@@ -392,7 +392,7 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/small/",
+        run_folder="./results/debug/",
         network_folder="atb/",
         EPOCHS=50,
         BATCH_SIZE=512,

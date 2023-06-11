@@ -26,12 +26,12 @@ class TRSF(nn.Module):
         # Activation layer
         self.activation = nn.ReLU()
         # Positional encoding layer
-        self.pos_encoder = pos_encodings.PositionalEncoding1D(self.n_features + self.embed_total_dims)
+        self.pos_encoder = pos_encodings.PositionalEncoding1D(self.n_features)
         # Encoder layer
-        encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features + self.embed_total_dims, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
         # Linear compression layer
-        self.feature_extract = nn.Linear(self.n_features + self.embed_total_dims, 1)
+        self.feature_extract = nn.Linear(self.n_features + self.embed_total_dims + self.embed_total_dims, 1)
         self.feature_extract_activation = nn.ReLU()
     def forward(self, x):
         x_em = x[0]
@@ -39,12 +39,13 @@ class TRSF(nn.Module):
         # Embed categorical variables
         timeID_embedded = self.timeID_em(x_em[:,0])
         weekID_embedded = self.weekID_em(x_em[:,1])
-        x_em = torch.cat((timeID_embedded, weekID_embedded), dim=1).unsqueeze(1)
-        x_em = x_em.repeat(1,x_ct.shape[1],1)
-        x = torch.cat((x_ct, x_em), dim=2)
+        x_em = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
+        x_em = x_em.expand(-1, x_ct.shape[1], -1)
         # Get transformer prediction
-        out = self.pos_encoder(x)
-        out = self.transformer_encoder(out)
+        x_ct = self.pos_encoder(x_ct)
+        x_ct = self.transformer_encoder(x_ct)
+        # Combine all variables
+        out = torch.cat([x_em, x_ct], dim=2)
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
         return out
     def batch_step(self, data):
@@ -91,9 +92,9 @@ class TRSF_GRID(nn.Module):
             nn.ReLU()
         )
         # Positional encoding layer
-        self.pos_encoder = pos_encodings.PositionalEncoding1D(self.n_features + self.embed_total_dims + self.grid_compression_size)
+        self.pos_encoder = pos_encodings.PositionalEncoding1D(self.n_features + self.grid_compression_size)
         # Encoder layer
-        encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features + self.embed_total_dims + self.grid_compression_size, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features + self.grid_compression_size, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
         # Linear compression layer
         self.feature_extract = nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, 1)
@@ -105,18 +106,19 @@ class TRSF_GRID(nn.Module):
         # Embed categorical variables
         timeID_embedded = self.timeID_em(x_em[:,0])
         weekID_embedded = self.weekID_em(x_em[:,1])
-        x_em = torch.cat((timeID_embedded, weekID_embedded), dim=1).unsqueeze(1)
-        x_em = x_em.repeat(1,x_ct.shape[1],1)
+        x_em = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
+        x_em = x_em.expand(-1, x_ct.shape[1], -1)
         # Feed grid data through model
         x_gr = torch.flatten(x_gr, 0, 1)
         x_gr = torch.flatten(x_gr, 1)
         x_gr = self.linear_relu_stack_grid(x_gr)
         x_gr = torch.reshape(x_gr, (x_ct.shape[0], x_ct.shape[1], x_gr.shape[1]))
-        # Combine all variables
-        x = torch.cat((x_em, x_ct, x_gr), dim=2)
         # Get transformer prediction
-        out = self.pos_encoder(x)
-        out = self.transformer_encoder(out)
+        x_ct = torch.cat((x_ct, x_gr), dim=2)
+        x_ct = self.pos_encoder(x_ct)
+        x_ct = self.transformer_encoder(x_ct)
+        # Combine all variables
+        out = torch.cat((x_em, x_ct), dim=2)
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
         return out
     def batch_step(self, data):
@@ -169,9 +171,9 @@ class TRSF_GRID_ATTN(nn.Module):
             nn.ReLU()
         )
         # 1d sequence positional encoding layer
-        self.seq_pos_encoder = pos_encodings.PositionalEncoding1D(self.n_features + self.embed_total_dims + self.grid_compression_size)
+        self.seq_pos_encoder = pos_encodings.PositionalEncoding1D(self.n_features + self.grid_compression_size)
         # Encoder layer
-        seq_encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features + self.embed_total_dims + self.grid_compression_size, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
+        seq_encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features + self.grid_compression_size, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
         self.seq_transformer_encoder = nn.TransformerEncoder(seq_encoder_layer, num_layers=2)
         # Linear compression layer
         self.feature_extract = nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, 1)
@@ -183,8 +185,8 @@ class TRSF_GRID_ATTN(nn.Module):
         # Embed categorical variables
         timeID_embedded = self.timeID_em(x_em[:,0])
         weekID_embedded = self.weekID_em(x_em[:,1])
-        x_em = torch.cat((timeID_embedded, weekID_embedded), dim=1).unsqueeze(1)
-        x_em = x_em.repeat(1,x_ct.shape[1],1)
+        x_em = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
+        x_em = x_em.expand(-1, x_ct.shape[1], -1)
         # Feed grid data through model
         x_gr = torch.flatten(x_gr, 0, 1)
         x_gr = self.grid_pos_enc(x_gr)
@@ -192,11 +194,12 @@ class TRSF_GRID_ATTN(nn.Module):
         x_gr = torch.reshape(x_gr, (x_ct.shape[0], x_ct.shape[1], x_gr.shape[1]))
         x_gr = self.grid_transformer_encoder(x_gr)
         x_gr = self.linear_relu_stack_grid(x_gr)
-        # Combine all variables
-        x = torch.cat((x_em, x_ct, x_gr), dim=2)
         # Get transformer prediction
-        out = self.seq_pos_encoder(x)
-        out = self.seq_transformer_encoder(out)
+        x_ct = torch.cat([x_ct, x_gr], dim=2)
+        x_ct = self.seq_pos_encoder(x_ct)
+        x_ct = self.seq_transformer_encoder(x_ct)
+        # Combine all variables
+        out = torch.cat((x_em, x_ct), dim=2)
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
         return out
     def batch_step(self, data):

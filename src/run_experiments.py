@@ -76,45 +76,45 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
 
         # Declare neural network models
         nn_model_list = []
-        nn_model_list.append(ff.FF(
-            "FF",
-            n_features=12,
-            hidden_size=HIDDEN_SIZE,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(ff.FF_GRID(
-            "FF_GRID_IND",
-            n_features=12,
-            n_grid_features=8*3*3,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(ff.FF_GRID_ATTN(
-            "FF_GRID_ATTN",
-            n_features=12,
-            n_grid_features=8*3*3,
-            n_channels=8,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(ff.FF_GRID(
-            "FF_NGRID_IND",
-            n_features=12,
-            n_grid_features=5*3*3*3,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
+        # nn_model_list.append(ff.FF(
+        #     "FF",
+        #     n_features=12,
+        #     hidden_size=HIDDEN_SIZE,
+        #     batch_size=BATCH_SIZE,
+        #     embed_dict=embed_dict,
+        #     device=device
+        # ).to(device))
+        # nn_model_list.append(ff.FF_GRID(
+        #     "FF_GRID_IND",
+        #     n_features=12,
+        #     n_grid_features=8*5*5,
+        #     hidden_size=HIDDEN_SIZE,
+        #     grid_compression_size=8,
+        #     batch_size=BATCH_SIZE,
+        #     embed_dict=embed_dict,
+        #     device=device
+        # ).to(device))
+        # nn_model_list.append(ff.FF_GRID_ATTN(
+        #     "FF_GRID_ATTN",
+        #     n_features=12,
+        #     n_grid_features=8*5*5,
+        #     n_channels=8,
+        #     hidden_size=HIDDEN_SIZE,
+        #     grid_compression_size=8,
+        #     batch_size=BATCH_SIZE,
+        #     embed_dict=embed_dict,
+        #     device=device
+        # ).to(device))
+        # nn_model_list.append(ff.FF_GRID(
+        #     "FF_NGRID_IND",
+        #     n_features=12,
+        #     n_grid_features=5*3*5*5,
+        #     hidden_size=HIDDEN_SIZE,
+        #     grid_compression_size=8,
+        #     batch_size=BATCH_SIZE,
+        #     embed_dict=embed_dict,
+        #     device=device
+        # ).to(device))
         nn_model_list.append(rnn.GRU(
             "GRU",
             n_features=9,
@@ -123,76 +123,84 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             embed_dict=embed_dict,
             device=device
         ).to(device))
-        nn_model_list.append(rnn.GRU_GRID(
-            "GRU_GRID_IND",
-            n_features=9,
-            n_grid_features=8*3*3,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(rnn.GRU_GRID_ATTN(
-            "GRU_GRID_ATTN",
-            n_features=9,
-            n_grid_features=8*3*3,
-            n_channels=8,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(rnn.GRU_GRID(
-            "GRU_NGRID_IND",
-            n_features=9,
-            n_grid_features=5*3*3*3,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(transformer.TRSF(
-            "TRSF",
+        nn_model_list.append(rnn.GRU_HI(
+            "GRU_HI",
             n_features=9,
             hidden_size=HIDDEN_SIZE,
             batch_size=BATCH_SIZE,
             embed_dict=embed_dict,
             device=device
         ).to(device))
-        nn_model_list.append(transformer.TRSF_GRID(
-            "TRSF_IND",
-            n_features=9,
-            n_grid_features=8*3*3,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(transformer.TRSF_GRID_ATTN(
-            "TRSF_GRID_ATTN",
-            n_features=9,
-            n_grid_features=8*3*3,
-            n_channels=8,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(transformer.TRSF_GRID(
-            "TRSF_NGRID_IND",
-            n_features=9,
-            n_grid_features=5*3*3*3,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
+        # nn_model_list.append(rnn.GRU_GRID(
+        #     "GRU_GRID_IND",
+        #     n_features=9,
+        #     n_grid_features=8*5*5,
+        #     hidden_size=HIDDEN_SIZE,
+        #     grid_compression_size=8,
+        #     batch_size=BATCH_SIZE,
+        #     embed_dict=embed_dict,
+        #     device=device
+        # ).to(device))
+        # nn_model_list.append(rnn.GRU_GRID_ATTN(
+        #     "GRU_GRID_ATTN",
+        #     n_features=9,
+        #     n_grid_features=8*5*5,
+        #     n_channels=8,
+        #     hidden_size=HIDDEN_SIZE,
+        #     grid_compression_size=8,
+        #     batch_size=BATCH_SIZE,
+        #     embed_dict=embed_dict,
+        #     device=device
+        # ).to(device))
+        # nn_model_list.append(rnn.GRU_GRID(
+        #     "GRU_NGRID_IND",
+        #     n_features=9,
+        #     n_grid_features=5*3*5*5,
+        #     hidden_size=HIDDEN_SIZE,
+        #     grid_compression_size=8,
+        #     batch_size=BATCH_SIZE,
+        #     embed_dict=embed_dict,
+        #     device=device
+        # ).to(device))
+        # nn_model_list.append(transformer.TRSF(
+        #     "TRSF",
+        #     n_features=9,
+        #     hidden_size=HIDDEN_SIZE,
+        #     batch_size=BATCH_SIZE,
+        #     embed_dict=embed_dict,
+        #     device=device
+        # ).to(device))
+        # nn_model_list.append(transformer.TRSF_GRID(
+        #     "TRSF_IND",
+        #     n_features=9,
+        #     n_grid_features=8*5*5,
+        #     hidden_size=HIDDEN_SIZE,
+        #     grid_compression_size=8,
+        #     batch_size=BATCH_SIZE,
+        #     embed_dict=embed_dict,
+        #     device=device
+        # ).to(device))
+        # nn_model_list.append(transformer.TRSF_GRID_ATTN(
+        #     "TRSF_GRID_ATTN",
+        #     n_features=9,
+        #     n_grid_features=8*5*5,
+        #     n_channels=8,
+        #     hidden_size=HIDDEN_SIZE,
+        #     grid_compression_size=8,
+        #     batch_size=BATCH_SIZE,
+        #     embed_dict=embed_dict,
+        #     device=device
+        # ).to(device))
+        # nn_model_list.append(transformer.TRSF_GRID(
+        #     "TRSF_NGRID_IND",
+        #     n_features=9,
+        #     n_grid_features=5*3*5*5,
+        #     hidden_size=HIDDEN_SIZE,
+        #     grid_compression_size=8,
+        #     batch_size=BATCH_SIZE,
+        #     embed_dict=embed_dict,
+        #     device=device
+        # ).to(device))
 
         all_model_list = []
         all_model_list.extend(base_model_list)
@@ -473,7 +481,7 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_experiments(
-        run_folder="./results/small/",
+        run_folder="./results/par_hi/",
         train_network_folder="kcm/",
         test_network_folder="atb/",
         tune_network_folder="atb/",
@@ -489,7 +497,7 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_experiments(
-        run_folder="./results/small/",
+        run_folder="./results/par_hi/",
         train_network_folder="atb/",
         test_network_folder="kcm/",
         tune_network_folder="kcm/",
