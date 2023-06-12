@@ -28,7 +28,7 @@ class TRSF(nn.Module):
         # Positional encoding layer
         self.pos_encoder = pos_encodings.PositionalEncoding1D(self.n_features)
         # Encoder layer
-        encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features, nhead=2, dim_feedforward=self.hidden_size, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
         # Linear compression layer
         self.feature_extract = nn.Linear(self.n_features + self.embed_total_dims + self.embed_total_dims, 1)
@@ -94,7 +94,7 @@ class TRSF_GRID(nn.Module):
         # Positional encoding layer
         self.pos_encoder = pos_encodings.PositionalEncoding1D(self.n_features + self.grid_compression_size)
         # Encoder layer
-        encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features + self.grid_compression_size, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features + self.grid_compression_size, nhead=2, dim_feedforward=self.hidden_size, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
         # Linear compression layer
         self.feature_extract = nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, 1)
@@ -159,7 +159,7 @@ class TRSF_GRID_ATTN(nn.Module):
         # 2d grid positional encoding layer
         self.grid_pos_enc = pos_encodings.PositionalEncodingPermute2D(self.n_channels)
         # Grid attention
-        grid_encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_grid_features, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
+        grid_encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_grid_features, nhead=2, dim_feedforward=self.hidden_size, batch_first=True)
         self.grid_transformer_encoder = nn.TransformerEncoder(grid_encoder_layer, num_layers=2)
         # Activation layer
         self.activation = nn.ReLU()
@@ -173,7 +173,7 @@ class TRSF_GRID_ATTN(nn.Module):
         # 1d sequence positional encoding layer
         self.seq_pos_encoder = pos_encodings.PositionalEncoding1D(self.n_features + self.grid_compression_size)
         # Encoder layer
-        seq_encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features + self.grid_compression_size, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
+        seq_encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features + self.grid_compression_size, nhead=2, dim_feedforward=self.hidden_size, batch_first=True)
         self.seq_transformer_encoder = nn.TransformerEncoder(seq_encoder_layer, num_layers=2)
         # Linear compression layer
         self.feature_extract = nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, 1)

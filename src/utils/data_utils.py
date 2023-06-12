@@ -242,7 +242,7 @@ def shingle(trace_df, min_len, max_len):
     z['shingle_id'] = new_idx
     return z
 
-def calculate_trace_df(data, timezone, epsg, grid_bounds, data_dropout=.10, remove_stopped_pts=True):
+def calculate_trace_df(data, timezone, epsg, grid_bounds, coord_ref_center, data_dropout=.10, remove_stopped_pts=True):
     """
     Calculate difference in metrics between two consecutive trip points.
     This is the only place where points are filtered rather than entire shingles.
@@ -263,6 +263,9 @@ def calculate_trace_df(data, timezone, epsg, grid_bounds, data_dropout=.10, remo
     proj_crs = pyproj.CRS.from_epsg(epsg)
     transformer = pyproj.Transformer.from_crs(default_crs, proj_crs, always_xy=True)
     data['x'], data['y'] = transformer.transform(data['lon'], data['lat'])
+    # Add coordinates that are translated s.t. CBD is 0,0
+    data['x_cent'] = data['x'] - coord_ref_center[0]
+    data['y_cent'] = data['y'] - coord_ref_center[1]
     # Drop points outside of the network/grid bounding box
     data = data[data['x']>grid_bounds[0]]
     data = data[data['y']>grid_bounds[1]]
@@ -359,6 +362,8 @@ def apply_gtfs_timetables(data, gtfs_data, gtfs_folder_date):
     data = data.assign(stop_arrival_s=closest_stops[:,3])
     data = data.assign(stop_sequence=closest_stops[:,4])
     data = data.assign(stop_dist_km=closest_stops[:,5]/1000)
+    data = data.assign(stop_x_cent=closest_stops[:,5])
+    data = data.assign(stop_y_cent=closest_stops[:,6])
     # Get the timeID_s (for the first point of each trajectory)
     data = pd.merge(data, first_points, on='shingle_id')
     # Calculate the scheduled travel time from the first to each point in the shingle
@@ -378,7 +383,7 @@ def get_scheduled_arrival(trip_ids, x, y, gtfs_data):
     Returns: (distance to closest stop in km, scheduled arrival time at that stop).
     """
     data = np.column_stack([x, y, trip_ids])
-    gtfs_data_ary = gtfs_data[['stop_x','stop_y','trip_id','arrival_s','stop_sequence']].values
+    gtfs_data_ary = gtfs_data[['stop_x','stop_y','trip_id','arrival_s','stop_sequence','stop_x_cent','stop_y_cent']].values
 
     # Create dictionary mapping trip_ids to lists of points in gtfs
     id_to_points = {}
@@ -386,7 +391,7 @@ def get_scheduled_arrival(trip_ids, x, y, gtfs_data):
         id_to_points.setdefault(point[2],[]).append(point)
 
     # For each point find the closest stop that shares the trip_id
-    results = np.zeros((len(data), 6), dtype=object)
+    results = np.zeros((len(data), 8), dtype=object)
     for i, point in enumerate(data):
         corresponding_points = np.vstack(id_to_points.get(point[2], []))
         point = np.expand_dims(point, 0)
@@ -412,7 +417,7 @@ def get_best_gtfs_lookup(traces, gtfs_folder):
     file_to_gtfs_map = {k:v for k,v in zip(dates_needed_string, best_gtfs_dates_string)}
     return file_to_gtfs_map
 
-def clean_trace_df_w_timetables(traces, gtfs_folder, epsg):
+def clean_trace_df_w_timetables(traces, gtfs_folder, epsg, coord_ref_center):
     """
     Validate a set of tracked bus locations against GTFS.
     data: pandas dataframe with unified bus data
@@ -427,7 +432,7 @@ def clean_trace_df_w_timetables(traces, gtfs_folder, epsg):
     unique_gtfs = pd.unique(list(file_to_gtfs_map.values()))
     for current_gtfs_name in unique_gtfs:
         keys = [k for k,v in file_to_gtfs_map.items() if v==current_gtfs_name]
-        current_gtfs_data = merge_gtfs_files(f"{gtfs_folder}{current_gtfs_name}/", epsg)
+        current_gtfs_data = merge_gtfs_files(f"{gtfs_folder}{current_gtfs_name}/", epsg, coord_ref_center)
         result.append(apply_gtfs_timetables(traces[traces['file'].isin(keys)].copy(), current_gtfs_data, current_gtfs_name))
     result = pd.concat(result)
     result = result.sort_values(["file","shingle_id","locationtime"], ascending=True)
@@ -496,6 +501,8 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, grid_bounds, grid_s_res, 
         'lngs': lambda x: x.tolist(),
         'x': lambda x: x.tolist(),
         'y': lambda y: y.tolist(),
+        'x_cent': lambda x: x.tolist(),
+        'y_cent': lambda y: y.tolist(),
         'speed_m_s': lambda x: x.tolist(),
         'time_calc_s': lambda x: x.tolist(),
         'dist_calc_km': lambda x: x.tolist(),
@@ -551,6 +558,10 @@ def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg):
         "x_std": np.std(trace_data['x']),
         "y_mean": np.mean(trace_data['y']),
         "y_std": np.std(trace_data['y']),
+        "x_cent_mean": np.mean(trace_data['x_cent']),
+        "x_cent_std": np.std(trace_data['x_cent']),
+        "y_cent_mean": np.mean(trace_data['y_cent']),
+        "y_cent_std": np.std(trace_data['y_cent']),
         "speed_m_s_mean": np.mean(trace_data['speed_m_s']),
         "speed_m_s_std": np.std(trace_data['speed_m_s']),
         "bearing_mean": np.mean(trace_data['bearing']),
@@ -569,6 +580,10 @@ def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg):
         "stop_x_std": np.std(trace_data['stop_x']),
         "stop_y_mean": np.mean(trace_data['stop_y']),
         "stop_y_std": np.std(trace_data['stop_y']),
+        "stop_x_cent_mean": np.mean(trace_data['stop_x_cent']),
+        "stop_x_cent_std": np.std(trace_data['stop_x_cent']),
+        "stop_y_cent_mean": np.mean(trace_data['stop_y_cent']),
+        "stop_y_cent_std": np.std(trace_data['stop_y_cent']),
         "stop_dist_km_mean": np.mean(trace_data['stop_dist_km']),
         "stop_dist_km_std": np.std(trace_data['stop_dist_km']),
         "scheduled_time_s_mean": np.mean(grouped.max()[['scheduled_time_s']].values.flatten()),
@@ -618,7 +633,7 @@ def extract_operator_gtfs(old_folder, new_folder, source_col_trips, source_col_s
             z.to_csv(f"{new_folder}{file}/trips.txt")
             st.to_csv(f"{new_folder}{file}/stop_times.txt")
 
-def merge_gtfs_files(gtfs_folder, epsg):
+def merge_gtfs_files(gtfs_folder, epsg, coord_ref_center):
     """
     Join a set of GTFS files into a single dataframe. Each row is a trip + arrival time.
     Returns: pandas dataframe with merged GTFS data.
@@ -638,6 +653,8 @@ def merge_gtfs_files(gtfs_folder, epsg):
     proj_crs = pyproj.CRS.from_epsg(epsg)
     transformer = pyproj.Transformer.from_crs(default_crs, proj_crs, always_xy=True)
     gtfs_data['stop_x'], gtfs_data['stop_y'] = transformer.transform(gtfs_data['stop_lon'], gtfs_data['stop_lat'])
+    gtfs_data['stop_x_cent'] = gtfs_data['stop_x'] - coord_ref_center[0]
+    gtfs_data['stop_y_cent'] = gtfs_data['stop_y'] - coord_ref_center[1]
     return gtfs_data
 
 def get_date_from_filename(filename):

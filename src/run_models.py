@@ -172,14 +172,14 @@ def run_models(run_folder, network_folder, **kwargs):
             embed_dict=embed_dict,
             device=device
         ).to(device))
-        # nn_model_list.append(transformer.TRSF(
-        #     "TRSF",
-        #     n_features=9,
-        #     hidden_size=HIDDEN_SIZE,
-        #     batch_size=BATCH_SIZE,
-        #     embed_dict=embed_dict,
-        #     device=device
-        # ).to(device))
+        nn_model_list.append(transformer.TRSF(
+            "TRSF",
+            n_features=10,
+            hidden_size=HIDDEN_SIZE,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device))
         nn_model_list.append(transformer.TRSF_GRID(
             "TRSF_IND",
             n_features=9,
@@ -380,7 +380,7 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/debug/",
+        run_folder="./results/cross_attn/",
         network_folder="kcm/",
         EPOCHS=50,
         BATCH_SIZE=512,
@@ -392,7 +392,7 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/debug/",
+        run_folder="./results/cross_attn/",
         network_folder="atb/",
         EPOCHS=50,
         BATCH_SIZE=512,

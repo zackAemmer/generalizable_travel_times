@@ -17,8 +17,8 @@ from utils import data_utils
 def process_data_parallel(data, **kwargs):
     # Clean and transform raw bus data records
     traces = data_utils.shingle(data, 2, 5)
-    traces = data_utils.calculate_trace_df(traces, kwargs['timezone'], kwargs['epsg'], kwargs['grid_bounds'], kwargs['data_dropout'])
-    traces = data_utils.clean_trace_df_w_timetables(traces, kwargs['gtfs_folder'], kwargs['epsg'])
+    traces = data_utils.calculate_trace_df(traces, kwargs['timezone'], kwargs['epsg'], kwargs['grid_bounds'], kwargs['coord_ref_center'], kwargs['data_dropout'])
+    traces = data_utils.clean_trace_df_w_timetables(traces, kwargs['gtfs_folder'], kwargs['epsg'], kwargs['coord_ref_center'])
     traces = data_utils.calculate_cumulative_values(traces)
     return traces
 
@@ -63,6 +63,8 @@ def clean_data(dates, n_save_files, train_or_test, base_folder, **kwargs):
         deeptte_formatted_path = f"{base_folder}deeptte_formatted/{train_or_test}{file_num}"
         traces, train_ngrid, train_grid = data_utils.map_to_deeptte(traces, deeptte_formatted_path, grid_bounds=kwargs['grid_bounds'], grid_s_res=kwargs['grid_s_res'], grid_t_res=kwargs['grid_t_res'], grid_n_res=kwargs['grid_n_res'])
         summary_config = data_utils.get_summary_config(traces, kwargs['gtfs_folder'], n_save_files, kwargs['epsg'])
+        # Add generalized coordinates
+        traces = data_utils.centralize_coords(traces, summary_config)
         # Save config, and traces to file for notebook analyses
         with open(f"{deeptte_formatted_path}_config.json", mode="a") as out_file:
             json.dump(summary_config, out_file)
@@ -125,6 +127,7 @@ if __name__=="__main__":
     #     timezone="America/Los_Angeles",
     #     epsg="32148",
     #     grid_bounds = [369903,37911,409618,87758],
+    #     coord_ref_center = [386910,69022],
     #     grid_s_res=500,
     #     grid_t_res=120,
     #     grid_n_res=3,
@@ -149,6 +152,7 @@ if __name__=="__main__":
     #     timezone="Europe/Oslo",
     #     epsg="32632",
     #     grid_bounds = [527069,6970957,606659,7099381],
+    #     coord_ref_center = [569472,7034350],
     #     grid_s_res=5000,
     #     grid_t_res=120,
     #     grid_n_res=3,
@@ -159,7 +163,7 @@ if __name__=="__main__":
     torch.manual_seed(0)
     prepare_run(
         overwrite=True,
-        run_name="par_hi",
+        run_name="cross_attn",
         network_name="kcm",
         train_dates=data_utils.get_date_list("2023_03_15", 30),
         test_dates=data_utils.get_date_list("2023_04_15", 7),
@@ -173,6 +177,7 @@ if __name__=="__main__":
         timezone="America/Los_Angeles",
         epsg="32148",
         grid_bounds = [369903,37911,409618,87758],
+        coord_ref_center = [386910,69022],
         grid_s_res=500,
         grid_t_res=120,
         grid_n_res=3,
@@ -183,7 +188,7 @@ if __name__=="__main__":
     torch.manual_seed(0)
     prepare_run(
         overwrite=True,
-        run_name="par_hi",
+        run_name="cross_attn",
         network_name="atb",
         train_dates=data_utils.get_date_list("2023_03_15", 30),
         test_dates=data_utils.get_date_list("2023_04_15", 7),
@@ -197,7 +202,8 @@ if __name__=="__main__":
         timezone="Europe/Oslo",
         epsg="32632",
         grid_bounds = [527069,6970957,606659,7099381],
-        grid_s_res=2500,
+        coord_ref_center = [569472,7034350],
+        grid_s_res=1000,
         grid_t_res=120,
         grid_n_res=3,
         given_names=['trip_id','file','locationtime','lat','lon','vehicle_id']

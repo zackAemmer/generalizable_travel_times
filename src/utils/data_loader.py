@@ -58,14 +58,14 @@ def basic_collate(batch):
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
     # Continuous features
     X_ct = np.zeros((len(batch), 12))
-    X_ct[:,0] = [torch.tensor(x['x'][0]) for x in batch]
-    X_ct[:,1] = [torch.tensor(x['y'][0]) for x in batch]
-    X_ct[:,2] = [torch.tensor(x['x'][-1]) for x in batch]
-    X_ct[:,3] = [torch.tensor(x['y'][-1]) for x in batch]
+    X_ct[:,0] = [torch.tensor(x['x_cent'][0]) for x in batch]
+    X_ct[:,1] = [torch.tensor(x['y_cent'][0]) for x in batch]
+    X_ct[:,2] = [torch.tensor(x['x_cent'][-1]) for x in batch]
+    X_ct[:,3] = [torch.tensor(x['y_cent'][-1]) for x in batch]
     X_ct[:,4] = [torch.tensor(x['scheduled_time_s'][0]) for x in batch]
     X_ct[:,5] = [torch.tensor(x['stop_dist_km'][0]) for x in batch]
-    X_ct[:,6] = [torch.tensor(x['stop_x'][-1]) for x in batch]
-    X_ct[:,7] = [torch.tensor(x['stop_y'][-1]) for x in batch]
+    X_ct[:,6] = [torch.tensor(x['stop_x_cent'][-1]) for x in batch]
+    X_ct[:,7] = [torch.tensor(x['stop_y_cent'][-1]) for x in batch]
     X_ct[:,8] = [torch.tensor(x['speed_m_s'][0]) for x in batch]
     X_ct[:,9] = [torch.tensor(x['bearing'][0]) for x in batch]
     X_ct[:,10] = [torch.tensor(x['dist']) for x in batch]
@@ -90,14 +90,14 @@ def basic_grid_collate(batch):
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
     # Continuous features
     X_ct = np.zeros((len(batch), 12))
-    X_ct[:,0] = [torch.tensor(x['x'][0]) for x in batch]
-    X_ct[:,1] = [torch.tensor(x['y'][0]) for x in batch]
-    X_ct[:,2] = [torch.tensor(x['x'][-1]) for x in batch]
-    X_ct[:,3] = [torch.tensor(x['y'][-1]) for x in batch]
+    X_ct[:,0] = [torch.tensor(x['x_cent'][0]) for x in batch]
+    X_ct[:,1] = [torch.tensor(x['y_cent'][0]) for x in batch]
+    X_ct[:,2] = [torch.tensor(x['x_cent'][-1]) for x in batch]
+    X_ct[:,3] = [torch.tensor(x['y_cent'][-1]) for x in batch]
     X_ct[:,4] = [torch.tensor(x['scheduled_time_s'][0]) for x in batch]
     X_ct[:,5] = [torch.tensor(x['stop_dist_km'][0]) for x in batch]
-    X_ct[:,6] = [torch.tensor(x['stop_x'][-1]) for x in batch]
-    X_ct[:,7] = [torch.tensor(x['stop_y'][-1]) for x in batch]
+    X_ct[:,6] = [torch.tensor(x['stop_x_cent'][-1]) for x in batch]
+    X_ct[:,7] = [torch.tensor(x['stop_y_cent'][-1]) for x in batch]
     X_ct[:,8] = [torch.tensor(x['speed_m_s'][0]) for x in batch]
     X_ct[:,9] = [torch.tensor(x['bearing'][0]) for x in batch]
     X_ct[:,10] = [torch.tensor(x['dist']) for x in batch]
@@ -127,16 +127,17 @@ def sequential_collate(batch):
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
     X_em = torch.from_numpy(X_em)
     # Continuous features
-    X_ct = torch.zeros((len(batch), max_len, 9))
-    X_ct[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
-    X_ct[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
+    X_ct = torch.zeros((len(batch), max_len, 10))
+    X_ct[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x_cent']) for x in batch], batch_first=True)
+    X_ct[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y_cent']) for x in batch], batch_first=True)
     X_ct[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
     X_ct[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
     X_ct[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
-    X_ct[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
-    X_ct[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
+    X_ct[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x_cent']) for x in batch], batch_first=True)
+    X_ct[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y_cent']) for x in batch], batch_first=True)
     X_ct[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
     X_ct[:,:,8] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['passed_stops_n']) for x in batch], batch_first=True)
+    X_ct[:,:,9] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['passed_stops_n']) for x in batch], batch_first=True)
     # Target feature
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
     # Sort all by sequence length descending, for potential packing of each batch
@@ -156,13 +157,13 @@ def sequential_grid_collate(batch):
     X_em = torch.from_numpy(X_em)
     # Continuous features
     X_ct = torch.zeros((len(batch), max_len, 9))
-    X_ct[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x']) for x in batch], batch_first=True)
-    X_ct[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y']) for x in batch], batch_first=True)
+    X_ct[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x_cent']) for x in batch], batch_first=True)
+    X_ct[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y_cent']) for x in batch], batch_first=True)
     X_ct[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
     X_ct[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
     X_ct[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
-    X_ct[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x']) for x in batch], batch_first=True)
-    X_ct[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y']) for x in batch], batch_first=True)
+    X_ct[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x_cent']) for x in batch], batch_first=True)
+    X_ct[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y_cent']) for x in batch], batch_first=True)
     X_ct[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
     X_ct[:,:,8] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['passed_stops_n']) for x in batch], batch_first=True)
     # Grid features (NxCxLxHxW)
