@@ -6,47 +6,6 @@ from scipy import sparse
 from utils import data_utils
 
 
-class Grid:
-    def __init__(self, content, counts, mask, c_resolution, x_resolution, y_resolution, t_resolution):
-        self.content = sparse.csr_matrix(content.reshape(content.shape[0],-1))
-        self.counts = sparse.csr_matrix(counts.reshape(counts.shape[0],-1))
-        self.mask = sparse.csr_matrix(mask.reshape(mask.shape[0],-1))
-        self.c_resolution = c_resolution
-        self.x_resolution = x_resolution
-        self.y_resolution = y_resolution
-        self.t_resolution = t_resolution
-        self.fill_content = None
-        self.fill_counts = None
-    def get_content(self):
-        c = self.content.toarray()
-        c = np.reshape(c, (c.shape[0], self.c_resolution, self.y_resolution, self.x_resolution))
-        return c
-    def get_fill_content(self):
-        c = self.fill_content.toarray()
-        o = self.fill_counts.toarray()
-        c = np.reshape(c, (c.shape[0], self.c_resolution, self.y_resolution, self.x_resolution))
-        o = np.reshape(o, (o.shape[0], self.c_resolution, self.y_resolution, self.x_resolution))
-        return np.concatenate([c,o], axis=1)
-    def get_masked_content(self):
-        # Same regardless if applied to fill or not
-        c = self.content.toarray()
-        m = self.mask.toarray()
-        return c[m==1]
-    def get_masked_counts(self):
-        # Fill counts are just 0's
-        c = self.counts.toarray()
-        m = self.mask.toarray()
-        return c[m==1]
-    def get_density(self):
-        m = self.content.toarray()
-        return np.sum(~np.isnan(m)) / m.size
-    def get_fill_density(self):
-        m = self.fill_content.toarray()
-        return np.sum(~np.isnan(m)) / m.size
-    def set_fill_content(self, fill_content, fill_counts):
-        self.fill_content = sparse.csr_matrix(fill_content.reshape(fill_content.shape[0],-1))
-        self.fill_counts = sparse.csr_matrix(fill_counts.reshape(fill_counts.shape[0],-1))
-
 class NGrid:
     def __init__(self, content, c_resolution, x_resolution, y_resolution, t_resolution, n_resolution):
         self.content = content
@@ -116,82 +75,6 @@ def traces_to_ngrid(traces, grid_bounds, grid_s_res, grid_t_res, grid_n_res):
     ngrid = NGrid(content=obs, c_resolution=4, x_resolution=x_resolution, y_resolution=y_resolution, t_resolution=len(tbins), n_resolution=grid_n_res)
     return ngrid, tbin_idxs, xbin_idxs, ybin_idxs
 
-def traces_to_grid(traces, grid_bounds, grid_s_res, grid_t_res):
-    # Create grid
-    grid, tbins, xbins, ybins = decompose_and_rasterize(traces['speed_m_s'].values, traces['bearing'].values, traces['x'].values, traces['y'].values, traces['locationtime'].values, grid_bounds, grid_s_res, grid_t_res)
-    # Get tbins for each trace. No overlap between current trip and grid values.
-    # Grid assigned values: binedge[i-1] <= x < binedge[i]
-    # Trace values: binedge[i-1] < x <= binedge[i]
-    # Want all values up through the previous bin index (since that is guaranteed < x)
-    # [i-n_prior:i] will give give n_prior total values, including up to the bin before i
-    tbin_idxs = np.digitize(traces['locationtime'].values, tbins, right=True) - 1
-    tbin_idxs = np.maximum(0,tbin_idxs)
-    # Opposite is true for lat/lon: want the exact bin that the value falls in
-    # [i-buffer-1:i+buffer] will give 2*buffer+1 total values, with bin i in the middle
-    xbin_idxs = np.digitize(traces['x'].values, xbins, right=False)
-    xbin_idxs = np.maximum(0,xbin_idxs)
-    ybin_idxs = np.digitize(traces['y'].values, ybins, right=False)
-    ybin_idxs = np.maximum(0,ybin_idxs)
-    return grid, tbin_idxs, xbin_idxs, ybin_idxs
-
-def decompose_and_rasterize(features, bearings, x, y, times, grid_bounds, grid_s_res, grid_t_res):
-    # Get regularly spaced bins at given resolution/timestep across bbox for all collected points
-    # Need to flip bins for latitude because it should decrease downward through array
-    # Add a bin to the upper end; all obs are assigned such that bin_edge[i-1] <= x < bin_edge[i]
-    y_resolution = (grid_bounds[3] - grid_bounds[1]) // grid_s_res
-    x_resolution = (grid_bounds[2] - grid_bounds[0]) // grid_s_res
-    ybins = np.linspace(grid_bounds[1], grid_bounds[3], y_resolution)
-    ybins = np.append(ybins, ybins[-1]+.0000001)
-    xbins = np.linspace(grid_bounds[0], grid_bounds[2], x_resolution)
-    xbins = np.append(xbins, xbins[-1]+.0000001)
-    tbins = np.arange(np.min(times),np.max(times),grid_t_res)
-    tbins = np.append(tbins, tbins[-1]+1)
-    # Split features into quadrant channels
-    channel_obs = decompose_vector(features, bearings, np.column_stack([x, y, times]))
-    # For each channel, aggregate by location and timestep bins
-    # T x C x H x W
-    grid_content = np.ones((len(tbins)-1, len(channel_obs), len(ybins)-1, len(xbins)-1), dtype='float64') * -1
-    count_content = np.ones((len(tbins)-1, len(channel_obs), len(ybins)-1, len(xbins)-1), dtype='int64')
-    mask_content = np.ones((len(tbins)-1, len(channel_obs), len(ybins)-1, len(xbins)-1), dtype='int64')
-    for i, channel in enumerate(channel_obs):
-        # Get the average feature value in each bin
-        count_hist, count_edges = np.histogramdd(np.column_stack([channel[:,3], channel[:,2], channel[:,1]]), bins=[tbins, ybins, xbins])
-        sum_hist, edges = np.histogramdd(np.column_stack([channel[:,3], channel[:,2], channel[:,1]]), weights=channel[:,0], bins=[tbins, ybins, xbins])
-        rast = sum_hist / np.maximum(1, count_hist)
-        # Mask cells with no information as nan
-        mask = count_hist==0
-        rast[mask] = np.nan
-        # Save binned values for each channel
-        grid_content[:,i,:,:] = rast
-        count_content[:,i,:,:] = count_hist
-        mask_content[:,i,:,:] = mask
-    # Invert mask when saving so that True/1 points to specified values instead of unspecified
-    grid = Grid(grid_content, count_content, (1-mask_content), len(channel_obs), x_resolution, y_resolution, grid_t_res)
-    return grid, tbins, xbins, ybins
-
-def decompose_vector(scalars, bearings, data_to_attach=None):
-    """
-    Break speed vector into its x and y components.
-    scalars: array of speeds
-    data_to_attach: additional columns to keep with the decomposed values
-    Returns: array of x +/-, y +/- scalar components.
-    """
-    # Decompose each scalar into its x/y components
-    x = np.round(np.cos(bearings * np.pi/180) * scalars, 1)
-    y = np.round(np.sin(bearings * np.pi/180) * scalars, 1)
-    # Attach additional variables
-    x_all = np.column_stack([x, data_to_attach])
-    y_all = np.column_stack([y, data_to_attach])
-    # Include 0.0 observations in both channels
-    x_pos = x_all[x>=0.0]
-    x_neg = x_all[x<=0.0]
-    y_pos = y_all[y>=0.0]
-    y_neg = y_all[y<=0.0]
-    # Get absolute value of negative-direction observations
-    x_neg[:,0] = np.abs(x_neg[:,0])
-    y_neg[:,0] = np.abs(y_neg[:,0])
-    return (x_pos, x_neg, y_pos, y_neg)
-
 def fill_ngrid_forward(ngrid):
     """
     Fill forward (in time) the grid for timesteps w/o complete observations.
@@ -224,67 +107,6 @@ def fill_ngrid_forward(ngrid):
         filled_arr[t] = result
     ngrid.set_fill_content(filled_arr)
 
-def fill_grid_forward(grid_normal):
-    """
-    Fill forward (in time) each channel in the grid for timesteps w/o an observation.
-    """
-    grid_content = grid_normal.get_content()
-    filled_channels = np.zeros(grid_content.shape)
-    filled_counts = np.zeros(grid_content.shape)
-    for channel in range(grid_content.shape[1]):
-        ffilled, channel_counts = fill_channel_forward(grid_content[:,channel,:,:])
-        filled_channels[:,channel,:,:] = ffilled
-        filled_counts[:,channel,:,:] = channel_counts
-    # First n channels are original speeds, second n are the obs histories in grid resolution
-    grid_normal.set_fill_content(filled_channels, filled_counts)
-
-def fill_channel_forward(grid_channel):
-    tsteps, rows, cols = grid_channel.shape
-    mask = np.isnan(grid_channel)
-    ffilled = np.copy(grid_channel)
-    channel_counts = np.zeros(grid_channel.shape)
-    # For each cell, fill the value at this timestep w/previous value if it is masked
-    for i in range(rows):
-        for j in range(cols):
-            counter = 0
-            for t in range(1,tsteps):
-                if mask[t][i][j]:
-                    # Keep record of how many steps have been filled since last known value
-                    counter += 1
-                    ffilled[t][i][j] = ffilled[t-1][i][j]
-                    channel_counts[t][i][j] = counter
-                else:
-                    # When a known value is found, reset counter to 0
-                    counter = 0
-                    channel_counts[t][i][j] = counter
-    return ffilled, channel_counts
-
-def extract_grid_features(g, tbins, xbins, ybins, config, buffer=1):
-    """
-    Given sequence of bins from a trip, reconstruct grid features.
-    """
-    # All points in the sequence will have the information at the time of the starting point
-    # However the starting information is shifted in space to center features on each point
-    tbin_start_idx = tbins[0]
-    grid_features = []
-    for i in range(len(tbins)):
-        # Handle case where buffer goes off edge of grid
-        if xbins[i]-buffer-1 < 0 or ybins[i]-buffer-1 < 0:
-            feature = np.zeros((g.shape[1], 2*buffer+1, 2*buffer+1))
-            feature[:4,:,:] = np.nan
-        elif xbins[i]+buffer > g.shape[3] or ybins[i]+buffer > g.shape[2]:
-            feature = np.zeros((g.shape[1], 2*buffer+1, 2*buffer+1))
-            feature[:4,:,:] = np.nan
-        else:
-            # Filter grid based on shingle start time, and adjacent squares to buffer (pts +/- buffer, including middle point)
-            feature = g[tbin_start_idx,:,ybins[i]-buffer-1:ybins[i]+buffer,xbins[i]-buffer-1:xbins[i]+buffer].copy()
-        # Fill undefined cells with global average
-        feature[:4,:,:][np.isnan(feature[:4,:,:])] = config['speed_m_s_mean']
-        # Normalize all cells
-        feature[:4,:,:] = data_utils.normalize(feature[:4,:,:], config['speed_m_s_mean'], config['speed_m_s_std'])
-        grid_features.append(feature)
-    return grid_features
-
 def extract_ngrid_features(g, tbins, xbins, ybins, config, buffer=1):
     """
     Given sequence of bins from a trip, reconstruct grid features.
@@ -305,20 +127,16 @@ def extract_ngrid_features(g, tbins, xbins, ybins, config, buffer=1):
             # Filter grid based on adjacent squares to buffer (pts +/- buffer, including middle point)
             feature = g[tbin_start_idx,:,:,ybins[i]-buffer-1:ybins[i]+buffer,xbins[i]-buffer-1:xbins[i]+buffer].copy()
         # Fill undefined cells with global averages (per variable)
-        feature[0,:,:,:][np.isnan(feature[0,:,:,:])] = config['x_mean']
-        feature[1,:,:,:][np.isnan(feature[1,:,:,:])] = config['y_mean']
-        feature[2,:,:,:][np.isnan(feature[2,:,:,:])] = config['bearing_mean']
-        feature[3,:,:,:][np.isnan(feature[3,:,:,:])] = config['speed_m_s_mean']
-        feature[4,:,:,:][np.isnan(feature[4,:,:,:])] = 100
+        feature[0,:,:,:][np.isnan(feature[0,:,:,:])] = config['bearing_mean']
+        feature[1,:,:,:][np.isnan(feature[1,:,:,:])] = config['speed_m_s_mean']
+        feature[2,:,:,:][np.isnan(feature[2,:,:,:])] = 100
         # Normalize all cells
-        feature[0,:,:,:] = data_utils.normalize(feature[0,:,:,:], config['x_mean'], config['x_std'])
-        feature[1,:,:,:] = data_utils.normalize(feature[1,:,:,:], config['y_mean'], config['y_std'])
-        feature[2,:,:,:] = data_utils.normalize(feature[2,:,:,:], config['bearing_mean'], config['bearing_std'])
-        feature[3,:,:,:] = data_utils.normalize(feature[3,:,:,:], config['speed_m_s_mean'], config['speed_m_s_std'])
+        feature[0,:,:,:] = data_utils.normalize(feature[0,:,:,:], config['bearing_mean'], config['bearing_std'])
+        feature[1,:,:,:] = data_utils.normalize(feature[1,:,:,:], config['speed_m_s_mean'], config['speed_m_s_std'])
         grid_features.append(feature)
     return grid_features
 
-def save_grid_anim(data, file_name, vmin, vmax):
+def save_grid_anim(data, file_name):
     # Plot first 4 channels of second axis
     fig, axes = plt.subplots(2,2)
     axes = axes.reshape(-1)
@@ -328,7 +146,7 @@ def save_grid_anim(data, file_name, vmin, vmax):
         fig.suptitle(f"Frame {frame}")
         for i, ax in enumerate(axes):
             ax.clear()
-            ax.imshow(data[frame,i,:,:], cmap='plasma', vmin=vmin, vmax=vmax, origin="lower")
+            im = ax.imshow(data[frame,i,:,:], cmap='plasma', vmin=np.min(data[:,i,:,:]), vmax=np.max(data[:,i,:,:]), origin="lower")
     # Create the animation object
     ani = animation.FuncAnimation(fig, update, frames=data.shape[0])
     # Save the animation object

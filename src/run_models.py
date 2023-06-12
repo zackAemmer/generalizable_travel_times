@@ -94,45 +94,24 @@ def run_models(run_folder, network_folder, **kwargs):
 
         # Declare neural network models
         nn_model_list = []
-        # nn_model_list.append(ff.FF(
-        #     "FF",
-        #     n_features=12,
-        #     hidden_size=HIDDEN_SIZE,
-        #     batch_size=BATCH_SIZE,
-        #     embed_dict=embed_dict,
-        #     device=device
-        # ).to(device))
-        # nn_model_list.append(ff.FF_GRID(
-        #     "FF_GRID_IND",
-        #     n_features=12,
-        #     n_grid_features=8*5*5,
-        #     hidden_size=HIDDEN_SIZE,
-        #     grid_compression_size=8,
-        #     batch_size=BATCH_SIZE,
-        #     embed_dict=embed_dict,
-        #     device=device
-        # ).to(device))
-        # nn_model_list.append(ff.FF_GRID_ATTN(
-        #     "FF_GRID_ATTN",
-        #     n_features=12,
-        #     n_grid_features=8*5*5,
-        #     n_channels=8,
-        #     hidden_size=HIDDEN_SIZE,
-        #     grid_compression_size=8,
-        #     batch_size=BATCH_SIZE,
-        #     embed_dict=embed_dict,
-        #     device=device
-        # ).to(device))
-        # nn_model_list.append(ff.FF_GRID(
-        #     "FF_NGRID_IND",
-        #     n_features=12,
-        #     n_grid_features=5*3*5*5,
-        #     hidden_size=HIDDEN_SIZE,
-        #     grid_compression_size=8,
-        #     batch_size=BATCH_SIZE,
-        #     embed_dict=embed_dict,
-        #     device=device
-        # ).to(device))
+        nn_model_list.append(ff.FF(
+            "FF",
+            n_features=12,
+            hidden_size=HIDDEN_SIZE,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device))
+        nn_model_list.append(ff.FF_GRID(
+            "FF_NGRID_IND",
+            n_features=12,
+            n_grid_features=3*3*5*5,
+            hidden_size=HIDDEN_SIZE,
+            grid_compression_size=8,
+            batch_size=BATCH_SIZE,
+            embed_dict=embed_dict,
+            device=device
+        ).to(device))
         nn_model_list.append(rnn.GRU(
             "GRU",
             n_features=9,
@@ -142,30 +121,9 @@ def run_models(run_folder, network_folder, **kwargs):
             device=device
         ).to(device))
         nn_model_list.append(rnn.GRU_GRID(
-            "GRU_GRID_IND",
-            n_features=9,
-            n_grid_features=8*5*5,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=7,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(rnn.GRU_GRID_ATTN(
-            "GRU_GRID_ATTN",
-            n_features=9,
-            n_grid_features=8*5*5,
-            n_channels=8,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=7,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(rnn.GRU_GRID(
             "GRU_NGRID_IND",
             n_features=9,
-            n_grid_features=5*3*5*5,
+            n_grid_features=3*3*5*5,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=7,
             batch_size=BATCH_SIZE,
@@ -181,30 +139,9 @@ def run_models(run_folder, network_folder, **kwargs):
             device=device
         ).to(device))
         nn_model_list.append(transformer.TRSF_GRID(
-            "TRSF_IND",
-            n_features=9,
-            n_grid_features=8*5*5,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=7,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(transformer.TRSF_GRID_ATTN(
-            "TRSF_GRID_ATTN",
-            n_features=9,
-            n_grid_features=8*5*5,
-            n_channels=8,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=7,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(transformer.TRSF_GRID(
             "TRSF_NGRID_IND",
             n_features=9,
-            n_grid_features=5*3*5*5,
+            n_grid_features=3*3*5*5,
             hidden_size=HIDDEN_SIZE,
             grid_compression_size=7,
             batch_size=BATCH_SIZE,
@@ -233,15 +170,14 @@ def run_models(run_folder, network_folder, **kwargs):
             # Train all models on each training file; split samples in each file by fold
             for train_file in list(train_file_list):
                 # Load data and config for this training fold/file
-                train_data, test_data, grid, ngrid = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
-                grid_content = grid.get_fill_content()
+                train_data, test_data, ngrid = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
                 ngrid_content = ngrid.get_fill_content()
                 print(f"TRAIN FILE: {train_file}, {len(train_data)} train samples, {len(test_data)} test samples")
                 with open(f"{data_folder}train_config.json", "r") as f:
                     config = json.load(f)
 
                 # Construct dataloaders
-                base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(train_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid_content, combine=False)
+                base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(train_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=False)
 
                 # Train all models
                 for model, loader in zip(base_model_list, base_dataloaders):
@@ -268,16 +204,15 @@ def run_models(run_folder, network_folder, **kwargs):
                 test_losses = [0.0 for x in nn_model_list]
                 for train_file in train_file_list:
                     # Load data and config for this training fold
-                    train_data, test_data, grid, ngrid = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
-                    grid_content = grid.get_fill_content()
+                    train_data, test_data, ngrid = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
                     ngrid_content = ngrid.get_fill_content()
                     print(f"TEST FILE: {train_file}, {len(train_data)} train samples, {len(test_data)} test samples")
                     with open(f"{data_folder}train_config.json", "r") as f:
                         config = json.load(f)
 
                     # Construct dataloaders for network models
-                    _, train_dataloaders = model_utils.make_all_dataloaders(train_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid_content, combine=False)
-                    _, test_dataloaders = model_utils.make_all_dataloaders(test_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid_content, combine=False)
+                    _, train_dataloaders = model_utils.make_all_dataloaders(train_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=False)
+                    _, test_dataloaders = model_utils.make_all_dataloaders(test_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=False)
 
                     # Test all NN models on training and testing sets for this fold, across all files
                     for i, (model, train_loader, test_loader) in enumerate(zip(nn_model_list, train_dataloaders, test_dataloaders)):
@@ -301,14 +236,13 @@ def run_models(run_folder, network_folder, **kwargs):
 
         # Calculate performance metrics for fold
         for train_file in train_file_list:
-            train_data, test_data, grid, ngrid = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
-            grid_content = grid.get_fill_content()
+            train_data, test_data, ngrid = data_utils.load_fold_data(data_folder, train_file, fold_num, kwargs['n_folds'])
             ngrid_content = ngrid.get_fill_content()
             print(f"TEST FILE: {train_file}, {len(test_data)} test samples")
             with open(f"{data_folder}train_config.json", "r") as f:
                 config = json.load(f)
 
-            dataloaders = model_utils.make_all_dataloaders(test_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid_content, combine=True)
+            dataloaders = model_utils.make_all_dataloaders(test_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=True)
 
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):

@@ -48,7 +48,7 @@ def predict(model, dataloader, sequential_flag=False):
         avg_batch_loss = running_vloss / num_batches
         return labels, preds, avg_batch_loss
 
-def make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_content, ngrid_content, combine=True, data_subset=None):
+def make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=True, data_subset=None):
     # Subset data if applicable
     if data_subset is not None:
         if data_subset < 1:
@@ -62,17 +62,11 @@ def make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, grid_conte
     base_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS))
     base_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS))
     base_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS))
-    # nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS))
-    # nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid_content, buffer=buffer))
-    # nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=grid_content, buffer=buffer))
-    # nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=ngrid_content, is_ngrid=True, buffer=buffer))
+    nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS))
+    nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=ngrid_content, is_ngrid=True, buffer=buffer))
     nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS))
-    nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=buffer))
-    nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=buffer))
     nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=ngrid_content, is_ngrid=True, buffer=buffer))
-    # nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS))
-    nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=buffer))
-    nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=grid_content, buffer=buffer))
+    nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS))
     nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=ngrid_content, is_ngrid=True, buffer=buffer))
     if combine:
         base_dataloaders.extend(nn_dataloaders)
