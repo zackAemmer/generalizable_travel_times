@@ -366,11 +366,43 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
 
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_experiments(
+        run_folder="./results/debug/",
+        train_network_folder="kcm/",
+        test_network_folder="atb/",
+        tune_network_folder="atb/",
+        TUNE_EPOCHS=10,
+        BATCH_SIZE=64,
+        LEARN_RATE=1e-3,
+        HIDDEN_SIZE=32,
+        data_subset=.1,
+        n_tune_samples=100,
+        n_folds=3,
+    )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_experiments(
+        run_folder="./results/debug/",
+        train_network_folder="atb/",
+        test_network_folder="kcm/",
+        tune_network_folder="kcm/",
+        TUNE_EPOCHS=10,
+        BATCH_SIZE=64,
+        LEARN_RATE=1e-3,
+        HIDDEN_SIZE=32,
+        data_subset=.1,
+        n_tune_samples=100,
+        n_folds=3,
+    )
     # random.seed(0)
     # np.random.seed(0)
     # torch.manual_seed(0)
     # run_experiments(
-    #     run_folder="./results/debug/",
+    #     run_folder="./results/cross_attn/",
     #     train_network_folder="kcm/",
     #     test_network_folder="atb/",
     #     tune_network_folder="atb/",
@@ -386,7 +418,7 @@ if __name__=="__main__":
     # np.random.seed(0)
     # torch.manual_seed(0)
     # run_experiments(
-    #     run_folder="./results/debug/",
+    #     run_folder="./results/cross_attn/",
     #     train_network_folder="atb/",
     #     test_network_folder="kcm/",
     #     tune_network_folder="kcm/",
@@ -398,35 +430,3 @@ if __name__=="__main__":
     #     n_tune_samples=100,
     #     n_folds=5,
     # )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_experiments(
-        run_folder="./results/par_hi/",
-        train_network_folder="kcm/",
-        test_network_folder="atb/",
-        tune_network_folder="atb/",
-        TUNE_EPOCHS=10,
-        BATCH_SIZE=64,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
-        data_subset=.1,
-        n_tune_samples=100,
-        n_folds=5,
-    )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_experiments(
-        run_folder="./results/par_hi/",
-        train_network_folder="atb/",
-        test_network_folder="kcm/",
-        tune_network_folder="kcm/",
-        TUNE_EPOCHS=10,
-        BATCH_SIZE=64,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
-        data_subset=.1,
-        n_tune_samples=100,
-        n_folds=5,
-    )

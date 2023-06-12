@@ -31,7 +31,7 @@ class TRSF(nn.Module):
         encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features, nhead=2, dim_feedforward=self.hidden_size, batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
         # Linear compression layer
-        self.feature_extract = nn.Linear(self.n_features + self.embed_total_dims + self.embed_total_dims, 1)
+        self.feature_extract = nn.Linear(self.n_features + self.embed_total_dims, 1)
         self.feature_extract_activation = nn.ReLU()
     def forward(self, x):
         x_em = x[0]
@@ -109,10 +109,8 @@ class TRSF_GRID(nn.Module):
         x_em = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
         x_em = x_em.expand(-1, x_ct.shape[1], -1)
         # Feed grid data through model
-        x_gr = torch.flatten(x_gr, 0, 1)
-        x_gr = torch.flatten(x_gr, 1)
+        x_gr = torch.flatten(x_gr, 2)
         x_gr = self.linear_relu_stack_grid(x_gr)
-        x_gr = torch.reshape(x_gr, (x_ct.shape[0], x_ct.shape[1], x_gr.shape[1]))
         # Get transformer prediction
         x_ct = torch.cat((x_ct, x_gr), dim=2)
         x_ct = self.pos_encoder(x_ct)
@@ -156,27 +154,17 @@ class TRSF_GRID_ATTN(nn.Module):
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
         self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
-        # 2d grid positional encoding layer
-        self.grid_pos_enc = pos_encodings.PositionalEncodingPermute2D(self.n_channels)
-        # Grid attention
-        grid_encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_grid_features, nhead=2, dim_feedforward=self.hidden_size, batch_first=True)
-        self.grid_transformer_encoder = nn.TransformerEncoder(grid_encoder_layer, num_layers=2)
-        # Activation layer
+        # Grid
+        self.grid_pos_encoder = pos_encodings.PositionalEncoding3D(self.n_channels)
+        self.cross_attn = nn.MultiheadAttention(embed_dim=self.n_features, num_heads=2, dropout=0.1, batch_first=True, kdim=self.n_grid_features, vdim=self.n_grid_features)
         self.activation = nn.ReLU()
-        # Grid Feedforward
-        self.linear_relu_stack_grid = nn.Sequential(
-            nn.Linear(self.n_grid_features, self.hidden_size),
-            nn.ReLU(),
-            nn.Linear(self.hidden_size, self.grid_compression_size),
-            nn.ReLU()
-        )
-        # 1d sequence positional encoding layer
-        self.seq_pos_encoder = pos_encodings.PositionalEncoding1D(self.n_features + self.grid_compression_size)
+        self.trsf_ff = nn.Linear(in_features=self.n_features, out_features=self.hidden_size)
         # Encoder layer
-        seq_encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features + self.grid_compression_size, nhead=2, dim_feedforward=self.hidden_size, batch_first=True)
-        self.seq_transformer_encoder = nn.TransformerEncoder(seq_encoder_layer, num_layers=2)
+        self.seq_pos_encoder = pos_encodings.PositionalEncoding1D(self.hidden_size)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=self.hidden_size, nhead=2, dim_feedforward=self.hidden_size, batch_first=True)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
         # Linear compression layer
-        self.feature_extract = nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, 1)
+        self.feature_extract = nn.Linear(self.hidden_size + self.embed_total_dims, 1)
         self.feature_extract_activation = nn.ReLU()
     def forward(self, x):
         x_em = x[0]
@@ -187,19 +175,18 @@ class TRSF_GRID_ATTN(nn.Module):
         weekID_embedded = self.weekID_em(x_em[:,1])
         x_em = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
         x_em = x_em.expand(-1, x_ct.shape[1], -1)
-        # Feed grid data through model
-        x_gr = torch.flatten(x_gr, 0, 1)
-        x_gr = self.grid_pos_enc(x_gr)
-        x_gr = torch.flatten(x_gr, 1)
-        x_gr = torch.reshape(x_gr, (x_ct.shape[0], x_ct.shape[1], x_gr.shape[1]))
-        x_gr = self.grid_transformer_encoder(x_gr)
-        x_gr = self.linear_relu_stack_grid(x_gr)
-        # Get transformer prediction
-        x_ct = torch.cat([x_ct, x_gr], dim=2)
-        x_ct = self.seq_pos_encoder(x_ct)
-        x_ct = self.seq_transformer_encoder(x_ct)
+        # Cross attention between continuous inputs and grid features in a given trajectory
+        x_gr = torch.flatten(x_gr, 2, 3)
+        x_gr = torch.swapaxes(x_gr, 2, 4)
+        x_gr = self.grid_pos_encoder(x_gr)
+        x_gr = torch.flatten(x_gr, 2)
+        out, attn_wts = self.cross_attn(query=x_ct, key=x_gr, value=x_gr)
+        out = self.trsf_ff(self.activation(out))
+        # Get sequence prediction
+        out = self.seq_pos_encoder(out)
+        out = self.transformer_encoder(out)
         # Combine all variables
-        out = torch.cat((x_em, x_ct), dim=2)
+        out = torch.cat((x_em, out), dim=2)
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
         return out
     def batch_step(self, data):

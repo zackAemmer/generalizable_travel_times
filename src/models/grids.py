@@ -16,25 +16,34 @@ class NGrid:
         self.n_resolution = n_resolution
         self.fill_content = None
     def get_content(self, tbin_idx):
+        # Get grid for a given timestep
+        # Using loose observations, fill in grid cells; keeping nan when < n samples available
         c = np.zeros((self.c_resolution, self.n_resolution, self.y_resolution, self.x_resolution))
         c[:,:,:,:] = np.nan
+        # Keep track of the number of samples in a cell
         counter = np.zeros((self.y_resolution, self.x_resolution), dtype='int')
         t_idx_content = self.content[self.content['tbin_idx'] == tbin_idx]
         x_indices = t_idx_content['xbin_idx'].values
         y_indices = t_idx_content['ybin_idx'].values
-        obs_values = t_idx_content[['x','y','bearing','speed_m_s']].values
+        # Get features from each observation to include in grid
+        obs_values = t_idx_content[['bearing','speed_m_s']].values
         for x, y, obs in zip(x_indices, y_indices, obs_values):
             counter_state = counter[y,x]
             c[:,counter_state,y,x] = obs
             counter[y,x] += 1
         return c
+    def get_all_content(self):
+        c = np.array([self.get_content(t) for t in range(self.t_resolution-1)])
+        return c
+    def set_fill_content(self, fill_content):
+        self.fill_content = sparse.csr_matrix(fill_content.reshape(fill_content.shape[0],-1))
     def get_fill_content(self):
         c = self.fill_content.toarray()
         c = np.reshape(c, (c.shape[0], self.c_resolution+1, self.n_resolution, self.y_resolution, self.x_resolution))
         return c
-    def get_all_content(self):
-        c = np.array([self.get_content(t) for t in range(self.t_resolution-1)])
-        return c
+    def get_density(self):
+        c = self.get_all_content()
+        return np.sum(~np.isnan(c)) / c.size
     def get_masked_content(self):
         feature_content = []
         c = self.get_all_content()
@@ -43,11 +52,6 @@ class NGrid:
             f = c_sub[~np.isnan(c_sub)]
             feature_content.append(f)
         return feature_content
-    def get_density(self):
-        c = self.get_all_content()
-        return np.sum(~np.isnan(c)) / c.size
-    def set_fill_content(self, fill_content):
-        self.fill_content = sparse.csr_matrix(fill_content.reshape(fill_content.shape[0],-1))
 
 def traces_to_ngrid(traces, grid_bounds, grid_s_res, grid_t_res, grid_n_res):
     times = traces['locationtime'].values
@@ -71,8 +75,8 @@ def traces_to_ngrid(traces, grid_bounds, grid_s_res, grid_t_res, grid_n_res):
     traces['tbin_idx'] = tbin_idxs
     traces['xbin_idx'] = xbin_idxs
     traces['ybin_idx'] = ybin_idxs
-    obs = traces.groupby(['tbin_idx','xbin_idx','ybin_idx']).head(grid_n_res)[['tbin_idx','xbin_idx','ybin_idx','x','y','bearing','speed_m_s']]
-    ngrid = NGrid(content=obs, c_resolution=4, x_resolution=x_resolution, y_resolution=y_resolution, t_resolution=len(tbins), n_resolution=grid_n_res)
+    obs = traces.groupby(['tbin_idx','xbin_idx','ybin_idx']).head(grid_n_res)
+    ngrid = NGrid(content=obs, c_resolution=2, x_resolution=x_resolution, y_resolution=y_resolution, t_resolution=len(tbins), n_resolution=grid_n_res)
     return ngrid, tbin_idxs, xbin_idxs, ybin_idxs
 
 def fill_ngrid_forward(ngrid):
@@ -86,21 +90,22 @@ def fill_ngrid_forward(ngrid):
     # Any sample that has nan for any feature should have nan for its age
     mask = np.isnan(arr.sum(axis=1))
     age = np.where(mask, np.nan, 0)
+    # Add age as new channel/feature to be filled in the filled arr
     age = np.expand_dims(age, 1)
     filled_arr = np.concatenate([filled_arr, age], axis=1)
     for t in range(1, timesteps):
-        # Get all obs for current timestep, and previous
+        # Gather all obs for current timestep, and previous
         current_obs = filled_arr[t].copy()
         prev_obs = filled_arr[t-1].copy()
         # Increment age for all previous obs that will potentially be filled forwards to this timestep
-        prev_obs[4,:,:,:] += 1
+        prev_obs[-1,:,:,:] += 1
         # Concatenate current obs to prev
         result = np.concatenate([current_obs, prev_obs], axis=1)
-        # Sort by age lowest to highest, nan's last
-        sidx = result[4,:,:,:]
+        # Sort by age feature from lowest to highest, nan's last
+        sidx = result[-1,:,:,:]
         sidx = np.argsort(sidx, axis=0)
-        # Take first 3
-        sidx = sidx[:3,:,:] 
+        # Take first n observations
+        sidx = sidx[:ngrid.n_resolution,:,:]
         sidx = np.expand_dims(sidx, axis=0)
         sidx = np.repeat(sidx, result.shape[0], axis=0)
         result = np.take_along_axis(result, sidx, axis=1)
@@ -144,7 +149,8 @@ def save_grid_anim(data, file_name):
     # Define the update function that will be called for each frame of the animation
     def update(frame):
         fig.suptitle(f"Frame {frame}")
-        for i, ax in enumerate(axes):
+        for i in range(data.shape[1]):
+            ax = axes[i]
             ax.clear()
             im = ax.imshow(data[frame,i,:,:], cmap='plasma', vmin=np.min(data[:,i,:,:]), vmax=np.max(data[:,i,:,:]), origin="lower")
     # Create the animation object

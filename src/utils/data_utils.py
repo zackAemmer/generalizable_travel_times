@@ -509,6 +509,8 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, grid_bounds, grid_s_res, 
         # Nearest stop
         'stop_x': lambda x: x.tolist(),
         'stop_y': lambda x: x.tolist(),
+        'stop_x_cent': lambda x: x.tolist(),
+        'stop_y_cent': lambda x: x.tolist(),
         'stop_dist_km': lambda x: x.tolist(),
         'scheduled_time_s': lambda x: x.tolist(),
         'passed_stops_n': lambda x: x.tolist(),
