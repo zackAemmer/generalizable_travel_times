@@ -48,13 +48,21 @@ def predict(model, dataloader, sequential_flag=False):
         avg_batch_loss = running_vloss / num_batches
         return labels, preds, avg_batch_loss
 
-def make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=True, data_subset=None):
-    # Subset data if applicable
+def make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=True, data_subset=None, holdout_routes=None, keep_only_holdout_routes=False):
+    # Subset data for faster evaluation
     if data_subset is not None:
         if data_subset < 1:
             valid_data = np.random.choice(valid_data, int(data_subset*len(valid_data)))
         else:
             valid_data = np.random.choice(valid_data, data_subset)
+    # Holdout routes for generalization
+    if holdout_routes is not None:
+        if keep_only_holdout_routes:
+            keep_idx = [sample['route_id'] in holdout_routes for sample in valid_data]
+            valid_data = [x for i,x in enumerate(valid_data) if keep_idx[i]]
+        else:
+            keep_idx = [sample['route_id'] not in holdout_routes for sample in valid_data]
+            valid_data = [x for i,x in enumerate(valid_data) if keep_idx[i]]
     # Construct dataloaders for all models
     buffer = 2
     base_dataloaders = []

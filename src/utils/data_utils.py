@@ -361,6 +361,10 @@ def apply_gtfs_timetables(data, gtfs_data, gtfs_folder_date):
     data = data.assign(stop_dist_km=closest_stops[:,5]/1000)
     data = data.assign(stop_x_cent=closest_stops[:,5])
     data = data.assign(stop_y_cent=closest_stops[:,6])
+    data = data.assign(route_id=closest_stops[:,7])
+    data = data.assign(service_id=closest_stops[:,8])
+    data = data.assign(direction_id=closest_stops[:,9])
+
     # Get the timeID_s (for the first point of each trajectory)
     data = pd.merge(data, first_points, on='shingle_id')
     # Calculate the scheduled travel time from the first to each point in the shingle
@@ -380,15 +384,13 @@ def get_scheduled_arrival(trip_ids, x, y, gtfs_data):
     Returns: (distance to closest stop in km, scheduled arrival time at that stop).
     """
     data = np.column_stack([x, y, trip_ids])
-    gtfs_data_ary = gtfs_data[['stop_x','stop_y','trip_id','arrival_s','stop_sequence','stop_x_cent','stop_y_cent']].values
-
+    gtfs_data_ary = gtfs_data[['stop_x','stop_y','trip_id','arrival_s','stop_sequence','stop_x_cent','stop_y_cent','route_id','service_id','direction_id']].values
     # Create dictionary mapping trip_ids to lists of points in gtfs
     id_to_points = {}
     for point in gtfs_data_ary:
         id_to_points.setdefault(point[2],[]).append(point)
-
     # For each point find the closest stop that shares the trip_id
-    results = np.zeros((len(data), 8), dtype=object)
+    results = np.zeros((len(data), 11), dtype=object)
     for i, point in enumerate(data):
         corresponding_points = np.vstack(id_to_points.get(point[2], []))
         point = np.expand_dims(point, 0)
@@ -491,6 +493,9 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, grid_bounds, grid_s_res, 
         'dateID': 'min',
         'trip_id': 'min',
         'file': 'min',
+        'route_id': 'min',
+        'service_id': 'min',
+        'direction_id': 'min',
         # Individual point time/dist
         'lats': lambda x: x.tolist(),
         'lngs': lambda x: x.tolist(),

@@ -188,7 +188,7 @@ def run_models(run_folder, network_folder, **kwargs):
                     config = json.load(f)
 
                 # Construct dataloaders
-                base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(train_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=False)
+                base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(train_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=False, holdout_routes=kwargs['holdout_routes'])
 
                 # Train all models
                 for model, loader in zip(base_model_list, base_dataloaders):
@@ -222,8 +222,8 @@ def run_models(run_folder, network_folder, **kwargs):
                         config = json.load(f)
 
                     # Construct dataloaders for network models
-                    _, train_dataloaders = model_utils.make_all_dataloaders(train_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=False)
-                    _, test_dataloaders = model_utils.make_all_dataloaders(test_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=False)
+                    _, train_dataloaders = model_utils.make_all_dataloaders(train_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=False, holdout_routes=kwargs['holdout_routes'])
+                    _, test_dataloaders = model_utils.make_all_dataloaders(test_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=False, holdout_routes=kwargs['holdout_routes'])
 
                     # Test all NN models on training and testing sets for this fold, across all files
                     for i, (model, train_loader, test_loader) in enumerate(zip(nn_model_list, train_dataloaders, test_dataloaders)):
@@ -253,7 +253,7 @@ def run_models(run_folder, network_folder, **kwargs):
             with open(f"{data_folder}train_config.json", "r") as f:
                 config = json.load(f)
 
-            dataloaders = model_utils.make_all_dataloaders(test_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=True)
+            dataloaders = model_utils.make_all_dataloaders(test_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=True, holdout_routes=kwargs['holdout_routes'])
 
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
@@ -307,7 +307,8 @@ if __name__=="__main__":
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
-        n_folds=3
+        n_folds=3,
+        holdout_routes=[100252,100139,102581,100341,102720]
     )
     random.seed(0)
     np.random.seed(0)
@@ -319,7 +320,8 @@ if __name__=="__main__":
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
-        n_folds=3
+        n_folds=3,
+        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
     )
     # random.seed(0)
     # np.random.seed(0)
@@ -331,7 +333,8 @@ if __name__=="__main__":
     #     BATCH_SIZE=512,
     #     LEARN_RATE=1e-3,
     #     HIDDEN_SIZE=32,
-    #     n_folds=5
+    #     n_folds=5,
+    #     holdout_routes=[]
     # )
     # random.seed(0)
     # np.random.seed(0)
@@ -343,5 +346,6 @@ if __name__=="__main__":
     #     BATCH_SIZE=512,
     #     LEARN_RATE=1e-3,
     #     HIDDEN_SIZE=32,
-    #     n_folds=5
+    #     n_folds=5,
+    #     holdout_routes=[]
     # )
