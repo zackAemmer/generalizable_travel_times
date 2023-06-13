@@ -150,6 +150,8 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 "Train_Preds":[],
                 "Test_Labels":[],
                 "Test_Preds":[],
+                "Holdout_Labels":[],
+                "Holdout_Preds":[],
                 "Tune_Train_Labels":[],
                 "Tune_Train_Preds":[],
                 "Tune_Test_Labels":[],
@@ -195,6 +197,24 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 labels, preds = model.evaluate(loader, config)
                 model_fold_results[model.model_name]["Test_Labels"].extend(list(labels))
                 model_fold_results[model.model_name]["Test_Preds"].extend(list(preds))
+
+        # Test each model on a holdout validation set from the original training network
+        print(f"EXPERIMENT: HOLDOUT ROUTES")
+        print(f"Evaluating {run_folder}{train_network_folder} on {train_data_folder}")
+        for valid_file in train_file_list:
+            print(f"VALIDATE FILE: {valid_file}")
+            valid_data, ngrid = data_utils.load_all_data(train_data_folder, valid_file)
+            ngrid_content = ngrid.get_fill_content()
+            with open(f"{train_data_folder}train_config.json", "r") as f:
+                config = json.load(f)
+            print(f"Successfully loaded {len(valid_data)} testing samples.")
+            # Construct dataloaders for all models
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, data_subset=kwargs['data_subset'], holdout_routes=kwargs['holdout_routes'], keep_only_holdout_routes=True)
+            # Test all models
+            for model, loader in zip(all_model_list, dataloaders):
+                labels, preds = model.evaluate(loader, config)
+                model_fold_results[model.model_name]["Holdout_Labels"].extend(list(labels))
+                model_fold_results[model.model_name]["Holdout_Preds"].extend(list(preds))
 
         # Fine-tune each model, then test on a set from a different network
         print(f"EXPERIMENT: FINE TUNING")
@@ -313,6 +333,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             "Fold": fold_num,
             "Train_Losses": [],
             "Test_Losses": [],
+            "Holdout_Losses": [],
             "Tune_Train_Losses": [],
             "Tune_Test_Losses": [],
             "Extract_Train_Losses": [],
@@ -329,6 +350,11 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Test_Labels"], model_fold_results[mname]["Test_Preds"])), 2))
             _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Test_Labels"], model_fold_results[mname]["Test_Preds"]), 2))
             fold_results['Test_Losses'].append(_)
+            _ = [mname]
+            _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Holdout_Labels"], model_fold_results[mname]["Holdout_Preds"]), 2))
+            _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Holdout_Labels"], model_fold_results[mname]["Holdout_Preds"])), 2))
+            _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Holdout_Labels"], model_fold_results[mname]["Holdout_Preds"]), 2))
+            fold_results['Holdout_Losses'].append(_)
             _ = [mname]
             _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Tune_Train_Labels"], model_fold_results[mname]["Tune_Train_Preds"]), 2))
             _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Tune_Train_Labels"], model_fold_results[mname]["Tune_Train_Preds"])), 2))
@@ -381,6 +407,7 @@ if __name__=="__main__":
         data_subset=.1,
         n_tune_samples=100,
         n_folds=3,
+        holdout_routes=[100252,100139,102581,100341,102720]
     )
     random.seed(0)
     np.random.seed(0)
@@ -397,6 +424,7 @@ if __name__=="__main__":
         data_subset=.1,
         n_tune_samples=100,
         n_folds=3,
+        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
     )
     # random.seed(0)
     # np.random.seed(0)

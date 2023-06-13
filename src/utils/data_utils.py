@@ -751,7 +751,7 @@ def extract_results(city, model_results):
 def extract_gen_results(city, gen_results):
     # Extract generalization results
     res = []
-    experiments = ["Train_Losses","Test_Losses","Tune_Train_Losses","Tune_Test_Losses","Extract_Train_Losses","Extract_Test_Losses"]
+    experiments = ["Train_Losses","Test_Losses","Holdout_Losses","Tune_Train_Losses","Tune_Test_Losses","Extract_Train_Losses","Extract_Test_Losses"]
     for ex in experiments:
         fold_results = [x[ex] for x in gen_results]
         cities = []
