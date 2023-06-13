@@ -930,3 +930,17 @@ def create_tensor_mask(seq_lens):
     for i, seq_len in enumerate(seq_lens):
         mask[i, :seq_len] = 1
     return mask
+
+def get_dataset_stats(data_folder, given_names):
+    stats = {}
+    file_list = os.listdir(data_folder)
+    stats["num_days"] = len(file_list)
+    stats["start_day"] = min(file_list)
+    stats["end_day"] = max(file_list)
+    stats["num_obs"] = 0
+    stats["num_traj"] = 0
+    for pkl_file in file_list:
+        data, _ = data_utils.combine_pkl_data(data_folder, [pkl_file], given_names)
+        stats["num_obs"] += len(data)
+        stats["num_traj"] += len(np.unique(data.trip_id))
+    return stats

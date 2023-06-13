@@ -154,52 +154,32 @@ def fill_trajectories(df, min_timeID, max_timeID, group_id):
     fill['timeID_s'] = fill['timeID_s'].astype(int)
     return fill
 
-def plot_gtfsrt_trip(ax, trace_df, epsg):
+def plot_gtfsrt_trip(ax, trace_df, epsg, gtfs_folder):
     """
     Plot a single real-time bus trajectory on a map.
     ax: where to plot
     trace_df: data from trip to plot
     Returns: None.
     """
+    # Plot trip stops from GTFS
+    trace_date = trace_df['file'][0]
+    trip_id = trace_df['trip_id'][0]
+    file_to_gtfs_map = data_utils.get_best_gtfs_lookup(trace_df, gtfs_folder)
+    gtfs_data = data_utils.merge_gtfs_files(f"{gtfs_folder}{file_to_gtfs_map[trace_date]}/", epsg, [0,0])
+    to_plot_gtfs = gtfs_data[gtfs_data['trip_id']==trip_id]
+    to_plot_gtfs = geopandas.GeoDataFrame(to_plot_gtfs, geometry=geopandas.points_from_xy(to_plot_gtfs.stop_x, to_plot_gtfs.stop_y), crs=f"EPSG:{epsg}")
+    to_plot_gtfs.plot(ax=ax, marker='x', color='lightblue', markersize=10)
+    # Plot observations
     to_plot = trace_df.copy()
     to_plot = geopandas.GeoDataFrame(to_plot, geometry=geopandas.points_from_xy(to_plot.x, to_plot.y), crs=f"EPSG:{epsg}")
     to_plot_stop = trace_df.iloc[-1:,:]
     to_plot_stop = geopandas.GeoDataFrame(to_plot_stop, geometry=geopandas.points_from_xy(to_plot_stop.stop_x, to_plot_stop.stop_y), crs=f"EPSG:{epsg}")
-    # Plot all points
     to_plot.plot(ax=ax, marker='.', color='purple', markersize=20)
-    # Plot first/last points
-    to_plot.iloc[0:1,:].plot(ax=ax, marker='*', color='green', markersize=40)
+    # Plot first/last observations
+    to_plot.iloc[:1,:].plot(ax=ax, marker='*', color='green', markersize=40)
     to_plot.iloc[-1:,:].plot(ax=ax, marker='*', color='red', markersize=40)
-    # Also plot closest stop to final point
+    # Plot closest stop to final observation
     to_plot_stop.plot(ax=ax, marker='x', color='blue', markersize=20)
-
+    # Add custom legend
+    ax.legend(["Scheduled Trip Stops","Shingle Observations","Shingle Start","Shingle End", "Closest Stop"], loc="upper right")
     return None
-
-def plot_gtfs_trip(ax, trip_id, gtfs_data, epsg):
-    """
-    Plot scheduled stops for a single bus trip on a map.
-    ax: where to plot
-    trip_id: which trip in GTFS to plot
-    gtfs_data: merged GTFS data
-    Returns: None.
-    """
-    to_plot = gtfs_data.copy()
-    to_plot = to_plot[to_plot['trip_id']==trip_id]
-    to_plot = geopandas.GeoDataFrame(to_plot, geometry=geopandas.points_from_xy(to_plot.stop_x, to_plot.stop_y), crs=f"EPSG:{epsg}")
-    to_plot.plot(ax=ax, marker='x', color='lightgreen', markersize=10)
-    return None
-
-def plot_traces_on_map(mapbox_token, plot_data):
-    # Show overview of trace and adjacent on a map
-    px.set_mapbox_access_token(mapbox_token)
-    fig = px.scatter_mapbox(
-        plot_data,
-        lon="lon",
-        lat="lat",
-        color="Type"
-    )
-    fig.update_layout(
-    margin=dict(r=60, t=25, b=40, l=60)
-    )
-    # fig.write_html("../plots/adjacent_trip_traces.html")
-    fig.show()
