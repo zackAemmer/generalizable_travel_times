@@ -11,7 +11,7 @@ class TimeTableModel:
         return None
     def evaluate(self, dataloader, config):
         context, X, y = data_utils.extract_all_dataloader(dataloader)
-        scheduled_time_s = X[:,4].numpy()
+        scheduled_time_s = X[:,5].numpy()
         scheduled_time_s = data_utils.de_normalize(scheduled_time_s, config['scheduled_time_s_mean'], config['scheduled_time_s_std'])
         preds = scheduled_time_s
         labels = y.numpy()

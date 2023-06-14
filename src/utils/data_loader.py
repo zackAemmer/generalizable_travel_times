@@ -63,13 +63,13 @@ def basic_collate(batch):
     X_ct[:,2] = [torch.tensor(x['x_cent'][-1]) for x in batch]
     X_ct[:,3] = [torch.tensor(x['y_cent'][-1]) for x in batch]
     X_ct[:,4] = [torch.tensor(x['scheduled_time_s'][0]) for x in batch]
-    X_ct[:,5] = [torch.tensor(x['stop_dist_km'][0]) for x in batch]
-    X_ct[:,6] = [torch.tensor(x['stop_x_cent'][-1]) for x in batch]
-    X_ct[:,7] = [torch.tensor(x['stop_y_cent'][-1]) for x in batch]
-    X_ct[:,8] = [torch.tensor(x['speed_m_s'][0]) for x in batch]
-    X_ct[:,9] = [torch.tensor(x['bearing'][0]) for x in batch]
-    X_ct[:,10] = [torch.tensor(x['dist']) for x in batch]
-    X_ct[:,11] = [torch.sum(torch.tensor(x['passed_stops_n'])) for x in batch]
+    X_ct[:,5] = [torch.tensor(x['scheduled_time_s'][-1]) for x in batch]
+    X_ct[:,6] = [torch.tensor(x['stop_dist_km'][0]) for x in batch]
+    X_ct[:,7] = [torch.tensor(x['stop_dist_km'][-1]) for x in batch]
+    X_ct[:,8] = [torch.sum(torch.tensor(x['passed_stops_n'])) for x in batch]
+    X_ct[:,9] = [torch.tensor(x['speed_m_s'][0]) for x in batch]
+    X_ct[:,10] = [torch.mean(torch.tensor(x['bearing'])) for x in batch]
+    X_ct[:,11] = [torch.tensor(x['dist']) for x in batch]
     # Target featurex
     y = torch.from_numpy(np.array([x['time'] for x in batch]))
     # Sort all dataloaders so that they are consistent in the results
@@ -95,13 +95,13 @@ def basic_grid_collate(batch):
     X_ct[:,2] = [torch.tensor(x['x_cent'][-1]) for x in batch]
     X_ct[:,3] = [torch.tensor(x['y_cent'][-1]) for x in batch]
     X_ct[:,4] = [torch.tensor(x['scheduled_time_s'][0]) for x in batch]
-    X_ct[:,5] = [torch.tensor(x['stop_dist_km'][0]) for x in batch]
-    X_ct[:,6] = [torch.tensor(x['stop_x_cent'][-1]) for x in batch]
-    X_ct[:,7] = [torch.tensor(x['stop_y_cent'][-1]) for x in batch]
-    X_ct[:,8] = [torch.tensor(x['speed_m_s'][0]) for x in batch]
-    X_ct[:,9] = [torch.tensor(x['bearing'][0]) for x in batch]
-    X_ct[:,10] = [torch.tensor(x['dist']) for x in batch]
-    X_ct[:,11] = [torch.sum(torch.tensor(x['passed_stops_n'])) for x in batch]
+    X_ct[:,5] = [torch.tensor(x['scheduled_time_s'][-1]) for x in batch]
+    X_ct[:,6] = [torch.tensor(x['stop_dist_km'][0]) for x in batch]
+    X_ct[:,7] = [torch.tensor(x['stop_dist_km'][-1]) for x in batch]
+    X_ct[:,8] = [torch.sum(torch.tensor(x['passed_stops_n'])) for x in batch]
+    X_ct[:,9] = [torch.tensor(x['speed_m_s'][0]) for x in batch]
+    X_ct[:,10] = [torch.mean(torch.tensor(x['bearing'])) for x in batch]
+    X_ct[:,11] = [torch.tensor(x['dist']) for x in batch]
     # Grid features
     X_gr = np.zeros((len(batch), 8, 3, 3))
     X_gr = np.array([np.mean(np.concatenate([np.expand_dims(x, 0) for x in batch[i]['grid_features']]), axis=0) for i in range(len(batch))])

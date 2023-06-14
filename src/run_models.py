@@ -297,55 +297,55 @@ def run_models(run_folder, network_folder, **kwargs):
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
 
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
-    # run_models(
-    #     run_folder="./results/debug/",
-    #     network_folder="kcm/",
-    #     EPOCHS=10,
-    #     BATCH_SIZE=512,
-    #     LEARN_RATE=1e-3,
-    #     HIDDEN_SIZE=32,
-    #     n_folds=3,
-    #     holdout_routes=[100252,100139,102581,100341,102720]
-    # )
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
-    # run_models(
-    #     run_folder="./results/debug/",
-    #     network_folder="atb/",
-    #     EPOCHS=10,
-    #     BATCH_SIZE=512,
-    #     LEARN_RATE=1e-3,
-    #     HIDDEN_SIZE=32,
-    #     n_folds=3,
-    #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
-    # )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/cross_attn/",
+        run_folder="./results/debug/",
         network_folder="kcm/",
-        EPOCHS=50,
+        EPOCHS=30,
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
-        n_folds=5,
+        n_folds=3,
         holdout_routes=[100252,100139,102581,100341,102720]
     )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/cross_attn/",
+        run_folder="./results/debug/",
         network_folder="atb/",
-        EPOCHS=50,
+        EPOCHS=30,
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
-        n_folds=5,
+        n_folds=3,
         holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
     )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/cross_attn/",
+    #     network_folder="kcm/",
+    #     EPOCHS=50,
+    #     BATCH_SIZE=512,
+    #     LEARN_RATE=1e-3,
+    #     HIDDEN_SIZE=32,
+    #     n_folds=5,
+    #     holdout_routes=[100252,100139,102581,100341,102720]
+    # )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/cross_attn/",
+    #     network_folder="atb/",
+    #     EPOCHS=50,
+    #     BATCH_SIZE=512,
+    #     LEARN_RATE=1e-3,
+    #     HIDDEN_SIZE=32,
+    #     n_folds=5,
+    #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
+    # )

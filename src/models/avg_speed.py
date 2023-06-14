@@ -12,7 +12,7 @@ class AvgHourlySpeedModel:
         return None
     def train(self, dataloader, config):
         context, X, y = data_utils.extract_all_dataloader(dataloader)
-        speeds = X[:,8].numpy()
+        speeds = X[:,9].numpy()
         speeds = data_utils.de_normalize(speeds, config['speed_m_s_mean'], config['speed_m_s_std'])
         hours = context[:,0].numpy() // 60
         # Calculate average speed grouped by time of day
@@ -22,7 +22,7 @@ class AvgHourlySpeedModel:
         context, X, y = data_utils.extract_all_dataloader(dataloader)
         hours = context[:,0].numpy() // 60
         speeds = [self.get_speed_if_available(x) for x in hours]
-        dists = X[:,10].numpy()
+        dists = X[:,11].numpy()
         dists = data_utils.de_normalize(dists, config['dist_mean'], config['dist_std'])
         preds = dists*1000.0 / speeds
         labels = y.numpy()
