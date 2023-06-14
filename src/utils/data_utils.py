@@ -239,7 +239,7 @@ def shingle(trace_df, min_len, max_len):
     z['shingle_id'] = new_idx
     return z
 
-def calculate_trace_df(data, timezone, epsg, grid_bounds, coord_ref_center, data_dropout=.10, remove_stopped_pts=True):
+def calculate_trace_df(data, timezone, epsg, grid_bounds, coord_ref_center, data_dropout=.10):
     """
     Calculate difference in metrics between two consecutive trip points.
     This is the only place where points are filtered rather than entire shingles.
@@ -273,13 +273,12 @@ def calculate_trace_df(data, timezone, epsg, grid_bounds, coord_ref_center, data
     # Remove first point of every trip (not shingle), since its features are based on a different trip
     data = data.groupby(['file','trip_id'], as_index=False).apply(lambda group: group.iloc[1:,:])
     # Remove any points which seem to be erroneous or repeated
-    data = data[data['dist_calc_m']>=0.0]
-    data = data[data['time_calc_s']>0.0]
-    data = data[data['speed_m_s']>=0.0]
-    data = data[data['speed_m_s']<=35.0]
-    if remove_stopped_pts:
-        data = data[data['dist_calc_m']>0.0]
-        data = data[data['speed_m_s']>0.0]
+    data = data[data['dist_calc_m']>0]
+    data = data[data['dist_calc_m']<20000]
+    data = data[data['time_calc_s']>0]
+    data = data[data['time_calc_s']<60*60]
+    data = data[data['speed_m_s']>0]
+    data = data[data['speed_m_s']<35]
     # Now error points are removed, recalculate time and speed features
     # From here out, must filter shingles in order to not change time/dist calcs
     # Note that any point filtering necessitates recalculating travel times for individual points
@@ -297,13 +296,12 @@ def calculate_trace_df(data, timezone, epsg, grid_bounds, coord_ref_center, data
     invalid_shingles.append(shingle_times[shingle_times['time_calc_s']<=0].shingle_id)
     invalid_shingles.append(shingle_times[shingle_times['time_calc_s']>=3*60*60].shingle_id)
     # Invidiual point distance, time, speed
-    invalid_shingles.append(data[data['dist_calc_m']<0.0].shingle_id)
-    invalid_shingles.append(data[data['time_calc_s']<=0.0].shingle_id)
-    invalid_shingles.append(data[data['speed_m_s']<0.0].shingle_id)
-    invalid_shingles.append(data[data['speed_m_s']>35.0].shingle_id)
-    if remove_stopped_pts:
-        invalid_shingles.append(data[data['dist_calc_m']<=0.0].shingle_id)
-        invalid_shingles.append(data[data['speed_m_s']<=0.0].shingle_id)
+    invalid_shingles.append(data[data['dist_calc_m']<=0].shingle_id)
+    invalid_shingles.append(data[data['dist_calc_m']>=20000].shingle_id)
+    invalid_shingles.append(data[data['time_calc_s']<=0].shingle_id)
+    invalid_shingles.append(data[data['time_calc_s']>=60*60].shingle_id)
+    invalid_shingles.append(data[data['speed_m_s']<=0].shingle_id)
+    invalid_shingles.append(data[data['speed_m_s']>=35].shingle_id)
     invalid_shingles = pd.concat(invalid_shingles).values
     data = data[~data['shingle_id'].isin(invalid_shingles)]
     data['dist_calc_km'] = data['dist_calc_m'] / 1000.0

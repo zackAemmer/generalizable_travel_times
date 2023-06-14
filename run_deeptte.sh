@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 run_name=debug
-n_folds=2
-epochs=50
+n_folds=3
+epochs=30
 
 
 ### Move to project folder ###

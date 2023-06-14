@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 run_name=debug
-n_folds=2
+n_folds=3
 
 
 ### Move to project folder ###
