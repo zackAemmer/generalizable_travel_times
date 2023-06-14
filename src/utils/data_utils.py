@@ -355,16 +355,16 @@ def apply_gtfs_timetables(data, gtfs_data, gtfs_folder_date):
         gtfs_data
     )
     data = data.assign(stop_x=closest_stops[:,0])
-    data = data.assign(stop_y=closest_stops[:,1])
+    data = data.assign(stop_y=closest_stops[:,1]) # Skip trip_id
     data = data.assign(stop_arrival_s=closest_stops[:,3])
     data = data.assign(stop_sequence=closest_stops[:,4])
-    data = data.assign(stop_dist_km=closest_stops[:,5]/1000)
     data = data.assign(stop_x_cent=closest_stops[:,5])
     data = data.assign(stop_y_cent=closest_stops[:,6])
     data = data.assign(route_id=closest_stops[:,7])
+    data = data.assign(route_id=closest_stops[:,7])
     data = data.assign(service_id=closest_stops[:,8])
     data = data.assign(direction_id=closest_stops[:,9])
-
+    data = data.assign(stop_dist_km=closest_stops[:,10]/1000)
     # Get the timeID_s (for the first point of each trajectory)
     data = pd.merge(data, first_points, on='shingle_id')
     # Calculate the scheduled travel time from the first to each point in the shingle
@@ -383,23 +383,33 @@ def get_scheduled_arrival(trip_ids, x, y, gtfs_data):
     gtfs_data: merged GTFS files
     Returns: (distance to closest stop in km, scheduled arrival time at that stop).
     """
-    data = np.column_stack([x, y, trip_ids])
+    data = np.column_stack([x, y, trip_ids, np.arange(len(x))])
     gtfs_data_ary = gtfs_data[['stop_x','stop_y','trip_id','arrival_s','stop_sequence','stop_x_cent','stop_y_cent','route_id','service_id','direction_id']].values
     # Create dictionary mapping trip_ids to lists of points in gtfs
-    id_to_points = {}
+    id_to_stops = {}
     for point in gtfs_data_ary:
-        id_to_points.setdefault(point[2],[]).append(point)
-    # For each point find the closest stop that shares the trip_id
-    results = np.zeros((len(data), 11), dtype=object)
-    for i, point in enumerate(data):
-        corresponding_points = np.vstack(id_to_points.get(point[2], []))
-        point = np.expand_dims(point, 0)
-        # Find closest point and add to results
-        closest_point_dist, closest_point_idx = shape_utils.get_closest_point(corresponding_points[:,0:2], point[:,0:2])
-        closest_point = corresponding_points[closest_point_idx]
-        closest_point = np.append(closest_point, closest_point_dist)
-        results[i,:] = closest_point
-    return results
+        # If the key does not exist, insert the second argument. Otherwise return the value. Append afterward regardless.
+        id_to_stops.setdefault(point[2],[]).append(point)
+    # Repeat for trips in the data
+    id_to_data = {}
+    for point in data:
+        id_to_data.setdefault(point[2],[]).append(point)
+    # Iterate over each unique trip, getting closest stops for all points from that trip, and aggregating
+    # Adding closest stop distance, and sequence number to the end of gtfs_data features
+    result_counter = 0
+    result = np.zeros((len(data), gtfs_data_ary.shape[1]+2), dtype=object)
+    for key, value in id_to_data.items():
+        trip_data = np.vstack(value)
+        stop_data = np.vstack(id_to_stops[key])
+        stop_dists, stop_idxs = shape_utils.get_closest_point(stop_data[:,:2], trip_data[:,:2])
+        result[result_counter:result_counter+len(stop_idxs),:-2] = stop_data[stop_idxs]
+        result[result_counter:result_counter+len(stop_idxs),-2] = stop_dists
+        result[result_counter:result_counter+len(stop_idxs),-1] = trip_data[:,-1]
+        result_counter += len(stop_idxs)
+    # Sort the data points from aggregated trips back into their respective shingles
+    original_order = np.argsort(result[:,-1])
+    result = result[original_order,:]
+    return result
 
 def get_best_gtfs_lookup(traces, gtfs_folder):
     # Get the most recent GTFS files available corresponding to each unique file in the traces
@@ -940,7 +950,7 @@ def get_dataset_stats(data_folder, given_names):
     stats["num_obs"] = 0
     stats["num_traj"] = 0
     for pkl_file in file_list:
-        data, _ = data_utils.combine_pkl_data(data_folder, [pkl_file], given_names)
+        data, _ = combine_pkl_data(data_folder, [pkl_file], given_names)
         stats["num_obs"] += len(data)
         stats["num_traj"] += len(np.unique(data.trip_id))
     return stats
