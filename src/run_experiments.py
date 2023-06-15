@@ -191,7 +191,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, data_subset=kwargs['data_subset'])
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], data_subset=kwargs['data_subset'])
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
                 labels, preds = model.evaluate(loader, config)
@@ -209,7 +209,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, data_subset=kwargs['data_subset'])
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], data_subset=kwargs['data_subset'])
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
                 labels, preds = model.evaluate(loader, config)
@@ -247,7 +247,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 with open(f"{train_data_folder}train_config.json", "r") as f:
                     config = json.load(f)
                 # Construct dataloaders
-                base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(tune_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=False, data_subset=kwargs['n_tune_samples'])
+                base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(tune_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], combine=False, data_subset=kwargs['n_tune_samples'])
                 # Train all models
                 for model, loader in zip(base_model_list, base_dataloaders):
                     model.train(loader, config)
@@ -269,7 +269,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, data_subset=kwargs['data_subset'])
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], data_subset=kwargs['data_subset'])
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
                 labels, preds = model.evaluate(loader, config)
@@ -284,7 +284,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, data_subset=kwargs['data_subset'])
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], data_subset=kwargs['data_subset'])
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
                 labels, preds = model.evaluate(loader, config)
@@ -304,7 +304,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 with open(f"{train_data_folder}train_config.json", "r") as f:
                     config = json.load(f)
                 # Construct dataloaders
-                base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(tune_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=False, data_subset=kwargs['n_tune_samples'])
+                base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(tune_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], combine=False, data_subset=kwargs['n_tune_samples'])
                 # Train nn models
                 for model, loader in zip(nn_model_list, nn_dataloaders):
                     model_utils.set_feature_extraction(model)
@@ -323,7 +323,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, data_subset=kwargs['data_subset'])
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], data_subset=kwargs['data_subset'])
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
                 labels, preds = model.evaluate(loader, config)
@@ -338,7 +338,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, data_subset=kwargs['data_subset'])
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], data_subset=kwargs['data_subset'])
             # Test all models
             for model, loader in zip(all_model_list, dataloaders):
                 labels, preds = model.evaluate(loader, config)
