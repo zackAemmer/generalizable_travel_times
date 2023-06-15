@@ -82,83 +82,18 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
         base_model_list.append(data_utils.load_pkl(f"{run_folder}{train_network_folder}models/PER_TIM_{fold_num}.pkl"))
 
         # Declare neural network models
-        nn_model_list = []
-        nn_model_list.append(ff.FF(
-            "FF",
-            n_features=12,
-            hidden_size=HIDDEN_SIZE,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(ff.FF_GRID(
-            "FF_NGRID_IND",
-            n_features=12,
-            n_grid_features=3*3*5*5,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(rnn.GRU(
-            "GRU",
-            n_features=10,
-            hidden_size=HIDDEN_SIZE,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(rnn.GRU_GRID(
-            "GRU_NGRID_IND",
-            n_features=10,
-            n_grid_features=3*3*5*5,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(transformer.TRSF(
-            "TRSF",
-            n_features=10,
-            hidden_size=HIDDEN_SIZE,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(transformer.TRSF_GRID(
-            "TRSF_NGRID_IND",
-            n_features=10,
-            n_grid_features=3*3*5*5,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-        nn_model_list.append(transformer.TRSF_GRID_ATTN(
-            "TRSF_NGRID_CRS",
-            n_features=10,
-            n_grid_features=3*3*5*5,
-            n_channels=3*3,
-            hidden_size=HIDDEN_SIZE,
-            grid_compression_size=8,
-            batch_size=BATCH_SIZE,
-            embed_dict=embed_dict,
-            device=device
-        ).to(device))
-
-        all_model_list = []
-        all_model_list.extend(base_model_list)
-        all_model_list.extend(nn_model_list)
-
-        print(f"Model names: {[m.model_name for m in nn_model_list]}")
-        print(f"Model total parameters: {[sum(p.numel() for p in m.parameters()) for m in nn_model_list]}")
+        nn_model_list = model_utils.make_all_models(HIDDEN_SIZE, BATCH_SIZE, embed_dict, device)
 
         # Load all model weights
         for m in nn_model_list:
             m = m.load_state_dict(torch.load(f"{run_folder}{train_network_folder}models/{m.model_name}_{fold_num}.pt"))
+
+        # Create list with all active models
+        all_model_list = []
+        all_model_list.extend(base_model_list)
+        all_model_list.extend(nn_model_list)
+        print(f"Model names: {[m.model_name for m in nn_model_list]}")
+        print(f"Model total parameters: {[sum(p.numel() for p in m.parameters()) for m in nn_model_list]}")
 
         # Test models on different networks
         model_fold_results = {}
@@ -236,6 +171,10 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
 
         # Fine-tune each model, then test on a set from a different network
         print(f"EXPERIMENT: FINE TUNING")
+        # Re-declare nn models and all model list
+        nn_model_list = model_utils.make_all_models(HIDDEN_SIZE, BATCH_SIZE, embed_dict, device)
+        for m in nn_model_list:
+            m = m.load_state_dict(torch.load(f"{run_folder}{train_network_folder}models/{m.model_name}_{fold_num}.pt"))
         for epoch in range(kwargs['TUNE_EPOCHS']):
             print(f"FOLD: {fold_num}, FINE TUNING EPOCH: {epoch}")
             # Train all models on each training file; split samples in each file by fold
@@ -248,15 +187,11 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                     config = json.load(f)
                 # Construct dataloaders
                 base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(tune_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], combine=False, data_subset=kwargs['n_tune_samples'])
-                # Train all models
-                for model, loader in zip(base_model_list, base_dataloaders):
-                    model.train(loader, config)
+                # Train nn models
                 for model, loader in zip(nn_model_list, nn_dataloaders):
                     avg_batch_loss = model_utils.train(model, loader, kwargs['LEARN_RATE'])
         # Save tuned models
         print(f"Fold {fold_num} fine tuning complete, saving model states and metrics...")
-        for model in base_model_list:
-            model.save_to(f"{run_folder}{train_network_folder}models/{model.model_name}_tuned_{fold_num}.pkl")
         for model in nn_model_list:
             torch.save(model.state_dict(), f"{run_folder}{train_network_folder}models/{model.model_name}_tuned_{fold_num}.pt")
         # Retest each model on the original and generalization networks
@@ -269,9 +204,9 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], data_subset=kwargs['data_subset'])
+            base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], combine=False, data_subset=kwargs['data_subset'])
             # Test all models
-            for model, loader in zip(all_model_list, dataloaders):
+            for model, loader in zip(nn_model_list, nn_dataloaders):
                 labels, preds = model.evaluate(loader, config)
                 model_fold_results[model.model_name]["Tune_Train_Labels"].extend(list(labels))
                 model_fold_results[model.model_name]["Tune_Train_Preds"].extend(list(preds))
@@ -284,15 +219,19 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], data_subset=kwargs['data_subset'])
+            base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], combine=False, data_subset=kwargs['data_subset'])
             # Test all models
-            for model, loader in zip(all_model_list, dataloaders):
+            for model, loader in zip(nn_model_list, nn_dataloaders):
                 labels, preds = model.evaluate(loader, config)
                 model_fold_results[model.model_name]["Tune_Test_Labels"].extend(list(labels))
                 model_fold_results[model.model_name]["Tune_Test_Preds"].extend(list(preds))
 
         # Fine-tune each model, then test on a set from a different network
         print(f"EXPERIMENT: FEATURE EXTRACTION")
+        # Re-declare nn models and all model list
+        nn_model_list = model_utils.make_all_models(HIDDEN_SIZE, BATCH_SIZE, embed_dict, device)
+        for m in nn_model_list:
+            m = m.load_state_dict(torch.load(f"{run_folder}{train_network_folder}models/{m.model_name}_{fold_num}.pt"))
         for epoch in range(kwargs['TUNE_EPOCHS']):
             print(f"FOLD: {fold_num}, FEATURE EXTRACTION EPOCH: {epoch}")
             # Train all models on each training file; split samples in each file by fold
@@ -323,9 +262,9 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], data_subset=kwargs['data_subset'])
+            base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], combine=False, data_subset=kwargs['data_subset'])
             # Test all models
-            for model, loader in zip(all_model_list, dataloaders):
+            for model, loader in zip(nn_model_list, nn_dataloaders):
                 labels, preds = model.evaluate(loader, config)
                 model_fold_results[model.model_name]["Extract_Train_Labels"].extend(list(labels))
                 model_fold_results[model.model_name]["Extract_Train_Preds"].extend(list(preds))
@@ -338,9 +277,9 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], data_subset=kwargs['data_subset'])
+            base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], combine=False, data_subset=kwargs['data_subset'])
             # Test all models
-            for model, loader in zip(all_model_list, dataloaders):
+            for model, loader in zip(nn_model_list, nn_dataloaders):
                 labels, preds = model.evaluate(loader, config)
                 model_fold_results[model.model_name]["Extract_Test_Labels"].extend(list(labels))
                 model_fold_results[model.model_name]["Extract_Test_Preds"].extend(list(preds))

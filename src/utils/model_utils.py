@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 
+from models import ff, rnn, transformer
 from utils import data_utils, data_loader
 
 
@@ -48,6 +49,89 @@ def predict(model, dataloader, sequential_flag=False):
         avg_batch_loss = running_vloss / num_batches
         return labels, preds, avg_batch_loss
 
+def set_feature_extraction(model, feature_extraction=True):
+    if feature_extraction==False:
+        for param in model.parameters():
+            param.requires_grad = True
+    else:
+        for param in model.parameters():
+            param.requires_grad = False
+        # Each model must have a final named feature extraction layer
+        for param in model.feature_extract.parameters():
+            param.requires_grad = True
+        for param in model.feature_extract_activation.parameters():
+            param.requires_grad = True
+
+def make_all_models(hidden_size, batch_size, embed_dict, device):
+    # Declare neural network models
+    nn_model_list = []
+    nn_model_list.append(ff.FF(
+        "FF",
+        n_features=12,
+        hidden_size=hidden_size,
+        batch_size=batch_size,
+        embed_dict=embed_dict,
+        device=device
+    ).to(device))
+    nn_model_list.append(ff.FF_GRID(
+        "FF_NGRID_IND",
+        n_features=12,
+        n_grid_features=3*3*5*5,
+        hidden_size=hidden_size,
+        grid_compression_size=8,
+        batch_size=batch_size,
+        embed_dict=embed_dict,
+        device=device
+    ).to(device))
+    nn_model_list.append(rnn.GRU(
+        "GRU",
+        n_features=10,
+        hidden_size=hidden_size,
+        batch_size=batch_size,
+        embed_dict=embed_dict,
+        device=device
+    ).to(device))
+    nn_model_list.append(rnn.GRU_GRID(
+        "GRU_NGRID_IND",
+        n_features=10,
+        n_grid_features=3*3*5*5,
+        hidden_size=hidden_size,
+        grid_compression_size=8,
+        batch_size=batch_size,
+        embed_dict=embed_dict,
+        device=device
+    ).to(device))
+    nn_model_list.append(transformer.TRSF(
+        "TRSF",
+        n_features=10,
+        hidden_size=hidden_size,
+        batch_size=batch_size,
+        embed_dict=embed_dict,
+        device=device
+    ).to(device))
+    nn_model_list.append(transformer.TRSF_GRID(
+        "TRSF_NGRID_IND",
+        n_features=10,
+        n_grid_features=3*3*5*5,
+        hidden_size=hidden_size,
+        grid_compression_size=8,
+        batch_size=batch_size,
+        embed_dict=embed_dict,
+        device=device
+    ).to(device))
+    nn_model_list.append(transformer.TRSF_GRID_ATTN(
+        "TRSF_NGRID_CRS",
+        n_features=10,
+        n_grid_features=3*3*5*5,
+        n_channels=3*3,
+        hidden_size=hidden_size,
+        grid_compression_size=8,
+        batch_size=batch_size,
+        embed_dict=embed_dict,
+        device=device
+    ).to(device))
+    return nn_model_list
+
 def make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=True, data_subset=None, holdout_routes=None, keep_only_holdout_routes=False):
     # Subset data for faster evaluation
     if data_subset is not None:
@@ -82,16 +166,3 @@ def make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_cont
         return base_dataloaders
     else:
         return base_dataloaders, nn_dataloaders
-
-def set_feature_extraction(model, feature_extraction=True):
-    if feature_extraction==False:
-        for param in model.parameters():
-            param.requires_grad = True
-    else:
-        for param in model.parameters():
-            param.requires_grad = False
-        # Each model must have a final named feature extraction layer
-        for param in model.feature_extract.parameters():
-            param.requires_grad = True
-        for param in model.feature_extract_activation.parameters():
-            param.requires_grad = True
