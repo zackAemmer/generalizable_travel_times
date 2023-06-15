@@ -2,7 +2,7 @@
 set -e
 run_name=debug
 n_folds=3
-epochs=10
+tune_epochs=10
 
 
 ### Move data to folder ###
@@ -17,7 +17,7 @@ rm -rf ./result && mkdir ./result
 rm -rf ./saved_weights && mkdir ./saved_weights
 rm -rf ./logs && mkdir ./logs
 cp ../valle/results/$run_name/kcm/deeptte_results/saved_weights/* ./saved_weights/
-python main.py --task generalize --train_network kcm --test_network atb --batch_size 10 --epochs 10 --n_folds $n_folds --result_file ./result/deeptte --pooling_method attention --kernel_size 3 --alpha 0.1 --log_file generalize_log
+python main.py --task generalize --train_network kcm --test_network atb --batch_size 10 --epochs $tune_epochs --n_folds $n_folds --result_file ./result/deeptte --pooling_method attention --kernel_size 3 --alpha 0.1 --log_file generalize_log
 # Copy Deeptte results back to results folder
 cd ~/Skrivebord/valle
 mkdir -p ./results/$run_name/kcm/deeptte_results/generalization/
@@ -30,7 +30,7 @@ rm -rf ./result && mkdir ./result
 rm -rf ./saved_weights && mkdir ./saved_weights
 rm -rf ./logs && mkdir ./logs
 cp ../valle/results/$run_name/atb/deeptte_results/saved_weights/* ./saved_weights/
-python main.py --task generalize --train_network atb --test_network kcm --batch_size 10 --epochs 10 --n_folds $n_folds --result_file ./result/deeptte --pooling_method attention --kernel_size 3 --alpha 0.1 --log_file generalize_log
+python main.py --task generalize --train_network atb --test_network kcm --batch_size 10 --epochs $tune_epochs --n_folds $n_folds --result_file ./result/deeptte --pooling_method attention --kernel_size 3 --alpha 0.1 --log_file generalize_log
 # Copy Deeptte results back to results folder
 cd ~/Skrivebord/valle
 mkdir -p ./results/$run_name/atb/deeptte_results/generalization/

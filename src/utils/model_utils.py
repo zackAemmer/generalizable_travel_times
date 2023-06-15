@@ -133,12 +133,6 @@ def make_all_models(hidden_size, batch_size, embed_dict, device):
     return nn_model_list
 
 def make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=True, data_subset=None, holdout_routes=None, keep_only_holdout_routes=False):
-    # Subset data for faster evaluation
-    if data_subset is not None:
-        if data_subset < 1:
-            valid_data = np.random.choice(valid_data, int(data_subset*len(valid_data)))
-        else:
-            valid_data = np.random.choice(valid_data, data_subset)
     # Holdout routes for generalization
     if holdout_routes is not None:
         if keep_only_holdout_routes:
@@ -147,6 +141,12 @@ def make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_cont
         else:
             keep_idx = [sample['route_id'] not in holdout_routes for sample in valid_data]
             valid_data = [x for i,x in enumerate(valid_data) if keep_idx[i]]
+    # Subset data for faster evaluation
+    if data_subset is not None:
+        if data_subset < 1:
+            valid_data = np.random.choice(valid_data, int(data_subset*len(valid_data)))
+        else:
+            valid_data = np.random.choice(valid_data, data_subset)
     # Construct dataloaders for all models
     buffer = 2
     base_dataloaders = []
