@@ -194,6 +194,10 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
         print(f"Fold {fold_num} fine tuning complete, saving model states and metrics...")
         for model in nn_model_list:
             torch.save(model.state_dict(), f"{run_folder}{train_network_folder}models/{model.model_name}_tuned_{fold_num}.pt")
+        # Combine base models with newly tuned models for testing
+        all_model_list = []
+        all_model_list.extend(base_model_list)
+        all_model_list.extend(nn_model_list)
         # Retest each model on the original and generalization networks
         print(f"Evaluating {run_folder}{train_network_folder} on {train_data_folder}")
         for valid_file in train_file_list:
@@ -204,9 +208,9 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], combine=False, data_subset=kwargs['data_subset'])
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], data_subset=kwargs['data_subset'])
             # Test all models
-            for model, loader in zip(nn_model_list, nn_dataloaders):
+            for model, loader in zip(all_model_list, dataloaders):
                 labels, preds = model.evaluate(loader, config)
                 model_fold_results[model.model_name]["Tune_Train_Labels"].extend(list(labels))
                 model_fold_results[model.model_name]["Tune_Train_Preds"].extend(list(preds))
@@ -219,9 +223,9 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], combine=False, data_subset=kwargs['data_subset'])
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], data_subset=kwargs['data_subset'])
             # Test all models
-            for model, loader in zip(nn_model_list, nn_dataloaders):
+            for model, loader in zip(all_model_list, dataloaders):
                 labels, preds = model.evaluate(loader, config)
                 model_fold_results[model.model_name]["Tune_Test_Labels"].extend(list(labels))
                 model_fold_results[model.model_name]["Tune_Test_Preds"].extend(list(preds))
@@ -252,6 +256,10 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
         print(f"Fold {fold_num} feature extraction complete, saving model states and metrics...")
         for model in nn_model_list:
             torch.save(model.state_dict(), f"{run_folder}{train_network_folder}models/{model.model_name}_extracted_{fold_num}.pt")
+        # Combine base models with newly tuned models for testing
+        all_model_list = []
+        all_model_list.extend(base_model_list)
+        all_model_list.extend(nn_model_list)
         # Retest each model on the original and generalization networks
         print(f"Evaluating {run_folder}{train_network_folder} on {train_data_folder}")
         for valid_file in train_file_list:
@@ -262,9 +270,9 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], combine=False, data_subset=kwargs['data_subset'])
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], data_subset=kwargs['data_subset'])
             # Test all models
-            for model, loader in zip(nn_model_list, nn_dataloaders):
+            for model, loader in zip(all_model_list, dataloaders):
                 labels, preds = model.evaluate(loader, config)
                 model_fold_results[model.model_name]["Extract_Train_Labels"].extend(list(labels))
                 model_fold_results[model.model_name]["Extract_Train_Preds"].extend(list(preds))
@@ -277,9 +285,9 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 config = json.load(f)
             print(f"Successfully loaded {len(valid_data)} testing samples.")
             # Construct dataloaders for all models
-            base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], combine=False, data_subset=kwargs['data_subset'])
+            dataloaders = model_utils.make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, holdout_routes=kwargs['holdout_routes'], data_subset=kwargs['data_subset'])
             # Test all models
-            for model, loader in zip(nn_model_list, nn_dataloaders):
+            for model, loader in zip(all_model_list, dataloaders):
                 labels, preds = model.evaluate(loader, config)
                 model_fold_results[model.model_name]["Extract_Test_Labels"].extend(list(labels))
                 model_fold_results[model.model_name]["Extract_Test_Preds"].extend(list(preds))
@@ -349,45 +357,11 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
 
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_experiments(
-        run_folder="./results/debug/",
-        train_network_folder="kcm/",
-        test_network_folder="atb/",
-        tune_network_folder="atb/",
-        TUNE_EPOCHS=10,
-        BATCH_SIZE=64,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
-        data_subset=.1,
-        n_tune_samples=100,
-        n_folds=3,
-        holdout_routes=[100252,100139,102581,100341,102720],
-    )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_experiments(
-        run_folder="./results/debug/",
-        train_network_folder="atb/",
-        test_network_folder="kcm/",
-        tune_network_folder="kcm/",
-        TUNE_EPOCHS=10,
-        BATCH_SIZE=64,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
-        data_subset=.1,
-        n_tune_samples=100,
-        n_folds=3,
-        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
-    )
     # random.seed(0)
     # np.random.seed(0)
     # torch.manual_seed(0)
     # run_experiments(
-    #     run_folder="./results/cross_attn/",
+    #     run_folder="./results/debug/",
     #     train_network_folder="kcm/",
     #     test_network_folder="atb/",
     #     tune_network_folder="atb/",
@@ -397,14 +371,14 @@ if __name__=="__main__":
     #     HIDDEN_SIZE=32,
     #     data_subset=.1,
     #     n_tune_samples=100,
-    #     n_folds=5,
+    #     n_folds=3,
     #     holdout_routes=[100252,100139,102581,100341,102720]
     # )
     # random.seed(0)
     # np.random.seed(0)
     # torch.manual_seed(0)
     # run_experiments(
-    #     run_folder="./results/cross_attn/",
+    #     run_folder="./results/debug/",
     #     train_network_folder="atb/",
     #     test_network_folder="kcm/",
     #     tune_network_folder="kcm/",
@@ -414,6 +388,40 @@ if __name__=="__main__":
     #     HIDDEN_SIZE=32,
     #     data_subset=.1,
     #     n_tune_samples=100,
-    #     n_folds=5,
+    #     n_folds=3,
     #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
     # )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_experiments(
+        run_folder="./results/cross_attn/",
+        train_network_folder="kcm/",
+        test_network_folder="atb/",
+        tune_network_folder="atb/",
+        TUNE_EPOCHS=10,
+        BATCH_SIZE=64,
+        LEARN_RATE=1e-3,
+        HIDDEN_SIZE=32,
+        data_subset=.1,
+        n_tune_samples=100,
+        n_folds=5,
+        holdout_routes=[100252,100139,102581,100341,102720]
+    )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_experiments(
+        run_folder="./results/cross_attn/",
+        train_network_folder="atb/",
+        test_network_folder="kcm/",
+        tune_network_folder="kcm/",
+        TUNE_EPOCHS=10,
+        BATCH_SIZE=64,
+        LEARN_RATE=1e-3,
+        HIDDEN_SIZE=32,
+        data_subset=.1,
+        n_tune_samples=100,
+        n_folds=5,
+        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
+    )

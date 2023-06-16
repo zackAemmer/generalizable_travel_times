@@ -788,40 +788,81 @@ def extract_gen_results(city, gen_results):
         res.append(gen_df)
     return pd.concat(res, axis=0)
 
-def extract_deeptte_results(city, run_folder, network_folder, generalization_flag=False):
+def extract_deeptte_results(city, res_folder):
+    # Extract all fold and epoch losses from deeptte run
+    all_curve_data = []
+    all_fold_data = []
+    all_time_data = []
+    for res_file in os.listdir(res_folder):
+        res_labels = res_file.split("_")
+        if res_labels[1] == "CURVE":
+            res_preds = pd.read_csv(
+                f"{res_folder}/{res_file}",
+                delimiter=" ",
+                header=None,
+                names=["Label", "Pred"],
+                dtype={"Label": float, "Pred": float}
+            )
+            res_data = [
+                city,
+                res_labels[3],
+                "DEEPTTE",
+                "Test" if res_labels[2]=="TEST" else "Train",
+                res_labels[4].split(".")[0],
+                metrics.mean_absolute_error(res_preds['Label'], res_preds['Pred'])
+            ]
+            all_curve_data.append(res_data)
+        elif res_labels[1] == "FOLD":
+            res_preds = pd.read_csv(
+                f"{res_folder}/{res_file}",
+                delimiter=" ",
+                header=None,
+                names=["Label", "Pred"],
+                dtype={"Label": float, "Pred": float}
+            )
+            res_data = [
+                "DEEPTTE",
+                city,
+                res_labels[3].replace(),
+                metrics.mean_absolute_percentage_error(res_preds['Label'], res_preds['Pred']),
+                np.sqrt(metrics.mean_squared_error(res_preds['Label'], res_preds['Pred'])),
+                metrics.mean_absolute_error(res_preds['Label'], res_preds['Pred'])
+            ]
+            all_fold_data.append(res_data)
+        elif res_labels[1] == "time":
+            res_time = load_pkl(f"{res_folder}/{res_file}")
+            res_data = [
+                city,
+                res_labels[2].split(".")[0],
+                "DEEPTTE",
+                res_time
+            ]
+            all_time_data.append(res_data)
+    all_curve_data = pd.DataFrame(all_curve_data, columns=["City","Fold","Model","Loss Set","Epoch","Loss"])
+    all_fold_data = pd.DataFrame(all_fold_data, columns=["Model","City","Fold","MAPE","RMSE","MAE"])
+    all_time_data = pd.DataFrame(all_time_data, columns=["City","Fold","Model","Time"])
+    return all_fold_data, all_curve_data, all_time_data
+
+def extract_deeptte_gen_results(city, gen_folder):
     # Extract all fold and epoch losses from deeptte run
     all_run_data = []
-    if generalization_flag:
-        dest_dir = f"{run_folder}{network_folder}deeptte_results/generalization"
-    else:
-        dest_dir = f"{run_folder}{network_folder}deeptte_results/result"
-    for res_file in os.listdir(dest_dir):
+    for res_file in os.listdir(gen_folder):
         res_preds = pd.read_csv(
-            f"{dest_dir}/{res_file}",
+            f"{gen_folder}/{res_file}",
             delimiter=" ",
             header=None,
             names=["Label", "Pred"],
             dtype={"Label": float, "Pred": float}
         )
+        # model_name, Loss name 1, Loss name 2, epoch_num
         res_labels = res_file.split("_")
-        if generalization_flag:
-            # model_name, test_file_name, fold_num, epoch_num = res_labels
-            _, _, test_file_name, _, _ = res_labels
-            fold_num = 0
-            epoch_num = 0
-        elif len(res_labels)==5:
-            model_name, test_file_name, test_file_num, fold_num, epoch_num = res_labels
-            test_file_name = test_file_name + "_" + test_file_num
-            epoch_num = epoch_num.split(".")[0]
-        elif len(res_labels)==4:
-            model_name, test_file_name, fold_num, epoch_num = res_labels
-            epoch_num = epoch_num.split(".")[0]
+        loss_name = f"{res_labels[1]}_{res_labels[2]}"
+        fold_num = res_labels[3]
         res_data = [
             "DeepTTE",
             city,
-            test_file_name,
+            loss_name,
             fold_num,
-            epoch_num,
             metrics.mean_absolute_percentage_error(res_preds['Label'], res_preds['Pred']),
             np.sqrt(metrics.mean_squared_error(res_preds['Label'], res_preds['Pred'])),
             metrics.mean_absolute_error(res_preds['Label'], res_preds['Pred'])
@@ -832,17 +873,16 @@ def extract_deeptte_results(city, run_folder, network_folder, generalization_fla
         columns=[
             "Model",
             "City",
-            "Loss Set",
+            "Loss",
             "Fold",
-            "Epoch",
             "MAPE",
             "RMSE",
             "MAE"
         ]
     )
     all_run_data['Fold'] = all_run_data['Fold'].astype(int)
-    all_run_data['Epoch'] = all_run_data['Epoch'].astype(int)
-    return all_run_data.sort_values(['Fold','Epoch'])
+    all_run_data['Loss'] = all_run_data['Loss'].replace(to_replace=["TRAIN_TRAIN","TRAIN_TEST","TRAIN_HOLDOUT","EXTRACT_TRAIN","EXTRACT_TEST","TUNE_TRAIN","TUNE_TEST"], value=["Train_Losses","Test_Losses","Holdout_Losses","Extract_Train_Losses","Extract_Test_Losses","Tune_Train_Losses","Tune_Test_Losses"])
+    return all_run_data.sort_values(['Fold'])
 
 def extract_all_dataloader(dataloader, sequential_flag=False):
     """
