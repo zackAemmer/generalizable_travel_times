@@ -162,8 +162,8 @@ def plot_gtfsrt_trip(ax, trace_df, epsg, gtfs_folder):
     Returns: None.
     """
     # Plot trip stops from GTFS
-    trace_date = trace_df['file'][0]
-    trip_id = trace_df['trip_id'][0]
+    trace_date = trace_df['file'].iloc[0]
+    trip_id = trace_df['trip_id'].iloc[0]
     file_to_gtfs_map = data_utils.get_best_gtfs_lookup(trace_df, gtfs_folder)
     gtfs_data = data_utils.merge_gtfs_files(f"{gtfs_folder}{file_to_gtfs_map[trace_date]}/", epsg, [0,0])
     to_plot_gtfs = gtfs_data[gtfs_data['trip_id']==trip_id]

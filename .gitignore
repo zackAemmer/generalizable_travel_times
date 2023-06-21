@@ -11,6 +11,8 @@ current_scraping_files.zip
 /results/*
 /aws/*
 /src/scraped_data/*
+profile.prof
+trace.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

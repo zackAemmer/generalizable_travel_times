@@ -1,28 +1,72 @@
+import json
+from random import sample
+
 import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, IterableDataset
 
 from models import grids
 from utils import data_utils, shape_utils
 
 
+# class GenericDataset(Dataset):
+#     def __init__(self, content, config, grid=None, is_ngrid=None, buffer=1):
+#         self.content = content
+#         self.config = config
+#         self.grid = grid
+#         self.is_ngrid = is_ngrid
+#         self.buffer = buffer
+#     def __getitem__(self, index):
+#         sample = self.content[index]
+#         if self.grid is not None:
+#             # Handles normalization, and selection of the specific buffered t/x/y bins
+#             if self.is_ngrid:
+#                 grid_features = grids.extract_ngrid_features(self.grid, sample['tbin_idx'], sample['xbin_idx'], sample['ybin_idx'], self.config, self.buffer)
+#             else:
+#                 grid_features = grids.extract_grid_features(self.grid, sample['tbin_idx'], sample['xbin_idx'], sample['ybin_idx'], self.config, self.buffer)
+#             sample['grid_features'] = grid_features
+#         sample = apply_normalization(sample.copy(), self.config)
+#         return sample
+#     def __len__(self):
+#         return len(self.content)
+
 class GenericDataset(Dataset):
-    def __init__(self, content, config, grid=None, is_ngrid=None, buffer=1):
-        self.content = content
+    def __init__(self, file_path, config, grid=None, subset=None, holdout_routes=None, keep_only_holdout=False):
+        self.file_path = file_path
         self.config = config
-        self.grid = grid
-        self.is_ngrid = is_ngrid
-        self.buffer = buffer
-    def __getitem__(self, index):
-        sample = self.content[index]
-        if self.grid is not None:
-            # Handles normalization, and selection of the specific buffered t/x/y bins
-            if self.is_ngrid:
-                grid_features = grids.extract_ngrid_features(self.grid, sample['tbin_idx'], sample['xbin_idx'], sample['ybin_idx'], self.config, self.buffer)
+        self.grid=grid
+        self.subset = subset
+        self.holdout_routes = holdout_routes
+        self.keep_only_holdout = keep_only_holdout
+        # # Need to map to numpy
+        # self.content = np.zeros((100000,12))
+        # with open(self.file_path, "r") as f:
+        #     for i, line in enumerate(f):
+        #         z = json.loads(line)
+        #         self.content[i,0] = z['time_gap'][2]
+        # Filter out (or keep exclusively) any routes that are used for generalization tests
+        self.content  = list(map(lambda x: json.loads(x), open(self.file_path, "r").readlines()))
+        if self.holdout_routes is not None:
+            is_holdout = [x['route_id'] in holdout_routes for x in self.content]
+            if self.keep_only_holdout==True:
+                self.content = [sample for (sample, is_holdout) in zip(self.content,is_holdout) if is_holdout]
             else:
-                grid_features = grids.extract_grid_features(self.grid, sample['tbin_idx'], sample['xbin_idx'], sample['ybin_idx'], self.config, self.buffer)
-            sample['grid_features'] = grid_features
-        sample = apply_normalization(sample.copy(), self.config)
+                self.content = [sample for (sample, is_holdout) in zip(self.content,is_holdout) if not is_holdout]
+        if self.subset is not None:
+            if self.subset < 1:
+                self.content = sample(self.content, int(len(self.content)*self.subset))
+            else:
+                self.content = sample(self.content, self.subset)
+        # Save length of all shingles
+        self.lengths = list(map(lambda x: len(x['lngs']), self.content))
+    def __getitem__(self, index):
+        sample = self.content[index].copy()
+        # if self.grid is not None:
+        #     xbin_idxs, ybin_idxs = self.grid.digitize_points(sample['x'], sample['y'])
+        #     grid_features = self.grid.get_grid_features(xbin_idxs, ybin_idxs, [sample['locationtime'][0] for x in sample['lngs']])
+        # grid_features = apply_grid_normalization(grid_features, self.config)
+        sample = apply_normalization(sample, self.config)
+        # sample['grid_features'] = grid_features
         return sample
     def __len__(self):
         return len(self.content)
@@ -41,14 +85,25 @@ def apply_normalization(sample, config):
             sample[var_name] = data_utils.normalize(np.array(sample[var_name]), config[f"{var_name}_mean"], config[f"{var_name}_std"])
     return sample
 
-def make_generic_dataloader(data, config, batch_size, collate_fn, num_workers, grid=None, is_ngrid=None, buffer=None):
-    dataset = GenericDataset(data, config, grid, is_ngrid, buffer)
-    if num_workers > 0:
-        pin_memory=True
+def apply_grid_normalization(grid_features, config):
+    # Get the average age of observations in this shingle; or use estimate of global mean if all observations are nan
+    obs_ages = grid_features[:,-1,:,:,:]
+    obs_ages = obs_ages[~np.isnan(obs_ages)]
+    if len(obs_ages)==0:
+        # Estimate of global distribution
+        obs_mean = 3000
+        obs_std = 15000
     else:
-        pin_memory=False
-    dataloader = DataLoader(dataset, collate_fn=collate_fn, batch_size=batch_size, shuffle=True, pin_memory=pin_memory, num_workers=num_workers)
-    return dataloader
+        obs_mean = np.mean(obs_ages)
+        obs_std = np.std(obs_ages)
+    # Fill all nan values with the mean, then normalize
+    grid_features[:,0,:,:,:] = np.nan_to_num(grid_features[:,0,:,:,:], config['speed_m_s_mean'])
+    grid_features[:,1,:,:,:] = np.nan_to_num(grid_features[:,1,:,:,:], config['bearing_mean'])
+    grid_features[:,-1,:,:,:] = np.nan_to_num(grid_features[:,-1,:,:,:], obs_mean)
+    grid_features[:,0,:,:,:] = data_utils.normalize(grid_features[:,:,0,:,:], config[f"speed_m_s_mean"], config[f"speed_m_s_std"])
+    grid_features[:,1,:,:,:] = data_utils.normalize(grid_features[:,:,1,:,:], config[f"bearing_mean"], config[f"bearing_std"])
+    grid_features[:,-1,:,:,:] = data_utils.normalize(grid_features[:,:,-1,:,:], obs_mean, obs_std)
+    return grid_features
 
 def basic_collate(batch):
     # Last dimension is number of sequence variables below

@@ -120,36 +120,32 @@ def get_date_list(start, n_days):
     date_list = [base + timedelta(days=x) for x in range(n_days)]
     return [f"{date.strftime('%Y_%m_%d')}.pkl" for date in date_list]
 
-def load_fold_data(data_folder, filename, fold_num, total_folds):
-    ngrid = load_pkl(f"{data_folder}/../{filename}_ngrid.pkl")
-    train_data = []
-    contents = open(f"{data_folder}{filename}", "r").read()
-    train_data.append([json.loads(str(item)) for item in contents.strip().split('\n')])
-    train_data = list(itertools.chain.from_iterable(train_data))
-    # Select all data that is not part of this testing fold
-    n_per_fold = len(train_data) // total_folds
-    mask = np.ones(len(train_data), bool)
-    mask[fold_num*n_per_fold:(fold_num+1)*n_per_fold] = 0
-    return ([item for item, keep in zip(train_data, mask) if keep], [item for item, keep in zip(train_data, mask) if not keep], ngrid)
+# def load_fold_data(data_folder, filename, fold_num, total_folds):
+#     ngrid = load_pkl(f"{data_folder}/../{filename}_ngrid.pkl")
+#     train_data = []
+#     contents = open(f"{data_folder}{filename}", "r").read()
+#     train_data.append([json.loads(str(item)) for item in contents.strip().split('\n')])
+#     train_data = list(itertools.chain.from_iterable(train_data))
+#     # Select all data that is not part of this testing fold
+#     n_per_fold = len(train_data) // total_folds
+#     mask = np.ones(len(train_data), bool)
+#     mask[fold_num*n_per_fold:(fold_num+1)*n_per_fold] = 0
+#     return ([item for item, keep in zip(train_data, mask) if keep], [item for item, keep in zip(train_data, mask) if not keep], ngrid)
 
-def load_all_data(data_folder, filename):
-    ngrid = load_pkl(f"{data_folder}/../{filename}_ngrid.pkl")
-    valid_data = []
-    contents = open(f"{data_folder}{filename}", "r").read()
-    valid_data.append([json.loads(str(item)) for item in contents.strip().split('\n')])
-    valid_data = list(itertools.chain.from_iterable(valid_data))
-    return valid_data, ngrid
+# def load_all_data(data_folder, filename):
+#     # ngrid = load_pkl(f"{data_folder}/../{filename}_ngrid.pkl")
+#     valid_data = []
+#     return valid_data, ngrid
 
 def load_all_inputs(run_folder, network_folder, file_num):
     with open(f"{run_folder}{network_folder}/deeptte_formatted/train_config.json") as f:
         config = json.load(f)
     train_traces = load_pkl(f"{run_folder}{network_folder}train{file_num}_traces.pkl")
-    train_data, train_ngrid = load_all_data(f"{run_folder}{network_folder}deeptte_formatted/", f"train{file_num}")
+    train_data = list(map(lambda x: json.loads(x), open(f"{run_folder}{network_folder}deeptte_formatted/train", "r").readlines()))
     return {
         "config": config,
         "train_traces": train_traces,
         "train_data": train_data,
-        "train_ngrid": train_ngrid,
     }
 
 def combine_config_files(cfg_folder, n_save_files, train_or_test):
@@ -180,6 +176,7 @@ def combine_config_files(cfg_folder, n_save_files, train_or_test):
     summary_config["gtfs_folder"] = temp[0]["gtfs_folder"]
     summary_config["n_save_files"] = temp[0]["n_save_files"]
     summary_config["epsg"] = temp[0]["epsg"]
+    summary_config["grid_bounds"] = temp[0]["grid_bounds"]
     summary_config["train_set"] = temp[0]["train_set"]
     summary_config["test_set"] = temp[0]["test_set"]
     # Save final configs
@@ -460,7 +457,7 @@ def remap_ids(df_list, id_col):
         df[f"{id_col}_recode"] = recode
     return (df_list, len(pd.unique(all_ids)), mapping)
 
-def map_to_deeptte(trace_data, deeptte_formatted_path, grid_bounds, grid_s_res, grid_t_res, grid_n_res):
+def map_to_deeptte(trace_data, deeptte_formatted_path):
     """
     Reshape pandas dataframe to the json format needed to use deeptte.
     trace_data: dataframe with bus trajectories
@@ -476,13 +473,13 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, grid_bounds, grid_s_res, 
     # Lists
     trace_data['lats'] = trace_data['lat']
     trace_data['lngs'] = trace_data['lon']
+    trace_data['trip_start_locationtime'] = trace_data['locationtime']
 
-    # Calculate and add grid features
-    ngrid, tbin_idxs, xbin_idxs, ybin_idxs = grids.traces_to_ngrid(trace_data, grid_bounds, grid_s_res=grid_s_res, grid_t_res=grid_t_res, grid_n_res=grid_n_res)
-    grids.fill_ngrid_forward(ngrid)
-    trace_data['tbin_idx'] = tbin_idxs
-    trace_data['xbin_idx'] = xbin_idxs
-    trace_data['ybin_idx'] = ybin_idxs
+    # # Calculate and add grid features
+    # ngrid.add_grid_content(trace_data)
+    # xbin_idxs, ybin_idxs = ngrid.digitize_points(trace_data[['x']].values, trace_data[['y']].values)
+    # trace_data['xbin_idx'] = xbin_idxs
+    # trace_data['ybin_idx'] = ybin_idxs
 
     # Gather by shingle
     groups = trace_data.groupby('shingle_id')
@@ -517,8 +514,10 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, grid_bounds, grid_s_res, 
         'bearing': lambda x: x.tolist(),
         # Trip start time
         'trip_start_timeID_s': 'min',
+        'trip_start_locationtime': 'min',
         # Trip ongoing time
         'timeID_s': lambda x: x.tolist(),
+        'locationtime': lambda x: x.tolist(),
         # Nearest stop
         'stop_x': lambda x: x.tolist(),
         'stop_y': lambda x: x.tolist(),
@@ -527,19 +526,18 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, grid_bounds, grid_s_res, 
         'stop_dist_km': lambda x: x.tolist(),
         'scheduled_time_s': lambda x: x.tolist(),
         'passed_stops_n': lambda x: x.tolist(),
-        # Grid
-        'tbin_idx': lambda x: x.tolist(),
-        'xbin_idx': lambda x: x.tolist(),
-        'ybin_idx': lambda x: x.tolist()
+        # # Grid
+        # 'xbin_idx': lambda x: x.tolist(),
+        # 'ybin_idx': lambda x: x.tolist()
     })
 
     # Convert the DataFrame to a dictionary with the original format
     result_json_string = result.to_json(orient='records', lines=True)
-    with open(deeptte_formatted_path, mode='w+') as out_file:
+    with open(deeptte_formatted_path, mode='a') as out_file:
         out_file.write(result_json_string)
-    return trace_data, ngrid
+    return trace_data
 
-def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg):
+def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg, grid_bounds):
     """
     Get a dict of means and sds which are used to normalize data by DeepTTE.
     trace_data: pandas dataframe with unified columns and calculated distances
@@ -606,10 +604,20 @@ def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg):
         "gtfs_folder": gtfs_folder,
         "n_save_files": n_save_files,
         "epsg": epsg,
+        "grid_bounds": grid_bounds,
         "train_set": ["train"+str(x) for x in range(0,n_save_files)],
         "test_set": ["test"+str(x) for x in range(0,n_save_files)]
     }
     return summary_dict
+
+def map_from_deeptte(datalist, keys):
+    lengths = [len(x['lngs']) for x in datalist]
+    res = np.ones((sum(lengths), len(keys)))
+    for i,key in enumerate(keys):
+        vals = [sample[key] for sample in datalist]
+        vals = [item for sublist in vals for item in sublist]
+        res[:,i] = vals
+    return res
 
 def extract_operator(old_folder, new_folder, source_col, op_name):
     """
@@ -892,7 +900,7 @@ def extract_all_dataloader(dataloader, sequential_flag=False):
     all_X = []
     all_y = []
     seq_lens = []
-    for i, data in enumerate(dataloader):
+    for data in dataloader:
         data, y = data
         context, X = data[:2]
         all_context.append(context)
