@@ -39,8 +39,10 @@ class NGridBetter:
         self.points = self.points[np.argsort(self.points[:,0]),:]
         point_xbins, point_ybins = self.digitize_points(self.points[:,1], self.points[:,2])
         # Build lookup table for grid cells to sorted point lists
-        for x, xbin in enumerate(self.xbins):
-            for y, ybin in enumerate(self.ybins):
+        for x in range(len(self.xbins)+1):
+            for y in range(len(self.ybins)+1):
+                if x==79:
+                    print("here")
                 cell_points = self.points[(point_xbins==x) & (point_ybins==y)]
                 self.cell_lookup[x,y] = cell_points
     def get_grid_features(self, x_idxs, y_idxs, locationtimes, n_points=3, buffer=2):
