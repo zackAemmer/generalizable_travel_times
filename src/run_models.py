@@ -139,20 +139,14 @@ def run_models(run_folder, network_folder, **kwargs):
             dataset.grid = train_ngrid
             for model in base_model_list:
                 print(f"Training: {model.model_name}")
-                if model.requires_grid:
-                    dataset.add_grid_features = True
-                else:
-                    dataset.add_grid_features = False
+                dataset.add_grid_features = model.requires_grid
                 loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
                 t0 = time.time()
                 model.train(loader, config)
                 model.train_time += (time.time() - t0)
             for model, optimizer in zip(nn_model_list, nn_optimizer_list):
                 print(f"Training: {model.model_name}")
-                if model.requires_grid:
-                    dataset.add_grid_features = True
-                else:
-                    dataset.add_grid_features = False
+                dataset.add_grid_features = model.requires_grid
                 loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
                 t0 = time.time()
                 avg_batch_loss = model_utils.train(model, loader, optimizer, LEARN_RATE)
@@ -172,10 +166,7 @@ def run_models(run_folder, network_folder, **kwargs):
 
                 for i, model in enumerate(nn_model_list):
                     print(f"Evaluating: {model.model_name}")
-                    if model.requires_grid:
-                        dataset.add_grid_features = True
-                    else:
-                        dataset.add_grid_features = False
+                    dataset.add_grid_features = model.requires_grid
                     # Evaluate on fold train set
                     dataset.grid = train_ngrid
                     loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
@@ -202,20 +193,14 @@ def run_models(run_folder, network_folder, **kwargs):
         dataset.grid = test_ngrid
         for model in base_model_list:
             print(f"Evaluating: {model.model_name}")
-            if model.requires_grid:
-                    dataset.add_grid_features = True
-            else:
-                dataset.add_grid_features = False
+            dataset.add_grid_features = model.requires_grid
             loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, config)
             model_fold_results[model.model_name]["Labels"].extend(list(labels))
             model_fold_results[model.model_name]["Preds"].extend(list(preds))
         for model in nn_model_list:
             print(f"Evaluating: {model.model_name}")
-            if model.requires_grid:
-                    dataset.add_grid_features = True
-            else:
-                dataset.add_grid_features = False
+            dataset.add_grid_features = model.requires_grid
             loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, config)
             model_fold_results[model.model_name]["Labels"].extend(list(labels))
@@ -289,31 +274,31 @@ if __name__=="__main__":
         n_folds=5,
         holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
     )
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
-    # run_models(
-    #     run_folder="./results/small/",
-    #     network_folder="kcm/",
-    #     EPOCHS=30,
-    #     BATCH_SIZE=512,
-    #     LEARN_RATE=1e-3,
-    #     HIDDEN_SIZE=32,
-    #     grid_s_size=500,
-    #     n_folds=3,
-    #     holdout_routes=[100252,100139,102581,100341,102720]
-    # )
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
-    # run_models(
-    #     run_folder="./results/small/",
-    #     network_folder="atb/",
-    #     EPOCHS=30,
-    #     BATCH_SIZE=512,
-    #     LEARN_RATE=1e-3,
-    #     HIDDEN_SIZE=32,
-    #     grid_s_size=500,
-    #     n_folds=3,
-    #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
-    # )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_models(
+        run_folder="./results/small/",
+        network_folder="kcm/",
+        EPOCHS=30,
+        BATCH_SIZE=512,
+        LEARN_RATE=1e-3,
+        HIDDEN_SIZE=32,
+        grid_s_size=500,
+        n_folds=5,
+        holdout_routes=[100252,100139,102581,100341,102720]
+    )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_models(
+        run_folder="./results/small/",
+        network_folder="atb/",
+        EPOCHS=30,
+        BATCH_SIZE=512,
+        LEARN_RATE=1e-3,
+        HIDDEN_SIZE=32,
+        grid_s_size=500,
+        n_folds=5,
+        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
+    )

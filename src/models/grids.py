@@ -56,6 +56,8 @@ class NGridBetter:
         # Each element in each list is total enumeration of x,y cell indices for 1 point
         x_queries = np.concatenate([x[0].flatten() for x in buffer_range])
         y_queries = np.concatenate([y[1].flatten() for y in buffer_range])
+        x_queries = np.clip(x_queries,0,len(self.xbins))
+        y_queries = np.clip(y_queries,0,len(self.ybins))
         # Limit to bounds of the grid
         t_queries = np.array(locationtimes).repeat(grid_size*grid_size)
         n_recent_points = self.get_recent_points(x_queries, y_queries, t_queries, n_points)

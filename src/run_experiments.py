@@ -132,19 +132,13 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
         print(f"EXPERIMENT: SAME NETWORK")
         print(f"Evaluating {run_folder}{train_network_folder} on {train_network_folder}")
         for model in base_model_list:
-            if model.requires_grid:
-                train_network_dataset.add_grid_features = True
-            else:
-                train_network_dataset.add_grid_features = False
+            train_network_dataset.add_grid_features = model.requires_grid
             loader = DataLoader(train_network_dataset, sampler=train_network_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, train_network_config)
             model_fold_results[model.model_name]["Train_Labels"].extend(list(labels))
             model_fold_results[model.model_name]["Train_Preds"].extend(list(preds))
         for model in nn_model_list:
-            if model.requires_grid:
-                train_network_dataset.add_grid_features = True
-            else:
-                train_network_dataset.add_grid_features = False
+            train_network_dataset.add_grid_features = model.requires_grid
             loader = DataLoader(train_network_dataset, sampler=train_network_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, train_network_config)
             model_fold_results[model.model_name]["Train_Labels"].extend(list(labels))
@@ -153,19 +147,13 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
         print(f"EXPERIMENT: DIFFERENT NETWORK")
         print(f"Evaluating {run_folder}{train_network_folder} on {test_network_folder}")
         for model in base_model_list:
-            if model.requires_grid:
-                test_network_dataset.add_grid_features = True
-            else:
-                test_network_dataset.add_grid_features = False
+            test_network_dataset.add_grid_features = model.requires_grid
             loader = DataLoader(test_network_dataset, sampler=test_network_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, test_network_config)
             model_fold_results[model.model_name]["Test_Labels"].extend(list(labels))
             model_fold_results[model.model_name]["Test_Preds"].extend(list(preds))
         for model in nn_model_list:
-            if model.requires_grid:
-                test_network_dataset.add_grid_features = True
-            else:
-                test_network_dataset.add_grid_features = False
+            test_network_dataset.add_grid_features = model.requires_grid
             loader = DataLoader(test_network_dataset, sampler=test_network_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, test_network_config)
             model_fold_results[model.model_name]["Test_Labels"].extend(list(labels))
@@ -174,19 +162,13 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
         print(f"EXPERIMENT: HOLDOUT ROUTES")
         print(f"Evaluating {run_folder}{train_network_folder} on holdout routes from {train_network_folder}")
         for model in base_model_list:
-            if model.requires_grid:
-                holdout_route_dataset.add_grid_features = True
-            else:
-                holdout_route_dataset.add_grid_features = False
+            holdout_route_dataset.add_grid_features = model.requires_grid
             loader = DataLoader(holdout_route_dataset, sampler=holdout_route_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, train_network_config)
             model_fold_results[model.model_name]["Holdout_Labels"].extend(list(labels))
             model_fold_results[model.model_name]["Holdout_Preds"].extend(list(preds))
         for model in nn_model_list:
-            if model.requires_grid:
-                holdout_route_dataset.add_grid_features = True
-            else:
-                holdout_route_dataset.add_grid_features = False
+            holdout_route_dataset.add_grid_features = model.requires_grid
             loader = DataLoader(holdout_route_dataset, sampler=holdout_route_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, test_network_config)
             model_fold_results[model.model_name]["Holdout_Labels"].extend(list(labels))
@@ -205,55 +187,37 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             # Train all models
             for model in base_model_list:
                 print(f"Training: {model.model_name}")
-                if model.requires_grid:
-                    tune_network_dataset.add_grid_features = True
-                else:
-                    tune_network_dataset.add_grid_features = False
+                tune_network_dataset.add_grid_features = model.requires_grid
                 loader = DataLoader(tune_network_dataset, sampler=tune_network_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
                 model.train(loader, tune_network_config)
             for model, optimizer in zip(nn_model_list, nn_optimizer_list):
                 print(f"Training: {model.model_name}")
-                if model.requires_grid:
-                    tune_network_dataset.add_grid_features = True
-                else:
-                    tune_network_dataset.add_grid_features = False
+                tune_network_dataset.add_grid_features = model.requires_grid
                 loader = DataLoader(tune_network_dataset, sampler=tune_network_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
                 avg_batch_loss = model_utils.train(model, loader, optimizer, LEARN_RATE)
         # Test all models on train network
         print(f"Evaluating {run_folder}{train_network_folder} tuned on {run_folder}{test_network_folder}")
         for model in base_model_list:
-            if model.requires_grid:
-                train_network_dataset.add_grid_features = True
-            else:
-                train_network_dataset.add_grid_features = False
+            train_network_dataset.add_grid_features = model.requires_grid
             loader = DataLoader(train_network_dataset, sampler=train_network_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, train_network_config)
             model_fold_results[model.model_name]["Tune_Train_Labels"].extend(list(labels))
             model_fold_results[model.model_name]["Tune_Train_Preds"].extend(list(preds))
         for model in nn_model_list:
-            if model.requires_grid:
-                train_network_dataset.add_grid_features = True
-            else:
-                train_network_dataset.add_grid_features = False
+            train_network_dataset.add_grid_features = model.requires_grid
             loader = DataLoader(train_network_dataset, sampler=train_network_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, train_network_config)
             model_fold_results[model.model_name]["Tune_Train_Labels"].extend(list(labels))
             model_fold_results[model.model_name]["Tune_Train_Preds"].extend(list(preds))
         # Test all models on test network
         for model in base_model_list:
-            if model.requires_grid:
-                test_network_dataset.add_grid_features = True
-            else:
-                test_network_dataset.add_grid_features = False
+            test_network_dataset.add_grid_features = model.requires_grid
             loader = DataLoader(test_network_dataset, sampler=test_network_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, test_network_config)
             model_fold_results[model.model_name]["Tune_Test_Labels"].extend(list(labels))
             model_fold_results[model.model_name]["Tune_Test_Preds"].extend(list(preds))
         for model in nn_model_list:
-            if model.requires_grid:
-                test_network_dataset.add_grid_features = True
-            else:
-                test_network_dataset.add_grid_features = False
+            test_network_dataset.add_grid_features = model.requires_grid
             loader = DataLoader(test_network_dataset, sampler=train_network_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, test_network_config)
             model_fold_results[model.model_name]["Tune_Test_Labels"].extend(list(labels))
@@ -276,56 +240,38 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             # Train all models
             for model in base_model_list:
                 print(f"Training: {model.model_name}")
-                if model.requires_grid:
-                    tune_network_dataset.add_grid_features = True
-                else:
-                    tune_network_dataset.add_grid_features = False
+                tune_network_dataset.add_grid_features = model.requires_grid
                 loader = DataLoader(tune_network_dataset, sampler=tune_network_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
                 model.train(loader, tune_network_config)
             for model, optimizer in zip(nn_model_list, nn_optimizer_list):
                 print(f"Training: {model.model_name}")
-                if model.requires_grid:
-                    tune_network_dataset.add_grid_features = True
-                else:
-                    tune_network_dataset.add_grid_features = False
+                tune_network_dataset.add_grid_features = model.requires_grid
                 loader = DataLoader(tune_network_dataset, sampler=tune_network_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
                 model_utils.set_feature_extraction(model)
                 avg_batch_loss = model_utils.train(model, loader, optimizer, LEARN_RATE)
         # Test all models on train network
         print(f"Evaluating {run_folder}{train_network_folder} tuned on {run_folder}{test_network_folder}")
         for model in base_model_list:
-            if model.requires_grid:
-                train_network_dataset.add_grid_features = True
-            else:
-                train_network_dataset.add_grid_features = False
+            train_network_dataset.add_grid_features = model.requires_grid
             loader = DataLoader(train_network_dataset, sampler=train_network_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, train_network_config)
             model_fold_results[model.model_name]["Extract_Train_Labels"].extend(list(labels))
             model_fold_results[model.model_name]["Extract_Train_Preds"].extend(list(preds))
         for model in nn_model_list:
-            if model.requires_grid:
-                train_network_dataset.add_grid_features = True
-            else:
-                train_network_dataset.add_grid_features = False
+            train_network_dataset.add_grid_features = model.requires_grid
             loader = DataLoader(train_network_dataset, sampler=train_network_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, train_network_config)
             model_fold_results[model.model_name]["Extract_Train_Labels"].extend(list(labels))
             model_fold_results[model.model_name]["Extract_Train_Preds"].extend(list(preds))
         # Test all models on test network
         for model in base_model_list:
-            if model.requires_grid:
-                test_network_dataset.add_grid_features = True
-            else:
-                test_network_dataset.add_grid_features = False
+            test_network_dataset.add_grid_features = model.requires_grid
             loader = DataLoader(test_network_dataset, sampler=test_network_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, test_network_config)
             model_fold_results[model.model_name]["Extract_Test_Labels"].extend(list(labels))
             model_fold_results[model.model_name]["Extract_Test_Preds"].extend(list(preds))
         for model in nn_model_list:
-            if model.requires_grid:
-                test_network_dataset.add_grid_features = True
-            else:
-                test_network_dataset.add_grid_features = False
+            test_network_dataset.add_grid_features = model.requires_grid
             loader = DataLoader(test_network_dataset, sampler=train_network_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, test_network_config)
             model_fold_results[model.model_name]["Extract_Test_Labels"].extend(list(labels))
