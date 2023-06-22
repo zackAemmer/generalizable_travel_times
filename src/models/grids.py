@@ -44,17 +44,28 @@ class NGridBetter:
                 cell_points = self.points[(point_xbins==x) & (point_ybins==y)]
                 self.cell_lookup[x,y] = cell_points
     def get_grid_features(self, x_idxs, y_idxs, locationtimes, n_points=3, buffer=2):
-        all_res = np.ones((len(x_idxs), n_points, 3, (2*buffer)+1, (2*buffer)+1))
-        all_res[:] = np.nan
-        for i in range(len(x_idxs)):
-            for x, x_buff in enumerate(range(x_idxs[i]-buffer, x_idxs[i]+buffer+1)):
-                for y, y_buff in enumerate(range(y_idxs[i]-buffer, y_idxs[i]+buffer+1)):
-                    t = self.get_recent_points(x_buff, y_buff, locationtimes[i], n_points)
-                    all_res[i,:,:,x,y] = t
-        # tsteps X channels X samples X height X width
-        all_res = np.swapaxes(all_res, 1, 2)
-        all_res = np.swapaxes(all_res, 3, 4)
-        return all_res
+        seq_len = len(x_idxs)
+        grid_size = (2 * buffer) + 1
+        # For every point, want grid buffer in x and y
+        x_range = np.arange(grid_size)
+        y_range = np.arange(grid_size)
+        x_buffer_range = x_idxs[:, np.newaxis] - buffer + x_range
+        y_buffer_range = y_idxs[:, np.newaxis] - buffer + y_range
+        # For every 1d set of X,Y grid ranges, want a 2d buffer
+        buffer_range = [np.meshgrid(arr1,arr2) for arr1,arr2 in zip(x_buffer_range,y_buffer_range)]
+        # Each element in each list is total enumeration of x,y cell indices for 1 point
+        x_queries = np.concatenate([x[0].flatten() for x in buffer_range])
+        y_queries = np.concatenate([y[1].flatten() for y in buffer_range])
+        # Limit to bounds of the grid
+        x_queries = np.clip(x_queries,0,len(self.xbins)-1)
+        y_queries = np.clip(y_queries,0,len(self.ybins)-1)
+        t_queries = np.array(locationtimes).repeat(grid_size*grid_size)
+        n_recent_points = self.get_recent_points(x_queries, y_queries, t_queries, n_points)
+        n_recent_points = n_recent_points.reshape((seq_len,grid_size,grid_size,n_points,6))
+        # TxXxYxNxC -> TxCxYxNxX -> TxCxNxYxX
+        n_recent_points = np.swapaxes(n_recent_points, 1, 4)
+        n_recent_points = np.swapaxes(n_recent_points, 2, 3)
+        return n_recent_points
     def get_full_grid(self, grid_t_size, n_points=3):
         tbins = np.arange(np.min(self.points[:,0]),np.max(self.points[:,0]), grid_t_size)
         tbins = np.append(tbins, tbins[-1]+1)
@@ -68,32 +79,34 @@ class NGridBetter:
         all_res = np.swapaxes(all_res, 1, 2)
         all_res = np.swapaxes(all_res, 3, 4)
         return all_res
+    # def get_recent_points(self, x_idx, y_idx, locationtime, n_points):
+    #     # Get lookup values for every pt/cell
+    #     cell_points = list(map(lambda pt: self.cell_lookup[(pt[0], pt[1])], zip(x_idx, y_idx)))
+    #     # Get only values that occurred after the pt locationtime
+    #     cell_points = [pts[pts[:,0]<t][-n_points:] for pts,t in zip(cell_points, locationtime)]
+    #     # Reverse the values so that the most recent are first
+    #     cell_points = [np.expand_dims(pts[::-1],0) for pts in cell_points]
+    #     # Fill with nan so that all are same shape
+    #     cell_points = [np.pad(pts, [(0,0), (0,n_points-pts.shape[1]), (0,6-pts.shape[2])], mode='constant', constant_values=np.nan) for pts in cell_points]
+    #     # Join and add obs_age feature
+    #     cell_points = np.concatenate(cell_points, axis=0)
+    #     cell_points[:,:,-1] = np.repeat(np.expand_dims(np.array(locationtime),1),n_points,1) - cell_points[:,:,0]
+    #     return cell_points
     def get_recent_points(self, x_idx, y_idx, locationtime, n_points):
-        # n_points x channels x height x width
-        # nan if no results in cell found
-        res = np.ones((n_points, 3))
-        res[:] = np.nan
-        cell_points = self.cell_lookup[min(max(0,x_idx),len(self.xbins)-1), min(max(0,y_idx),len(self.ybins)-1)]
-        # Fill as many samples back in time as exist in the cell
-        if len(cell_points) > 0:
-            for i in range(len(cell_points)):
-                if cell_points[i,0]>=locationtime:
-                    if i==0:
-                        # All points in the cell occur in the future
-                        return res
-                    else:
-                        # Don't want to include the last point which is >= the inference point
-                        i = i-1
-                        break
-            # Can't fill less than 0 points, or more than requested n_points
-            res_cell_points = cell_points[max(0,i-n_points):i,:].copy()
-            res_cell_time_diff = abs(res_cell_points[:,0] - locationtime)
-            res_cell_features = res_cell_points[:,3:]
-            res[:len(res_cell_points),:2] = res_cell_features[:]
-            res[:len(res_cell_points),-1] = res_cell_time_diff[:]
-            # Reverse order sorted on recency so that the first points are the most recent, keep nans last
-            res = res[np.argsort(res[:,-1])]
-        return res
+        num_cells = len(x_idx)
+        cell_points = np.empty((num_cells, n_points, 6))
+        cell_points.fill(np.nan)
+        for i, (x, y, time) in enumerate(zip(x_idx, y_idx, locationtime)):
+            # Get lookup values for every pt/cell
+            cell = self.cell_lookup[(x,y)]
+            if cell.size==0:
+                continue
+            # Get only values that occurred after the pt locationtime
+            points = cell[cell[:,0] < time][-n_points:][::-1]
+            cell_points[i,:points.shape[0],:5] = points
+        # Add obs_age feature
+        cell_points[:,:,-1] = np.repeat(np.expand_dims(np.array(locationtime),1),n_points,1) - cell_points[:,:,0]
+        return cell_points
 
 # class NGrid:
 #     def __init__(self, content, c_resolution, x_resolution, y_resolution, t_resolution, n_resolution):

@@ -9,7 +9,6 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import plotly.express as px
 import shapely
 import shapely.geometry
 from scipy.spatial import KDTree

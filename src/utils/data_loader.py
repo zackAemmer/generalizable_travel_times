@@ -31,13 +31,14 @@ from utils import data_utils, shape_utils
 #         return len(self.content)
 
 class GenericDataset(Dataset):
-    def __init__(self, file_path, config, grid=None, subset=None, holdout_routes=None, keep_only_holdout=False):
+    def __init__(self, file_path, config, grid=None, subset=None, holdout_routes=None, keep_only_holdout=False, add_grid_features=False):
         self.file_path = file_path
         self.config = config
         self.grid=grid
         self.subset = subset
         self.holdout_routes = holdout_routes
         self.keep_only_holdout = keep_only_holdout
+        self.add_grid_features = add_grid_features
         # # Need to map to numpy
         # self.content = np.zeros((100000,12))
         # with open(self.file_path, "r") as f:
@@ -61,12 +62,12 @@ class GenericDataset(Dataset):
         self.lengths = list(map(lambda x: len(x['lngs']), self.content))
     def __getitem__(self, index):
         sample = self.content[index].copy()
-        # if self.grid is not None:
-        #     xbin_idxs, ybin_idxs = self.grid.digitize_points(sample['x'], sample['y'])
-        #     grid_features = self.grid.get_grid_features(xbin_idxs, ybin_idxs, [sample['locationtime'][0] for x in sample['lngs']])
-        # grid_features = apply_grid_normalization(grid_features, self.config)
+        if self.grid is not None and self.add_grid_features:
+            xbin_idxs, ybin_idxs = self.grid.digitize_points(sample['x'], sample['y'])
+            grid_features = self.grid.get_grid_features(xbin_idxs, ybin_idxs, [sample['trip_start_locationtime'] for x in sample['lngs']])
+            grid_features = apply_grid_normalization(grid_features, self.config)
+            sample['grid_features'] = grid_features
         sample = apply_normalization(sample, self.config)
-        # sample['grid_features'] = grid_features
         return sample
     def __len__(self):
         return len(self.content)
@@ -91,18 +92,18 @@ def apply_grid_normalization(grid_features, config):
     obs_ages = obs_ages[~np.isnan(obs_ages)]
     if len(obs_ages)==0:
         # Estimate of global distribution
-        obs_mean = 3000
-        obs_std = 15000
+        obs_mean = 82000
+        obs_std = 51000
     else:
         obs_mean = np.mean(obs_ages)
         obs_std = np.std(obs_ages)
     # Fill all nan values with the mean, then normalize
-    grid_features[:,0,:,:,:] = np.nan_to_num(grid_features[:,0,:,:,:], config['speed_m_s_mean'])
-    grid_features[:,1,:,:,:] = np.nan_to_num(grid_features[:,1,:,:,:], config['bearing_mean'])
+    grid_features[:,3,:,:,:] = np.nan_to_num(grid_features[:,3,:,:,:], config['speed_m_s_mean'])
+    grid_features[:,4,:,:,:] = np.nan_to_num(grid_features[:,4,:,:,:], config['bearing_mean'])
     grid_features[:,-1,:,:,:] = np.nan_to_num(grid_features[:,-1,:,:,:], obs_mean)
-    grid_features[:,0,:,:,:] = data_utils.normalize(grid_features[:,:,0,:,:], config[f"speed_m_s_mean"], config[f"speed_m_s_std"])
-    grid_features[:,1,:,:,:] = data_utils.normalize(grid_features[:,:,1,:,:], config[f"bearing_mean"], config[f"bearing_std"])
-    grid_features[:,-1,:,:,:] = data_utils.normalize(grid_features[:,:,-1,:,:], obs_mean, obs_std)
+    grid_features[:,3,:,:,:] = data_utils.normalize(grid_features[:,3,:,:,:], config[f"speed_m_s_mean"], config[f"speed_m_s_std"])
+    grid_features[:,4,:,:,:] = data_utils.normalize(grid_features[:,4,:,:,:], config[f"bearing_mean"], config[f"bearing_std"])
+    grid_features[:,-1,:,:,:] = data_utils.normalize(grid_features[:,-1,:,:,:], obs_mean, obs_std)
     return grid_features
 
 def basic_collate(batch):
