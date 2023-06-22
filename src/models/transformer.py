@@ -9,14 +9,16 @@ from models import masked_loss, pos_encodings
 
 
 class TRSF(nn.Module):
-    def __init__(self, model_name, n_features, hidden_size, batch_size, embed_dict, device):
+    def __init__(self, model_name, n_features, hidden_size, batch_size, collate_fn, embed_dict, device):
         super(TRSF, self).__init__()
         self.model_name = model_name
         self.n_features = n_features
         self.hidden_size = hidden_size
         self.batch_size = batch_size
+        self.collate_fn = collate_fn
         self.embed_dict = embed_dict
         self.device = device
+        self.requires_grid = False
         self.train_time = 0.0
         self.loss_fn = masked_loss.MaskedHuberLoss()
         # Embeddings
@@ -66,7 +68,7 @@ class TRSF(nn.Module):
         return labels, preds
 
 class TRSF_GRID(nn.Module):
-    def __init__(self, model_name, n_features, n_grid_features, hidden_size, grid_compression_size, batch_size, embed_dict, device):
+    def __init__(self, model_name, n_features, n_grid_features, hidden_size, grid_compression_size, batch_size, collate_fn, embed_dict, device):
         super(TRSF_GRID, self).__init__()
         self.model_name = model_name
         self.n_features = n_features
@@ -74,8 +76,10 @@ class TRSF_GRID(nn.Module):
         self.hidden_size = hidden_size
         self.grid_compression_size = grid_compression_size
         self.batch_size = batch_size
+        self.collate_fn = collate_fn
         self.embed_dict = embed_dict
         self.device = device
+        self.requires_grid = True
         self.train_time = 0.0
         self.loss_fn = masked_loss.MaskedHuberLoss()
         # Embeddings
@@ -137,7 +141,7 @@ class TRSF_GRID(nn.Module):
         return labels, preds
 
 class TRSF_GRID_ATTN(nn.Module):
-    def __init__(self, model_name, n_features, n_grid_features, n_channels, hidden_size, grid_compression_size, batch_size, embed_dict, device):
+    def __init__(self, model_name, n_features, n_grid_features, n_channels, hidden_size, grid_compression_size, batch_size, collate_fn, embed_dict, device):
         super(TRSF_GRID_ATTN, self).__init__()
         self.model_name = model_name
         self.n_features = n_features
@@ -146,8 +150,10 @@ class TRSF_GRID_ATTN(nn.Module):
         self.hidden_size = hidden_size
         self.grid_compression_size = grid_compression_size
         self.batch_size = batch_size
+        self.collate_fn = collate_fn
         self.embed_dict = embed_dict
         self.device = device
+        self.requires_grid = True
         self.train_time = 0.0
         self.loss_fn = masked_loss.MaskedHuberLoss()
         # Embeddings

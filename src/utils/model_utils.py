@@ -71,116 +71,87 @@ def make_all_models(hidden_size, batch_size, embed_dict, device):
         hidden_size=hidden_size,
         batch_size=batch_size,
         embed_dict=embed_dict,
+        collate_fn=data_loader.basic_collate,
         device=device
     ).to(device))
-    # nn_model_list.append(ff.FF_GRID(
-    #     "FF_NGRID_IND",
-    #     n_features=12,
-    #     n_grid_features=3*3*5*5,
-    #     hidden_size=hidden_size,
-    #     grid_compression_size=8,
-    #     batch_size=batch_size,
-    #     embed_dict=embed_dict,
-    #     device=device
-    # ).to(device))
+    nn_model_list.append(ff.FF_GRID(
+        "FF_NGRID_IND",
+        n_features=12,
+        n_grid_features=3*3*5*5,
+        hidden_size=hidden_size,
+        grid_compression_size=8,
+        batch_size=batch_size,
+        embed_dict=embed_dict,
+        collate_fn=data_loader.basic_grid_collate,
+        device=device
+    ).to(device))
     nn_model_list.append(rnn.GRU(
         "GRU",
         n_features=10,
         hidden_size=hidden_size,
         batch_size=batch_size,
         embed_dict=embed_dict,
+        collate_fn=data_loader.sequential_collate,
         device=device
     ).to(device))
-    # nn_model_list.append(rnn.GRU_GRID(
-    #     "GRU_NGRID_IND",
-    #     n_features=10,
-    #     n_grid_features=3*3*5*5,
-    #     hidden_size=hidden_size,
-    #     grid_compression_size=8,
-    #     batch_size=batch_size,
-    #     embed_dict=embed_dict,
-    #     device=device
-    # ).to(device))
+    nn_model_list.append(rnn.GRU_GRID(
+        "GRU_NGRID_IND",
+        n_features=10,
+        n_grid_features=3*3*5*5,
+        hidden_size=hidden_size,
+        grid_compression_size=8,
+        batch_size=batch_size,
+        embed_dict=embed_dict,
+        collate_fn=data_loader.sequential_grid_collate,
+        device=device
+    ).to(device))
     nn_model_list.append(transformer.TRSF(
         "TRSF",
         n_features=10,
         hidden_size=hidden_size,
         batch_size=batch_size,
         embed_dict=embed_dict,
+        collate_fn=data_loader.sequential_collate,
         device=device
     ).to(device))
-    # nn_model_list.append(transformer.TRSF_GRID(
-    #     "TRSF_NGRID_IND",
-    #     n_features=10,
-    #     n_grid_features=3*3*5*5,
-    #     hidden_size=hidden_size,
-    #     grid_compression_size=8,
-    #     batch_size=batch_size,
-    #     embed_dict=embed_dict,
-    #     device=device
-    # ).to(device))
-    # nn_model_list.append(transformer.TRSF_GRID_ATTN(
-    #     "TRSF_NGRID_CRS",
-    #     n_features=10,
-    #     n_grid_features=3*3*5*5,
-    #     n_channels=3*3,
-    #     hidden_size=hidden_size,
-    #     grid_compression_size=8,
-    #     batch_size=batch_size,
-    #     embed_dict=embed_dict,
-    #     device=device
-    # ).to(device))
+    nn_model_list.append(transformer.TRSF_GRID(
+        "TRSF_NGRID_IND",
+        n_features=10,
+        n_grid_features=3*3*5*5,
+        hidden_size=hidden_size,
+        grid_compression_size=8,
+        batch_size=batch_size,
+        embed_dict=embed_dict,
+        collate_fn=data_loader.sequential_grid_collate,
+        device=device
+    ).to(device))
+    nn_model_list.append(transformer.TRSF_GRID_ATTN(
+        "TRSF_NGRID_CRS",
+        n_features=10,
+        n_grid_features=3*3*5*5,
+        n_channels=3*3,
+        hidden_size=hidden_size,
+        grid_compression_size=8,
+        batch_size=batch_size,
+        embed_dict=embed_dict,
+        collate_fn=data_loader.sequential_grid_collate,
+        device=device
+    ).to(device))
     return nn_model_list
 
-# def make_all_dataloaders(valid_data, config, BATCH_SIZE, NUM_WORKERS, ngrid_content, combine=True, data_subset=None, holdout_routes=None, keep_only_holdout_routes=False):
-#     # Holdout routes for generalization
-#     if holdout_routes is not None:
-#         if keep_only_holdout_routes:
-#             keep_idx = [sample['route_id'] in holdout_routes for sample in valid_data]
-#             valid_data = [x for i,x in enumerate(valid_data) if keep_idx[i]]
-#         else:
-#             keep_idx = [sample['route_id'] not in holdout_routes for sample in valid_data]
-#             valid_data = [x for i,x in enumerate(valid_data) if keep_idx[i]]
-#     # Subset data for faster evaluation
-#     if data_subset is not None:
-#         if data_subset < 1:
-#             valid_data = np.random.choice(valid_data, int(data_subset*len(valid_data)))
-#         else:
-#             valid_data = np.random.choice(valid_data, data_subset)
-#     print(f"Created dataloaders with {len(valid_data)} samples")
-#     # Construct dataloaders for all models
-#     buffer = 2
-#     base_dataloaders = []
-#     nn_dataloaders = []
-#     # base_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS))
-#     base_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS))
-#     base_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS))
-#     nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_collate, NUM_WORKERS))
-#     # nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.basic_grid_collate, NUM_WORKERS, grid=ngrid_content, is_ngrid=True, buffer=buffer))
-#     # nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS))
-#     # nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=ngrid_content, is_ngrid=True, buffer=buffer))
-#     # nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_collate, NUM_WORKERS))
-#     # nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=ngrid_content, is_ngrid=True, buffer=buffer))
-#     # nn_dataloaders.append(data_loader.make_generic_dataloader(valid_data, config, BATCH_SIZE, data_loader.sequential_grid_collate, NUM_WORKERS, grid=ngrid_content, is_ngrid=True, buffer=buffer))
-#     if combine:
-#         base_dataloaders.extend(nn_dataloaders)
-#         return base_dataloaders
+# def make_all_dataloaders(dataset, sampler, batch_size, num_workers):
+#     if num_workers > 0:
+#         pin_memory=True
 #     else:
-#         return base_dataloaders, nn_dataloaders
-
-def make_all_dataloaders(dataset, sampler, batch_size, num_workers):
-    if num_workers > 0:
-        pin_memory=True
-    else:
-        pin_memory=False
-    base_dataloaders = []
-    # Construct base datalaoders
-    base_dataloaders.append(DataLoader(dataset, sampler=sampler, collate_fn=data_loader.basic_collate, batch_size=batch_size, pin_memory=pin_memory, num_workers=num_workers))
-    base_dataloaders.append(DataLoader(dataset, sampler=sampler, collate_fn=data_loader.basic_collate, batch_size=batch_size, pin_memory=pin_memory, num_workers=num_workers))
-    base_dataloaders.append(DataLoader(dataset, sampler=sampler, collate_fn=data_loader.sequential_collate, batch_size=batch_size, pin_memory=pin_memory, num_workers=num_workers))
-    # Construct nn dataloaders
-    nn_dataloaders = []
-    nn_dataloaders.append(DataLoader(dataset, sampler=sampler, collate_fn=data_loader.basic_collate, batch_size=batch_size, pin_memory=pin_memory, num_workers=num_workers))
-    nn_dataloaders.append(DataLoader(dataset, sampler=sampler, collate_fn=data_loader.sequential_collate, batch_size=batch_size, pin_memory=pin_memory, num_workers=num_workers))
-    nn_dataloaders.append(DataLoader(dataset, sampler=sampler, collate_fn=data_loader.sequential_collate, batch_size=batch_size, pin_memory=pin_memory, num_workers=num_workers))
-    return base_dataloaders, nn_dataloaders
+#         pin_memory=False
+#     base_dataloaders = []
+#     # Construct base datalaoders
+#     base_dataloaders.append(DataLoader(dataset, sampler=sampler, collate_fn=data_loader.basic_collate, batch_size=batch_size, pin_memory=pin_memory, num_workers=num_workers))
+#     base_dataloaders.append(DataLoader(dataset, sampler=sampler, collate_fn=data_loader.basic_collate, batch_size=batch_size, pin_memory=pin_memory, num_workers=num_workers))
+#     base_dataloaders.append(DataLoader(dataset, sampler=sampler, collate_fn=data_loader.sequential_collate, batch_size=batch_size, pin_memory=pin_memory, num_workers=num_workers))
+#     # Construct nn dataloaders
+#     nn_dataloaders = []
+#     nn_dataloaders.append(DataLoader(dataset, sampler=sampler, collate_fn=data_loader.basic_collate, batch_size=batch_size, pin_memory=pin_memory, num_workers=num_workers))
+#     nn_dataloaders.append(DataLoader(dataset, sampler=sampler, collate_fn=data_loader.sequential_collate, batch_size=batch_size, pin_memory=pin_memory, num_workers=num_workers))
+#     nn_dataloaders.append(DataLoader(dataset, sampler=sampler, collate_fn=data_loader.sequential_collate, batch_size=batch_size, pin_memory=pin_memory, num_workers=num_workers))
+#     return base_dataloaders, nn_dataloaders

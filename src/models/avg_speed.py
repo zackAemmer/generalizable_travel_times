@@ -1,13 +1,15 @@
 import numpy as np
 import pandas as pd
 
-from utils import data_utils
+from utils import data_utils, data_loader
 
 
 class AvgHourlySpeedModel:
     def __init__(self, model_name):
         self.model_name = model_name
         self.speed_lookup = {}
+        self.requires_grid = False
+        self.collate_fn = data_loader.basic_collate
         self.train_time = 0.0
         return None
     def train(self, dataloader, config):

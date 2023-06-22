@@ -94,16 +94,19 @@ def run_models(run_folder, network_folder, **kwargs):
         base_model_list.append(avg_speed.AvgHourlySpeedModel("AVG"))
         base_model_list.append(schedule.TimeTableModel("SCH"))
         base_model_list.append(persistent.PersistentTimeSeqModel("PER_TIM"))
+
         # Declare neural network models
         nn_model_list = model_utils.make_all_models(HIDDEN_SIZE, BATCH_SIZE, embed_dict, device)
         nn_optimizer_list = [torch.optim.Adam(model.parameters(), lr=LEARN_RATE) for model in nn_model_list]
         print(f"Model names: {[m.model_name for m in nn_model_list]}")
         print(f"Model total parameters: {[sum(p.numel() for p in m.parameters()) for m in nn_model_list]}")
+
         # Summarize models in run
         model_names = [x.model_name for x in base_model_list]
         model_names.extend([x.model_name for x in nn_model_list])
         print(f"Model names: {model_names}")
         print(f"NN model total parameters: {[sum(p.numel() for p in m.parameters()) for m in nn_model_list]}")
+
         # Keep track of all model performances
         model_fold_results = {}
         for x in model_names:
@@ -123,45 +126,39 @@ def run_models(run_folder, network_folder, **kwargs):
         train_ngrid = grids.NGridBetter(config['grid_bounds'], kwargs['grid_s_size'])
         train_ngrid.add_grid_content(data_utils.map_from_deeptte([x for i,x in enumerate(dataset.content) if i in train_idx],["locationtime","x","y","speed_m_s","bearing"]))
         train_ngrid.build_cell_lookup()
-        dataset.grid = train_ngrid
-        # If we just enumerate the dataset how many points are there? 3days
+        test_ngrid = grids.NGridBetter(config['grid_bounds'], kwargs['grid_s_size'])
+        test_ngrid.add_grid_content(data_utils.map_from_deeptte([x for i,x in enumerate(dataset.content) if i in test_idx],["locationtime","x","y","speed_m_s","bearing"]))
+        test_ngrid.build_cell_lookup()
+
+        # If we just enumerate the dataset how many points are there?
         print(sum([len(x['lngs']) for x in dataset.content]))
 
-        # Train all models on each training file
+        # Train all models
         for epoch in range(EPOCHS):
             print(f"FOLD: {fold_num}, EPOCH: {epoch}")
-            # Construct dataloaders
-            base_dataloaders, nn_dataloaders = model_utils.make_all_dataloaders(dataset, train_sampler, BATCH_SIZE, NUM_WORKERS)
-
-            # Train all models
-            dataset.add_grid_features=False
-            t00 = time.time()
-            for model, loader in zip(base_model_list, base_dataloaders):
+            dataset.grid = train_ngrid
+            for model in base_model_list:
                 print(f"Training: {model.model_name}")
+                if model.requires_grid:
+                    dataset.add_grid_features = True
+                else:
+                    dataset.add_grid_features = False
+                loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
                 t0 = time.time()
                 model.train(loader, config)
                 model.train_time += (time.time() - t0)
-            for model, loader, optimizer in zip(nn_model_list, nn_dataloaders, nn_optimizer_list):
+            for model, optimizer in zip(nn_model_list, nn_optimizer_list):
                 print(f"Training: {model.model_name}")
+                if model.requires_grid:
+                    dataset.add_grid_features = True
+                else:
+                    dataset.add_grid_features = False
+                loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
                 t0 = time.time()
                 avg_batch_loss = model_utils.train(model, loader, optimizer, LEARN_RATE)
                 model.train_time += (time.time() - t0)
-            print(time.time() - t00)
 
-            dataset.add_grid_features=True
-            t00 = time.time()
-            for model, loader in zip(base_model_list, base_dataloaders):
-                print(f"Training: {model.model_name}")
-                t0 = time.time()
-                model.train(loader, config)
-                model.train_time += (time.time() - t0)
-            for model, loader, optimizer in zip(nn_model_list, nn_dataloaders, nn_optimizer_list):
-                print(f"Training: {model.model_name}")
-                t0 = time.time()
-                avg_batch_loss = model_utils.train(model, loader, optimizer, LEARN_RATE)
-                model.train_time += (time.time() - t0)
-            print(time.time() - t00)
-
+            # Evaluate NN curves at regular epochs
             if epoch % EPOCH_EVAL_FREQ == 0:
                 # Save current model states
                 print(f"Reached epoch {epoch} checkpoint, saving model states and curve values...")
@@ -170,23 +167,26 @@ def run_models(run_folder, network_folder, **kwargs):
                 for model in nn_model_list:
                     torch.save(model.state_dict(), f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pt")
 
-                # Record model curves on all train/test files for this fold]
                 train_losses = [0.0 for x in nn_model_list]
                 test_losses = [0.0 for x in nn_model_list]
 
-                # Construct dataloaders for network models
-                _, train_dataloaders = model_utils.make_all_dataloaders(dataset, train_sampler, BATCH_SIZE, NUM_WORKERS)
-                _, test_dataloaders = model_utils.make_all_dataloaders(dataset, test_sampler, BATCH_SIZE, NUM_WORKERS)
-
-                # Test all NN models on training and testing sets for this fold, across all files
-                for i, (model, train_loader, test_loader) in enumerate(zip(nn_model_list, train_dataloaders, test_dataloaders)):
+                for i, model in enumerate(nn_model_list):
                     print(f"Evaluating: {model.model_name}")
-                    labels, preds = model.evaluate(train_loader, config)
+                    if model.requires_grid:
+                        dataset.add_grid_features = True
+                    else:
+                        dataset.add_grid_features = False
+                    # Evaluate on fold train set
+                    dataset.grid = train_ngrid
+                    loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
+                    labels, preds = model.evaluate(loader, config)
                     train_losses[i] += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
-                    labels, preds = model.evaluate(test_loader, config)
+                    # Evaluate on fold test set
+                    dataset.grid = test_ngrid
+                    loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
+                    labels, preds = model.evaluate(loader, config)
                     test_losses[i] += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
 
-                # Record average train/test losses of all models across all files
                 for i, model in enumerate(nn_model_list):
                     model_fold_curves[model.model_name]['Train'].append(train_losses[i])
                     model_fold_curves[model.model_name]['Test'].append(test_losses[i])
@@ -199,14 +199,24 @@ def run_models(run_folder, network_folder, **kwargs):
             torch.save(model.state_dict(), f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pt")
 
         # Calculate performance metrics for fold
-        base_test_dataloaders, nn_test_dataloaders = model_utils.make_all_dataloaders(dataset, test_sampler, BATCH_SIZE, NUM_WORKERS)
-        for model, loader in zip(base_model_list, base_test_dataloaders):
+        dataset.grid = test_ngrid
+        for model in base_model_list:
             print(f"Evaluating: {model.model_name}")
+            if model.requires_grid:
+                    dataset.add_grid_features = True
+            else:
+                dataset.add_grid_features = False
+            loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, config)
             model_fold_results[model.model_name]["Labels"].extend(list(labels))
             model_fold_results[model.model_name]["Preds"].extend(list(preds))
-        for model, loader in zip(nn_model_list, nn_test_dataloaders):
+        for model in nn_model_list:
             print(f"Evaluating: {model.model_name}")
+            if model.requires_grid:
+                    dataset.add_grid_features = True
+            else:
+                dataset.add_grid_features = False
+            loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, config)
             model_fold_results[model.model_name]["Labels"].extend(list(labels))
             model_fold_results[model.model_name]["Preds"].extend(list(preds))

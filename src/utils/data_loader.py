@@ -9,27 +9,6 @@ from models import grids
 from utils import data_utils, shape_utils
 
 
-# class GenericDataset(Dataset):
-#     def __init__(self, content, config, grid=None, is_ngrid=None, buffer=1):
-#         self.content = content
-#         self.config = config
-#         self.grid = grid
-#         self.is_ngrid = is_ngrid
-#         self.buffer = buffer
-#     def __getitem__(self, index):
-#         sample = self.content[index]
-#         if self.grid is not None:
-#             # Handles normalization, and selection of the specific buffered t/x/y bins
-#             if self.is_ngrid:
-#                 grid_features = grids.extract_ngrid_features(self.grid, sample['tbin_idx'], sample['xbin_idx'], sample['ybin_idx'], self.config, self.buffer)
-#             else:
-#                 grid_features = grids.extract_grid_features(self.grid, sample['tbin_idx'], sample['xbin_idx'], sample['ybin_idx'], self.config, self.buffer)
-#             sample['grid_features'] = grid_features
-#         sample = apply_normalization(sample.copy(), self.config)
-#         return sample
-#     def __len__(self):
-#         return len(self.content)
-
 class GenericDataset(Dataset):
     def __init__(self, file_path, config, grid=None, subset=None, holdout_routes=None, keep_only_holdout=False, add_grid_features=False):
         self.file_path = file_path
@@ -104,6 +83,8 @@ def apply_grid_normalization(grid_features, config):
     grid_features[:,3,:,:,:] = data_utils.normalize(grid_features[:,3,:,:,:], config[f"speed_m_s_mean"], config[f"speed_m_s_std"])
     grid_features[:,4,:,:,:] = data_utils.normalize(grid_features[:,4,:,:,:], config[f"bearing_mean"], config[f"bearing_std"])
     grid_features[:,-1,:,:,:] = data_utils.normalize(grid_features[:,-1,:,:,:], obs_mean, obs_std)
+    # Only return the features we are interested in
+    grid_features = grid_features[:,3:,:,:,:]
     return grid_features
 
 def basic_collate(batch):
@@ -159,7 +140,6 @@ def basic_grid_collate(batch):
     X_ct[:,10] = [torch.mean(torch.tensor(x['bearing'])) for x in batch]
     X_ct[:,11] = [torch.tensor(x['dist']) for x in batch]
     # Grid features
-    X_gr = np.zeros((len(batch), 8, 3, 3))
     X_gr = np.array([np.mean(np.concatenate([np.expand_dims(x, 0) for x in batch[i]['grid_features']]), axis=0) for i in range(len(batch))])
     # Target feature
     y = torch.from_numpy(np.array([x['time'] for x in batch]))
