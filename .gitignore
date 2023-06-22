@@ -13,6 +13,7 @@ current_scraping_files.zip
 /src/scraped_data/*
 profile.prof
 trace.json
+/src/models/deeptte
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
