@@ -82,7 +82,7 @@ class NGridBetter:
         num_cells = len(x_idx)
         cell_points = np.empty((num_cells, n_points, 6))
         cell_points.fill(np.nan)
-        for i, (x, y, time) in enumerate(zip(x_idx, y_idx, locationtime)):
+        for i, (x, y, t) in enumerate(zip(x_idx, y_idx, locationtime)):
             # Get lookup values for every pt/cell
             cell = self.cell_lookup[(x,y)]
             if cell.size==0:
