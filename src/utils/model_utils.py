@@ -3,10 +3,11 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 
 from models import ff, rnn, transformer
+from models.deeptte import DeepTTE
 from utils import data_utils, data_loader
 
 
-def train(model, dataloader, optimizer, LEARN_RATE):
+def train(model, dataloader, optimizer):
     # Use gradients while training
     model.train()
     running_tloss = 0.0
@@ -62,69 +63,69 @@ def set_feature_extraction(model, feature_extraction=True):
         for param in model.feature_extract_activation.parameters():
             param.requires_grad = True
 
-def make_all_models(hidden_size, batch_size, embed_dict, device):
+def make_all_models(hidden_size, batch_size, embed_dict, device, config):
     # Declare neural network models
     nn_model_list = []
-    nn_model_list.append(ff.FF(
-        "FF",
-        n_features=12,
-        hidden_size=hidden_size,
-        batch_size=batch_size,
-        embed_dict=embed_dict,
-        collate_fn=data_loader.basic_collate,
-        device=device
-    ).to(device))
-    nn_model_list.append(ff.FF_GRID(
-        "FF_NGRID_IND",
-        n_features=12,
-        n_grid_features=3*3*5*5,
-        hidden_size=hidden_size,
-        grid_compression_size=8,
-        batch_size=batch_size,
-        embed_dict=embed_dict,
-        collate_fn=data_loader.basic_grid_collate,
-        device=device
-    ).to(device))
-    nn_model_list.append(rnn.GRU(
-        "GRU",
-        n_features=10,
-        hidden_size=hidden_size,
-        batch_size=batch_size,
-        embed_dict=embed_dict,
-        collate_fn=data_loader.sequential_collate,
-        device=device
-    ).to(device))
-    nn_model_list.append(rnn.GRU_GRID(
-        "GRU_NGRID_IND",
-        n_features=10,
-        n_grid_features=3*3*5*5,
-        hidden_size=hidden_size,
-        grid_compression_size=8,
-        batch_size=batch_size,
-        embed_dict=embed_dict,
-        collate_fn=data_loader.sequential_grid_collate,
-        device=device
-    ).to(device))
-    nn_model_list.append(transformer.TRSF(
-        "TRSF",
-        n_features=10,
-        hidden_size=hidden_size,
-        batch_size=batch_size,
-        embed_dict=embed_dict,
-        collate_fn=data_loader.sequential_collate,
-        device=device
-    ).to(device))
-    nn_model_list.append(transformer.TRSF_GRID(
-        "TRSF_NGRID_IND",
-        n_features=10,
-        n_grid_features=3*3*5*5,
-        hidden_size=hidden_size,
-        grid_compression_size=8,
-        batch_size=batch_size,
-        embed_dict=embed_dict,
-        collate_fn=data_loader.sequential_grid_collate,
-        device=device
-    ).to(device))
+    # nn_model_list.append(ff.FF(
+    #     "FF",
+    #     n_features=12,
+    #     hidden_size=hidden_size,
+    #     batch_size=batch_size,
+    #     embed_dict=embed_dict,
+    #     collate_fn=data_loader.basic_collate,
+    #     device=device
+    # ).to(device))
+    # nn_model_list.append(ff.FF_GRID(
+    #     "FF_NGRID_IND",
+    #     n_features=12,
+    #     n_grid_features=3*3*5*5,
+    #     hidden_size=hidden_size,
+    #     grid_compression_size=8,
+    #     batch_size=batch_size,
+    #     embed_dict=embed_dict,
+    #     collate_fn=data_loader.basic_grid_collate,
+    #     device=device
+    # ).to(device))
+    # nn_model_list.append(rnn.GRU(
+    #     "GRU",
+    #     n_features=10,
+    #     hidden_size=hidden_size,
+    #     batch_size=batch_size,
+    #     embed_dict=embed_dict,
+    #     collate_fn=data_loader.sequential_collate,
+    #     device=device
+    # ).to(device))
+    # nn_model_list.append(rnn.GRU_GRID(
+    #     "GRU_NGRID_IND",
+    #     n_features=10,
+    #     n_grid_features=3*3*5*5,
+    #     hidden_size=hidden_size,
+    #     grid_compression_size=8,
+    #     batch_size=batch_size,
+    #     embed_dict=embed_dict,
+    #     collate_fn=data_loader.sequential_grid_collate,
+    #     device=device
+    # ).to(device))
+    # nn_model_list.append(transformer.TRSF(
+    #     "TRSF",
+    #     n_features=10,
+    #     hidden_size=hidden_size,
+    #     batch_size=batch_size,
+    #     embed_dict=embed_dict,
+    #     collate_fn=data_loader.sequential_collate,
+    #     device=device
+    # ).to(device))
+    # nn_model_list.append(transformer.TRSF_GRID(
+    #     "TRSF_NGRID_IND",
+    #     n_features=10,
+    #     n_grid_features=3*3*5*5,
+    #     hidden_size=hidden_size,
+    #     grid_compression_size=8,
+    #     batch_size=batch_size,
+    #     embed_dict=embed_dict,
+    #     collate_fn=data_loader.sequential_grid_collate,
+    #     device=device
+    # ).to(device))
     # nn_model_list.append(transformer.TRSF_GRID_ATTN(
     #     "TRSF_NGRID_CRS",
     #     n_features=10,
@@ -137,6 +138,12 @@ def make_all_models(hidden_size, batch_size, embed_dict, device):
     #     collate_fn=data_loader.sequential_grid_collate,
     #     device=device
     # ).to(device))
+    nn_model_list.append(DeepTTE.Net(
+        "DEEP_TTE",
+        collate_fn=data_loader.deeptte_collate,
+        device=device,
+        config=config
+    ).to(device))
     return nn_model_list
 
 # def make_all_dataloaders(dataset, sampler, batch_size, num_workers):

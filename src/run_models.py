@@ -2,20 +2,18 @@
 
 
 import gc
-import itertools
 import json
-import os
 import random
 import time
 
 import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader,TensorDataset,random_split,SubsetRandomSampler, ConcatDataset
+from torch.utils.data import DataLoader, SubsetRandomSampler
 from sklearn import metrics
 from sklearn.model_selection import KFold
 from tabulate import tabulate
 
-from models import avg_speed, conv, ff, grids, persistent, rnn, schedule, transformer
+from models import avg_speed, grids, persistent, schedule
 from utils import data_loader, data_utils, model_utils
 
 from torch.profiler import profile, record_function, ProfilerActivity
@@ -57,7 +55,7 @@ def run_models(run_folder, network_folder, **kwargs):
     BATCH_SIZE = kwargs['BATCH_SIZE']
     LEARN_RATE = kwargs['LEARN_RATE']
     HIDDEN_SIZE = kwargs['HIDDEN_SIZE']
-    EPOCH_EVAL_FREQ = 5
+    EPOCH_EVAL_FREQ = 10
 
     # Define embedded variables for network models
     embed_dict = {
@@ -96,7 +94,7 @@ def run_models(run_folder, network_folder, **kwargs):
         base_model_list.append(persistent.PersistentTimeSeqModel("PER_TIM"))
 
         # Declare neural network models
-        nn_model_list = model_utils.make_all_models(HIDDEN_SIZE, BATCH_SIZE, embed_dict, device)
+        nn_model_list = model_utils.make_all_models(HIDDEN_SIZE, BATCH_SIZE, embed_dict, device, config)
         nn_optimizer_list = [torch.optim.Adam(model.parameters(), lr=LEARN_RATE) for model in nn_model_list]
         print(f"Model names: {[m.model_name for m in nn_model_list]}")
         print(f"Model total parameters: {[sum(p.numel() for p in m.parameters()) for m in nn_model_list]}")
@@ -122,16 +120,18 @@ def run_models(run_folder, network_folder, **kwargs):
                 "Test":[]
             }
 
-        # Build grid using only data from this fold
-        train_ngrid = grids.NGridBetter(config['grid_bounds'], kwargs['grid_s_size'])
-        train_ngrid.add_grid_content(data_utils.map_from_deeptte([x for i,x in enumerate(dataset.content) if i in train_idx],["locationtime","x","y","speed_m_s","bearing"]))
-        train_ngrid.build_cell_lookup()
-        test_ngrid = grids.NGridBetter(config['grid_bounds'], kwargs['grid_s_size'])
-        test_ngrid.add_grid_content(data_utils.map_from_deeptte([x for i,x in enumerate(dataset.content) if i in test_idx],["locationtime","x","y","speed_m_s","bearing"]))
-        test_ngrid.build_cell_lookup()
-
         # If we just enumerate the dataset how many points are there?
-        print(sum([len(x['lngs']) for x in dataset.content]))
+        print(f"{sum([len(x['lngs']) for x in dataset.content])} points in dataset, {len(dataset.content)} samples")
+
+        # Build grid using only data from this fold
+        print(f"Building grid on fold training data")
+        train_ngrid = grids.NGridBetter(config['grid_bounds'], kwargs['grid_s_size'])
+        # train_ngrid.add_grid_content(data_utils.map_from_deeptte([x for i,x in enumerate(dataset.content) if i in train_idx],["locationtime","x","y","speed_m_s","bearing"]))
+        # train_ngrid.build_cell_lookup()
+        print(f"Building grid on fold testing data")
+        test_ngrid = grids.NGridBetter(config['grid_bounds'], kwargs['grid_s_size'])
+        # test_ngrid.add_grid_content(data_utils.map_from_deeptte([x for i,x in enumerate(dataset.content) if i in test_idx],["locationtime","x","y","speed_m_s","bearing"]))
+        # test_ngrid.build_cell_lookup()
 
         # Train all models
         for epoch in range(EPOCHS):
@@ -149,7 +149,7 @@ def run_models(run_folder, network_folder, **kwargs):
                 dataset.add_grid_features = model.requires_grid
                 loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
                 t0 = time.time()
-                avg_batch_loss = model_utils.train(model, loader, optimizer, LEARN_RATE)
+                avg_batch_loss = model_utils.train(model, loader, optimizer)
                 model.train_time += (time.time() - t0)
 
             # Evaluate NN curves at regular epochs
@@ -165,14 +165,15 @@ def run_models(run_folder, network_folder, **kwargs):
                 test_losses = [0.0 for x in nn_model_list]
 
                 for i, model in enumerate(nn_model_list):
-                    print(f"Evaluating: {model.model_name}")
                     dataset.add_grid_features = model.requires_grid
                     # Evaluate on fold train set
+                    print(f"Evaluating: {model.model_name} on fold train data")
                     dataset.grid = train_ngrid
                     loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
                     labels, preds = model.evaluate(loader, config)
                     train_losses[i] += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
                     # Evaluate on fold test set
+                    print(f"Evaluating: {model.model_name} on fold test data")
                     dataset.grid = test_ngrid
                     loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
                     labels, preds = model.evaluate(loader, config)
@@ -231,11 +232,6 @@ def run_models(run_folder, network_folder, **kwargs):
         # Save temp run results after each fold
         data_utils.write_pkl(run_results, f"{run_folder}{network_folder}model_results_temp.pkl")
 
-        # Clean memory at end of each fold
-        gc.collect()
-        if device==torch.device("cuda"):
-            torch.cuda.empty_cache()
-
     # Save run results
     data_utils.write_pkl(run_results, f"{run_folder}{network_folder}model_results.pkl")
     print(f"MODEL RUN COMPLETED '{run_folder}{network_folder}'")
@@ -246,34 +242,34 @@ def run_models(run_folder, network_folder, **kwargs):
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
 
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/debug/",
-        network_folder="kcm/",
-        EPOCHS=30,
-        BATCH_SIZE=512,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
-        grid_s_size=500,
-        n_folds=5,
-        holdout_routes=[100252,100139,102581,100341,102720]
-    )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/debug/",
-        network_folder="atb/",
-        EPOCHS=30,
-        BATCH_SIZE=512,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
-        grid_s_size=500,
-        n_folds=5,
-        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
-    )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/debug/",
+    #     network_folder="kcm/",
+    #     EPOCHS=30,
+    #     BATCH_SIZE=512,
+    #     LEARN_RATE=1e-3,
+    #     HIDDEN_SIZE=32,
+    #     grid_s_size=500,
+    #     n_folds=5,
+    #     holdout_routes=[100252,100139,102581,100341,102720]
+    # )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/debug/",
+    #     network_folder="atb/",
+    #     EPOCHS=30,
+    #     BATCH_SIZE=512,
+    #     LEARN_RATE=1e-3,
+    #     HIDDEN_SIZE=32,
+    #     grid_s_size=500,
+    #     n_folds=5,
+    #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
+    # )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)

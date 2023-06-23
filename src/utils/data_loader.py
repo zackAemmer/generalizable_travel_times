@@ -216,3 +216,25 @@ def sequential_grid_collate(batch):
     X_gr = X_gr[sorted_indices,:,:].float()
     y = y[sorted_indices,:].float()
     return [X_em, X_ct, X_gr, sorted_slens], y
+
+def deeptte_collate(data):
+    stat_attrs = ['dist', 'time']
+    info_attrs = ['weekID', 'timeID']
+    traj_attrs = ['lngs', 'lats', 'time_gap', 'dist_gap']
+    traj_attrs = ['lngs','lats','time_gap','dist_gap','bearing','scheduled_time_s','stop_dist_km','stop_x_cent','stop_y_cent','passed_stops_n']
+    attr, traj = {}, {}
+    lens = np.asarray([len(item['lngs']) for item in data])
+    for key in stat_attrs:
+        attr[key] = torch.FloatTensor([item[key] for item in data])
+    for key in info_attrs:
+        attr[key] = torch.LongTensor([item[key] for item in data])
+    for key in traj_attrs:
+        seqs = np.asarray([item[key] for item in data], dtype=object)
+        mask = np.arange(lens.max()) < lens[:, None]
+        padded = np.zeros(mask.shape, dtype = np.float32)
+        padded[mask] = np.concatenate(seqs)
+        padded = torch.from_numpy(padded).float()
+        traj[key] = padded
+    lens = lens.tolist()
+    traj['lens'] = lens
+    return [attr, traj]
