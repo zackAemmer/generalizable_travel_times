@@ -35,14 +35,13 @@ class NGridBetter:
         else:
             self.points = np.concatenate((self.points, data), axis=0)
     def build_cell_lookup(self):
-        # Sort on time from low to high; no longer continuous shingles
+        # Sort on time from high to low; no longer continuous shingles
         self.points = self.points[np.argsort(self.points[:,0]),:]
         point_xbins, point_ybins = self.digitize_points(self.points[:,1], self.points[:,2])
         # Build lookup table for grid cells to sorted point lists
         for x in range(len(self.xbins)+1):
             for y in range(len(self.ybins)+1):
-                cell_points = self.points[(point_xbins==x) & (point_ybins==y)]
-                self.cell_lookup[x,y] = cell_points
+                self.cell_lookup[x,y] = self.points[(point_xbins==x) & (point_ybins==y)]
     def get_grid_features(self, x_idxs, y_idxs, locationtimes, n_points=3, buffer=2):
         seq_len = len(x_idxs)
         grid_size = (2 * buffer) + 1
@@ -88,8 +87,10 @@ class NGridBetter:
             cell = self.cell_lookup[(x,y)]
             if cell.size==0:
                 continue
-            # Get only values that occurred after the pt locationtime
-            points = cell[cell[:,0] < time][-n_points:][::-1]
+            else:
+                # Get only values that occurred after the pt locationtime
+                idx = np.searchsorted(cell[:,0],t)
+                points = cell[:idx,:][-n_points:][::-1]
             cell_points[i,:points.shape[0],:5] = points
         # Add obs_age feature
         cell_points[:,:,-1] = np.repeat(np.expand_dims(np.array(locationtime),1),n_points,1) - cell_points[:,:,0]
