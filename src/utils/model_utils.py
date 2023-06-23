@@ -36,6 +36,9 @@ def predict(model, dataloader, sequential_flag=False):
         num_batches = len(dataloader)
         for vdata in dataloader:
             vlabels, vpreds, loss = model.batch_step(vdata)
+            # Handle batch of 1
+            if vpreds.dim()==0:
+                vpreds = torch.unsqueeze(vpreds, 0)
             # Accumulate batch loss
             running_vloss += loss.item()
             # Save predictions and labels
@@ -66,66 +69,66 @@ def set_feature_extraction(model, feature_extraction=True):
 def make_all_models(hidden_size, batch_size, embed_dict, device, config):
     # Declare neural network models
     nn_model_list = []
-    # nn_model_list.append(ff.FF(
-    #     "FF",
-    #     n_features=12,
-    #     hidden_size=hidden_size,
-    #     batch_size=batch_size,
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.basic_collate,
-    #     device=device
-    # ).to(device))
-    # nn_model_list.append(ff.FF_GRID(
-    #     "FF_NGRID_IND",
-    #     n_features=12,
-    #     n_grid_features=3*3*5*5,
-    #     hidden_size=hidden_size,
-    #     grid_compression_size=8,
-    #     batch_size=batch_size,
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.basic_grid_collate,
-    #     device=device
-    # ).to(device))
-    # nn_model_list.append(rnn.GRU(
-    #     "GRU",
-    #     n_features=10,
-    #     hidden_size=hidden_size,
-    #     batch_size=batch_size,
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.sequential_collate,
-    #     device=device
-    # ).to(device))
-    # nn_model_list.append(rnn.GRU_GRID(
-    #     "GRU_NGRID_IND",
-    #     n_features=10,
-    #     n_grid_features=3*3*5*5,
-    #     hidden_size=hidden_size,
-    #     grid_compression_size=8,
-    #     batch_size=batch_size,
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.sequential_grid_collate,
-    #     device=device
-    # ).to(device))
-    # nn_model_list.append(transformer.TRSF(
-    #     "TRSF",
-    #     n_features=10,
-    #     hidden_size=hidden_size,
-    #     batch_size=batch_size,
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.sequential_collate,
-    #     device=device
-    # ).to(device))
-    # nn_model_list.append(transformer.TRSF_GRID(
-    #     "TRSF_NGRID_IND",
-    #     n_features=10,
-    #     n_grid_features=3*3*5*5,
-    #     hidden_size=hidden_size,
-    #     grid_compression_size=8,
-    #     batch_size=batch_size,
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.sequential_grid_collate,
-    #     device=device
-    # ).to(device))
+    nn_model_list.append(ff.FF(
+        "FF",
+        n_features=12,
+        hidden_size=hidden_size,
+        batch_size=batch_size,
+        embed_dict=embed_dict,
+        collate_fn=data_loader.basic_collate,
+        device=device
+    ).to(device))
+    nn_model_list.append(ff.FF_GRID(
+        "FF_NGRID_IND",
+        n_features=12,
+        n_grid_features=3*3*5*5,
+        hidden_size=hidden_size,
+        grid_compression_size=8,
+        batch_size=batch_size,
+        embed_dict=embed_dict,
+        collate_fn=data_loader.basic_grid_collate,
+        device=device
+    ).to(device))
+    nn_model_list.append(rnn.GRU(
+        "GRU",
+        n_features=10,
+        hidden_size=hidden_size,
+        batch_size=batch_size,
+        embed_dict=embed_dict,
+        collate_fn=data_loader.sequential_collate,
+        device=device
+    ).to(device))
+    nn_model_list.append(rnn.GRU_GRID(
+        "GRU_NGRID_IND",
+        n_features=10,
+        n_grid_features=3*3*5*5,
+        hidden_size=hidden_size,
+        grid_compression_size=8,
+        batch_size=batch_size,
+        embed_dict=embed_dict,
+        collate_fn=data_loader.sequential_grid_collate,
+        device=device
+    ).to(device))
+    nn_model_list.append(transformer.TRSF(
+        "TRSF",
+        n_features=10,
+        hidden_size=hidden_size,
+        batch_size=batch_size,
+        embed_dict=embed_dict,
+        collate_fn=data_loader.sequential_collate,
+        device=device
+    ).to(device))
+    nn_model_list.append(transformer.TRSF_GRID(
+        "TRSF_NGRID_IND",
+        n_features=10,
+        n_grid_features=3*3*5*5,
+        hidden_size=hidden_size,
+        grid_compression_size=8,
+        batch_size=batch_size,
+        embed_dict=embed_dict,
+        collate_fn=data_loader.sequential_grid_collate,
+        device=device
+    ).to(device))
     # nn_model_list.append(transformer.TRSF_GRID_ATTN(
     #     "TRSF_NGRID_CRS",
     #     n_features=10,
@@ -145,20 +148,3 @@ def make_all_models(hidden_size, batch_size, embed_dict, device, config):
         config=config
     ).to(device))
     return nn_model_list
-
-# def make_all_dataloaders(dataset, sampler, batch_size, num_workers):
-#     if num_workers > 0:
-#         pin_memory=True
-#     else:
-#         pin_memory=False
-#     base_dataloaders = []
-#     # Construct base datalaoders
-#     base_dataloaders.append(DataLoader(dataset, sampler=sampler, collate_fn=data_loader.basic_collate, batch_size=batch_size, pin_memory=pin_memory, num_workers=num_workers))
-#     base_dataloaders.append(DataLoader(dataset, sampler=sampler, collate_fn=data_loader.basic_collate, batch_size=batch_size, pin_memory=pin_memory, num_workers=num_workers))
-#     base_dataloaders.append(DataLoader(dataset, sampler=sampler, collate_fn=data_loader.sequential_collate, batch_size=batch_size, pin_memory=pin_memory, num_workers=num_workers))
-#     # Construct nn dataloaders
-#     nn_dataloaders = []
-#     nn_dataloaders.append(DataLoader(dataset, sampler=sampler, collate_fn=data_loader.basic_collate, batch_size=batch_size, pin_memory=pin_memory, num_workers=num_workers))
-#     nn_dataloaders.append(DataLoader(dataset, sampler=sampler, collate_fn=data_loader.sequential_collate, batch_size=batch_size, pin_memory=pin_memory, num_workers=num_workers))
-#     nn_dataloaders.append(DataLoader(dataset, sampler=sampler, collate_fn=data_loader.sequential_collate, batch_size=batch_size, pin_memory=pin_memory, num_workers=num_workers))
-#     return base_dataloaders, nn_dataloaders

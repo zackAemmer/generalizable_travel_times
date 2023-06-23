@@ -126,12 +126,12 @@ def run_models(run_folder, network_folder, **kwargs):
         # Build grid using only data from this fold
         print(f"Building grid on fold training data")
         train_ngrid = grids.NGridBetter(config['grid_bounds'], kwargs['grid_s_size'])
-        # train_ngrid.add_grid_content(data_utils.map_from_deeptte([x for i,x in enumerate(dataset.content) if i in train_idx],["locationtime","x","y","speed_m_s","bearing"]))
-        # train_ngrid.build_cell_lookup()
+        train_ngrid.add_grid_content(data_utils.map_from_deeptte([x for i,x in enumerate(dataset.content) if i in train_idx],["locationtime","x","y","speed_m_s","bearing"]))
+        train_ngrid.build_cell_lookup()
         print(f"Building grid on fold testing data")
         test_ngrid = grids.NGridBetter(config['grid_bounds'], kwargs['grid_s_size'])
-        # test_ngrid.add_grid_content(data_utils.map_from_deeptte([x for i,x in enumerate(dataset.content) if i in test_idx],["locationtime","x","y","speed_m_s","bearing"]))
-        # test_ngrid.build_cell_lookup()
+        test_ngrid.add_grid_content(data_utils.map_from_deeptte([x for i,x in enumerate(dataset.content) if i in test_idx],["locationtime","x","y","speed_m_s","bearing"]))
+        test_ngrid.build_cell_lookup()
 
         # Train all models
         for epoch in range(EPOCHS):
@@ -242,11 +242,39 @@ def run_models(run_folder, network_folder, **kwargs):
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
 
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_models(
+        run_folder="./results/debug/",
+        network_folder="kcm/",
+        EPOCHS=20,
+        BATCH_SIZE=512,
+        LEARN_RATE=1e-3,
+        HIDDEN_SIZE=32,
+        grid_s_size=500,
+        n_folds=3,
+        holdout_routes=[100252,100139,102581,100341,102720]
+    )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_models(
+        run_folder="./results/debug/",
+        network_folder="atb/",
+        EPOCHS=20,
+        BATCH_SIZE=512,
+        LEARN_RATE=1e-3,
+        HIDDEN_SIZE=32,
+        grid_s_size=500,
+        n_folds=3,
+        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
+    )
     # random.seed(0)
     # np.random.seed(0)
     # torch.manual_seed(0)
     # run_models(
-    #     run_folder="./results/debug/",
+    #     run_folder="./results/small/",
     #     network_folder="kcm/",
     #     EPOCHS=30,
     #     BATCH_SIZE=512,
@@ -260,7 +288,7 @@ if __name__=="__main__":
     # np.random.seed(0)
     # torch.manual_seed(0)
     # run_models(
-    #     run_folder="./results/debug/",
+    #     run_folder="./results/small/",
     #     network_folder="atb/",
     #     EPOCHS=30,
     #     BATCH_SIZE=512,
@@ -270,31 +298,3 @@ if __name__=="__main__":
     #     n_folds=5,
     #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
     # )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/small/",
-        network_folder="kcm/",
-        EPOCHS=30,
-        BATCH_SIZE=512,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
-        grid_s_size=500,
-        n_folds=5,
-        holdout_routes=[100252,100139,102581,100341,102720]
-    )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/small/",
-        network_folder="atb/",
-        EPOCHS=30,
-        BATCH_SIZE=512,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
-        grid_s_size=500,
-        n_folds=5,
-        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
-    )
