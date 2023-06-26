@@ -21,7 +21,8 @@ class EntireEstimator(nn.Module):
             self.residuals.append(nn.Linear(hidden_size, hidden_size))
 
         ### Final fully connected layer to output the Collective TTE value
-        self.hid2out = nn.Linear(hidden_size, 1)
+        # Previously named hid2out; renamed for fine-tuning purposes
+        self.feature_extraction = nn.Linear(hidden_size, 1)
 
     def forward(self, attr_t, sptm_t):
         inputs = torch.cat((attr_t, sptm_t), dim = 1)   ### size [batch, 128 + 28 = 156]
@@ -34,7 +35,7 @@ class EntireEstimator(nn.Module):
             residual = F.leaky_relu(self.residuals[i](hidden))
             hidden = hidden + residual
 
-        out = self.hid2out(hidden)   ### size [batch, 1]: final Collective TTE value
+        out = self.feature_extraction(hidden)   ### size [batch, 1]: final Collective TTE value
 
         return out
 
@@ -57,14 +58,15 @@ class LocalEstimator(nn.Module):
 
         self.input2hid = nn.Linear(input_size, 64)
         self.hid2hid = nn.Linear(64, 32)
-        self.hid2out = nn.Linear(32, 1)
+        # Previously hid2out, renamed for fine tuning
+        self.feature_extract = nn.Linear(32, 1)
 
     def forward(self, sptm_s):
         hidden = F.leaky_relu(self.input2hid(sptm_s))   ### size [variable, 64]
 
         hidden = F.leaky_relu(self.hid2hid(hidden))   ### size [variable, 32]
 
-        out = self.hid2out(hidden)   ### size [variable, 1]
+        out = self.feature_extract(hidden)   ### size [variable, 1]
 
         return out
 
