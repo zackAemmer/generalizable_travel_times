@@ -92,6 +92,7 @@ class Net(nn.Module):
         self.model_name = model_name
         self.collate_fn = collate_fn
         self.device = device
+        self.is_nn = True
         self.requires_grid = False
         self.config = config
         self.train_time = 0.0

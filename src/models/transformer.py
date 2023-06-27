@@ -18,6 +18,7 @@ class TRSF(nn.Module):
         self.collate_fn = collate_fn
         self.embed_dict = embed_dict
         self.device = device
+        self.is_nn = True
         self.requires_grid = False
         self.train_time = 0.0
         self.loss_fn = masked_loss.MaskedHuberLoss()
@@ -79,6 +80,7 @@ class TRSF_GRID(nn.Module):
         self.collate_fn = collate_fn
         self.embed_dict = embed_dict
         self.device = device
+        self.is_nn = True
         self.requires_grid = True
         self.train_time = 0.0
         self.loss_fn = masked_loss.MaskedHuberLoss()
@@ -153,6 +155,7 @@ class TRSF_GRID_ATTN(nn.Module):
         self.collate_fn = collate_fn
         self.embed_dict = embed_dict
         self.device = device
+        self.is_nn = True
         self.requires_grid = True
         self.train_time = 0.0
         self.loss_fn = masked_loss.MaskedHuberLoss()

@@ -9,6 +9,7 @@ class TimeTableModel:
         self.requires_grid = False
         self.collate_fn = data_loader.basic_collate
         self.train_time = 0.0
+        self.is_nn = False
     def train(self, dataloader, config):
         return None
     def evaluate(self, dataloader, config):

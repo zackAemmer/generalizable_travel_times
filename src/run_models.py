@@ -31,7 +31,7 @@ def run_models(run_folder, network_folder, **kwargs):
     These are then analyzed in a jupyter notebook.
     """
 
-    # with profile(activities=[ProfilerActivity.CPU]) as prof:
+    # with profile(activities=[ProfilerActivity.CPU], with_flops=True) as prof:
     #     with record_function("train_models"):
 
     print("="*30)
@@ -87,23 +87,11 @@ def run_models(run_folder, network_folder, **kwargs):
         train_sampler = SubsetRandomSampler(train_idx)
         test_sampler = SubsetRandomSampler(test_idx)
 
-        # Declare baseline models
-        base_model_list = []
-        base_model_list.append(avg_speed.AvgHourlySpeedModel("AVG"))
-        base_model_list.append(schedule.TimeTableModel("SCH"))
-        base_model_list.append(persistent.PersistentTimeSeqModel("PER_TIM"))
-
-        # Declare neural network models
-        nn_model_list = model_utils.make_all_models(HIDDEN_SIZE, BATCH_SIZE, embed_dict, device, config)
-        nn_optimizer_list = [torch.optim.Adam(model.parameters(), lr=LEARN_RATE) for model in nn_model_list]
-        print(f"Model names: {[m.model_name for m in nn_model_list]}")
-        print(f"Model total parameters: {[sum(p.numel() for p in m.parameters()) for m in nn_model_list]}")
-
-        # Summarize models in run
-        model_names = [x.model_name for x in base_model_list]
-        model_names.extend([x.model_name for x in nn_model_list])
+        # Declare models
+        model_list = model_utils.make_all_models(HIDDEN_SIZE, BATCH_SIZE, embed_dict, device, config)
+        model_names = [m.model_name for m in model_list]
         print(f"Model names: {model_names}")
-        print(f"NN model total parameters: {[sum(p.numel() for p in m.parameters()) for m in nn_model_list]}")
+        print(f"Model total parameters: {[sum(p.numel() for p in m.parameters()) for m in model_list if m.is_nn]}")
 
         # Keep track of all model performances
         model_fold_results = {}
@@ -114,13 +102,13 @@ def run_models(run_folder, network_folder, **kwargs):
             }
         # Keep track of train/test curves during training for network models
         model_fold_curves = {}
-        for x in nn_model_list:
-            model_fold_curves[x.model_name] = {
-                "Train":[],
-                "Test":[]
-            }
+        for x in model_list:
+            if x.is_nn:
+                model_fold_curves[x.model_name] = {
+                    "Train":[],
+                    "Test":[]
+                }
 
-        # If we just enumerate the dataset how many points are there?
         print(f"{sum([len(x['lngs']) for x in dataset.content])} points in dataset, {len(dataset.content)} samples")
 
         # Build grid using only data from this fold
@@ -134,83 +122,56 @@ def run_models(run_folder, network_folder, **kwargs):
         test_ngrid.build_cell_lookup()
 
         # Train all models
-        for epoch in range(EPOCHS):
-            print(f"FOLD: {fold_num}, EPOCH: {epoch}")
-            dataset.grid = train_ngrid
-            for model in base_model_list:
-                print(f"Training: {model.model_name}")
-                dataset.add_grid_features = model.requires_grid
-                loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
-                t0 = time.time()
+        for model in model_list:
+            print(f"Training: {model.model_name} on fold train data")
+            dataset.add_grid_features = model.requires_grid
+            loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
+            if not model.is_nn:
                 model.train(loader, config)
-                model.train_time += (time.time() - t0)
-            for model, optimizer in zip(nn_model_list, nn_optimizer_list):
-                print(f"Training: {model.model_name}")
-                dataset.add_grid_features = model.requires_grid
-                loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
-                t0 = time.time()
-                avg_batch_loss = model_utils.train(model, loader, optimizer)
-                model.train_time += (time.time() - t0)
+            else:
+                optimizer = torch.optim.Adam(model.parameters(), lr=LEARN_RATE)
+                for epoch in range(EPOCHS):
+                    print(f"NETWORK: {network_folder}, FOLD: {fold_num}, EPOCH: {epoch}, MODEL: {model.model_name}")
+                    t0 = time.time()
+                    avg_batch_loss = model_utils.train(model, loader, optimizer)
+                    model.train_time += (time.time() - t0)
 
-            # Evaluate NN curves at regular epochs
-            if epoch % EPOCH_EVAL_FREQ == 0:
-                # Save current model states
-                print(f"Reached epoch {epoch} checkpoint, saving model states and curve values...")
-                for model in base_model_list:
-                    model.save_to(f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pkl")
-                for model in nn_model_list:
-                    torch.save(model.state_dict(), f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pt")
-
-                train_losses = [0.0 for x in nn_model_list]
-                test_losses = [0.0 for x in nn_model_list]
-
-                for i, model in enumerate(nn_model_list):
-                    dataset.add_grid_features = model.requires_grid
-                    # Evaluate on fold train set
-                    print(f"Evaluating: {model.model_name} on fold train data")
-                    dataset.grid = train_ngrid
-                    loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
-                    labels, preds = model.evaluate(loader, config)
-                    train_losses[i] += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
-                    # Evaluate on fold test set
-                    print(f"Evaluating: {model.model_name} on fold test data")
-                    dataset.grid = test_ngrid
-                    loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
-                    labels, preds = model.evaluate(loader, config)
-                    test_losses[i] += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
-
-                for i, model in enumerate(nn_model_list):
-                    model_fold_curves[model.model_name]['Train'].append(train_losses[i])
-                    model_fold_curves[model.model_name]['Test'].append(test_losses[i])
+                    # Evaluate NN curves at regular epochs
+                    if epoch % EPOCH_EVAL_FREQ == 0 and model.is_nn:
+                        print(f"Evaluating: {model.model_name} on fold train data")
+                        train_losses = 0.0
+                        dataset.grid = train_ngrid
+                        loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
+                        labels, preds = model.evaluate(loader, config)
+                        train_losses += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+                        model_fold_curves[model.model_name]['Train'].append(train_losses)
+                        print(f"Evaluating: {model.model_name} on fold test data")
+                        test_losses = 0.0
+                        dataset.grid = test_ngrid
+                        loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
+                        labels, preds = model.evaluate(loader, config)
+                        test_losses += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
+                        model_fold_curves[model.model_name]['Test'].append(test_losses)
 
         # Save final fold models
         print(f"Fold {fold_num} training complete, saving model states and metrics...")
-        for model in base_model_list:
-            model.save_to(f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pkl")
-        for model in nn_model_list:
-            torch.save(model.state_dict(), f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pt")
+        for model in model_list:
+            if model.is_nn:
+                torch.save(model.state_dict(), f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pt")
+            else:
+                model.save_to(f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pkl")
 
         # Calculate performance metrics for fold
         dataset.grid = test_ngrid
-        for model in base_model_list:
-            print(f"Evaluating: {model.model_name}")
-            dataset.add_grid_features = model.requires_grid
-            loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
-            labels, preds = model.evaluate(loader, config)
-            model_fold_results[model.model_name]["Labels"].extend(list(labels))
-            model_fold_results[model.model_name]["Preds"].extend(list(preds))
-        for model in nn_model_list:
-            print(f"Evaluating: {model.model_name}")
+        for model in model_list:
+            print(f"Fold final evaluation for: {model.model_name}")
             dataset.add_grid_features = model.requires_grid
             loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, config)
             model_fold_results[model.model_name]["Labels"].extend(list(labels))
             model_fold_results[model.model_name]["Preds"].extend(list(preds))
         # Calculate various losses:
-        model_names = [x.model_name for x in base_model_list]
-        model_names.extend([x.model_name for x in nn_model_list])
-        train_times = [x.train_time for x in base_model_list]
-        train_times.extend([x.train_time for x in nn_model_list])
+        train_times = [x.train_time for x in model_list]
         fold_results = {
             "Model_Names": model_names,
             "Fold": fold_num,
@@ -248,12 +209,12 @@ if __name__=="__main__":
     run_models(
         run_folder="./results/debug/",
         network_folder="kcm/",
-        EPOCHS=20,
+        EPOCHS=2,
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
         grid_s_size=500,
-        n_folds=3,
+        n_folds=2,
         holdout_routes=[100252,100139,102581,100341,102720]
     )
     random.seed(0)
@@ -262,12 +223,12 @@ if __name__=="__main__":
     run_models(
         run_folder="./results/debug/",
         network_folder="atb/",
-        EPOCHS=20,
+        EPOCHS=2,
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
         grid_s_size=500,
-        n_folds=3,
+        n_folds=2,
         holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
     )
     # random.seed(0)

@@ -16,6 +16,7 @@ class FF(nn.Module):
         self.collate_fn = collate_fn
         self.embed_dict = embed_dict
         self.device = device
+        self.is_nn = True
         self.requires_grid = False
         self.train_time = 0.0
         self.loss_fn = torch.nn.HuberLoss()
@@ -70,6 +71,7 @@ class FF_GRID(nn.Module):
         self.collate_fn = collate_fn
         self.embed_dict = embed_dict
         self.device = device
+        self.is_nn = True
         self.requires_grid = True
         self.train_time = 0.0
         self.loss_fn = torch.nn.HuberLoss()
@@ -135,6 +137,7 @@ class FF_GRID_ATTN(nn.Module):
         self.collate_fn = collate_fn
         self.embed_dict = embed_dict
         self.device = device
+        self.is_nn = True
         self.requires_grid = True
         self.train_time = 0.0
         self.loss_fn = torch.nn.HuberLoss()

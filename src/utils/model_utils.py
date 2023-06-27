@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from models import ff, rnn, transformer
+from models import ff, rnn, transformer, avg_speed, schedule, persistent
 from models.deeptte import DeepTTE
 from utils import data_utils, data_loader
 
@@ -66,7 +66,13 @@ def set_feature_extraction(model, feature_extraction=True):
         for param in model.feature_extract_activation.parameters():
             param.requires_grad = True
 
-def make_all_models(hidden_size, batch_size, embed_dict, device, config):
+def make_all_models(hidden_size, batch_size, embed_dict, device, config, load_weights=False, weight_folder=None, fold_num=None):
+    # Declare base models
+    base_model_list = []
+    base_model_list.append(avg_speed.AvgHourlySpeedModel("AVG"))
+    base_model_list.append(schedule.TimeTableModel("SCH"))
+    base_model_list.append(persistent.PersistentTimeSeqModel("PER_TIM"))
+
     # Declare neural network models
     nn_model_list = []
     nn_model_list.append(ff.FF(
@@ -147,4 +153,15 @@ def make_all_models(hidden_size, batch_size, embed_dict, device, config):
         device=device,
         config=config
     ).to(device))
-    return nn_model_list
+
+    if load_weights:
+        base_model_list = []
+        for b in base_model_list:
+            b = data_utils.load_pkl(f"{weight_folder}{b.name}_{fold_num}.pkl")
+        for m in nn_model_list:
+            m = m.load_state_dict(torch.load(f"{weight_folder}{m.model_name}_{fold_num}.pt"))
+
+    # Combine all models
+    base_model_list.extend(nn_model_list)
+
+    return base_model_list

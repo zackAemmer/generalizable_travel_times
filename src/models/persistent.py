@@ -9,6 +9,7 @@ class PersistentTimeSeqModel:
         self.requires_grid = False
         self.collate_fn = data_loader.sequential_collate
         self.train_time = 0.0
+        self.is_nn = False
         return None
     def train(self, dataloader, config):
         return None
