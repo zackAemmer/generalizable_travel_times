@@ -129,6 +129,9 @@ def run_models(run_folder, network_folder, **kwargs):
             if not model.is_nn:
                 model.train(loader, config)
             else:
+                # # Model profiling for training time and flops
+                # with profile(activities=[ProfilerActivity.CPU], with_flops=True) as prof:
+                #     with record_function(f"train {model.model_name}"):
                 optimizer = torch.optim.Adam(model.parameters(), lr=LEARN_RATE)
                 for epoch in range(EPOCHS):
                     print(f"NETWORK: {network_folder}, FOLD: {fold_num}, EPOCH: {epoch}, MODEL: {model.model_name}")
@@ -152,6 +155,9 @@ def run_models(run_folder, network_folder, **kwargs):
                         labels, preds = model.evaluate(loader, config)
                         test_losses += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
                         model_fold_curves[model.model_name]['Test'].append(test_losses)
+
+        # prof.export_chrome_trace("trace.json")
+        # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=20))
 
         # Save final fold models
         print(f"Fold {fold_num} training complete, saving model states and metrics...")
@@ -197,8 +203,6 @@ def run_models(run_folder, network_folder, **kwargs):
     data_utils.write_pkl(run_results, f"{run_folder}{network_folder}model_results.pkl")
     print(f"MODEL RUN COMPLETED '{run_folder}{network_folder}'")
 
-    # prof.export_chrome_trace("trace.json")
-    # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=20))
 
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
@@ -259,3 +263,31 @@ if __name__=="__main__":
     #     n_folds=5,
     #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
     # )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_models(
+        run_folder="./results/profiling/",
+        network_folder="kcm/",
+        EPOCHS=1,
+        BATCH_SIZE=512,
+        LEARN_RATE=1e-3,
+        HIDDEN_SIZE=32,
+        grid_s_size=500,
+        n_folds=1,
+        holdout_routes=[100252,100139,102581,100341,102720]
+    )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_models(
+        run_folder="./results/profiling/",
+        network_folder="atb/",
+        EPOCHS=1,
+        BATCH_SIZE=512,
+        LEARN_RATE=1e-3,
+        HIDDEN_SIZE=32,
+        grid_s_size=500,
+        n_folds=1,
+        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
+    )
