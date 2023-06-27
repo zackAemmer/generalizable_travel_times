@@ -31,8 +31,8 @@ def run_models(run_folder, network_folder, **kwargs):
     These are then analyzed in a jupyter notebook.
     """
 
-    # with profile(activities=[ProfilerActivity.CPU], with_flops=True) as prof:
-    #     with record_function("train_models"):
+    # with profile(activities=[ProfilerActivity.CPU]) as prof:
+    #     with record_function("model_inference"):
 
     print("="*30)
     print(f"RUN MODEL: '{run_folder}'")
@@ -41,7 +41,7 @@ def run_models(run_folder, network_folder, **kwargs):
     # Select device to train on, and number workers if GPU
     if torch.cuda.is_available():
         device = torch.device("cuda")
-        NUM_WORKERS = 8
+        NUM_WORKERS = 0
     # elif torch.backends.mps.is_available():
     #     device = torch.device("mps")
     else:
@@ -109,6 +109,7 @@ def run_models(run_folder, network_folder, **kwargs):
                     "Test":[]
                 }
 
+        # Total run samples
         print(f"{sum([len(x['lngs']) for x in dataset.content])} points in dataset, {len(dataset.content)} samples")
 
         # Build grid using only data from this fold
@@ -123,59 +124,53 @@ def run_models(run_folder, network_folder, **kwargs):
 
         # Train all models
         for model in model_list:
-            print(f"Training: {model.model_name} on fold train data")
+            print(f"Fold training for: {model.model_name}")
             dataset.add_grid_features = model.requires_grid
+            dataset.grid = train_ngrid
             loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             if not model.is_nn:
                 model.train(loader, config)
+                print(f"Fold evaluation for: {model.model_name}")
+                dataset.grid = test_ngrid
+                loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
+                labels, preds = model.evaluate(loader, config)
+                model_fold_results[model.model_name]["Labels"].extend(list(labels))
+                model_fold_results[model.model_name]["Preds"].extend(list(preds))
+                # Save model
+                model.save_to(f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pkl")
             else:
-                # # Model profiling for training time and flops
-                # with profile(activities=[ProfilerActivity.CPU], with_flops=True) as prof:
-                #     with record_function(f"train {model.model_name}"):
+                # Train NN model on all fold data for n epochs
                 optimizer = torch.optim.Adam(model.parameters(), lr=LEARN_RATE)
                 for epoch in range(EPOCHS):
-                    print(f"NETWORK: {network_folder}, FOLD: {fold_num}, EPOCH: {epoch}, MODEL: {model.model_name}")
+                    print(f"NETWORK: {network_folder}, FOLD: {fold_num}, MODEL: {model.model_name}, EPOCH: {epoch}")
                     t0 = time.time()
                     avg_batch_loss = model_utils.train(model, loader, optimizer)
                     model.train_time += (time.time() - t0)
-
                     # Evaluate NN curves at regular epochs
                     if epoch % EPOCH_EVAL_FREQ == 0 and model.is_nn:
-                        print(f"Evaluating: {model.model_name} on fold train data")
+                        print(f"Curve evaluation for: {model.model_name} train data")
                         train_losses = 0.0
                         dataset.grid = train_ngrid
                         loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
                         labels, preds = model.evaluate(loader, config)
                         train_losses += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
                         model_fold_curves[model.model_name]['Train'].append(train_losses)
-                        print(f"Evaluating: {model.model_name} on fold test data")
+                        print(f"Curve evaluation for: {model.model_name} test data")
                         test_losses = 0.0
                         dataset.grid = test_ngrid
                         loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
                         labels, preds = model.evaluate(loader, config)
                         test_losses += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
                         model_fold_curves[model.model_name]['Test'].append(test_losses)
-
-        # prof.export_chrome_trace("trace.json")
-        # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=20))
-
-        # Save final fold models
-        print(f"Fold {fold_num} training complete, saving model states and metrics...")
-        for model in model_list:
-            if model.is_nn:
-                torch.save(model.state_dict(), f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pt")
-            else:
-                model.save_to(f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pkl")
-
-        # Calculate performance metrics for fold
-        dataset.grid = test_ngrid
-        for model in model_list:
             print(f"Fold final evaluation for: {model.model_name}")
-            dataset.add_grid_features = model.requires_grid
+            dataset.grid = test_ngrid
             loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS)
             labels, preds = model.evaluate(loader, config)
             model_fold_results[model.model_name]["Labels"].extend(list(labels))
             model_fold_results[model.model_name]["Preds"].extend(list(preds))
+            # Save model
+            torch.save(model.state_dict(), f"{run_folder}{network_folder}models/{model.model_name}_{fold_num}.pt")
+
         # Calculate various losses:
         train_times = [x.train_time for x in model_list]
         fold_results = {
@@ -203,6 +198,8 @@ def run_models(run_folder, network_folder, **kwargs):
     data_utils.write_pkl(run_results, f"{run_folder}{network_folder}model_results.pkl")
     print(f"MODEL RUN COMPLETED '{run_folder}{network_folder}'")
 
+    # prof.export_chrome_trace("profile.json")
+    # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=20))
 
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
@@ -263,31 +260,3 @@ if __name__=="__main__":
     #     n_folds=5,
     #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
     # )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/profiling/",
-        network_folder="kcm/",
-        EPOCHS=1,
-        BATCH_SIZE=512,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
-        grid_s_size=500,
-        n_folds=1,
-        holdout_routes=[100252,100139,102581,100341,102720]
-    )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/profiling/",
-        network_folder="atb/",
-        EPOCHS=1,
-        BATCH_SIZE=512,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
-        grid_s_size=500,
-        n_folds=1,
-        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
-    )
