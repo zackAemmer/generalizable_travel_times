@@ -61,10 +61,14 @@ def set_feature_extraction(model, feature_extraction=True):
         for param in model.parameters():
             param.requires_grad = False
         # Each model must have a final named feature extraction layer
-        for param in model.feature_extract.parameters():
-            param.requires_grad = True
-        # for param in model.feature_extract_activation.parameters():
-        #     param.requires_grad = True
+        if model.model_name=="DEEP_TTE":
+            for param in model.entire_estimate.feature_extract.parameters():
+                param.requires_grad = True
+            for param in model.local_estimate.feature_extract.parameters():
+                param.requires_grad = True
+        else:
+            for param in model.feature_extract.parameters():
+                param.requires_grad = True
 
 def make_all_models(hidden_size, batch_size, embed_dict, device, config, load_weights=False, weight_folder=None, fold_num=None):
     # Declare base models

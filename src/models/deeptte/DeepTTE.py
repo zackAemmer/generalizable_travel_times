@@ -22,7 +22,7 @@ class EntireEstimator(nn.Module):
 
         ### Final fully connected layer to output the Collective TTE value
         # Previously named hid2out; renamed for fine-tuning purposes
-        self.feature_extraction = nn.Linear(hidden_size, 1)
+        self.feature_extract = nn.Linear(hidden_size, 1)
 
     def forward(self, attr_t, sptm_t):
         inputs = torch.cat((attr_t, sptm_t), dim = 1)   ### size [batch, 128 + 28 = 156]
@@ -35,7 +35,7 @@ class EntireEstimator(nn.Module):
             residual = F.leaky_relu(self.residuals[i](hidden))
             hidden = hidden + residual
 
-        out = self.feature_extraction(hidden)   ### size [batch, 1]: final Collective TTE value
+        out = self.feature_extract(hidden)   ### size [batch, 1]: final Collective TTE value
 
         return out
 
