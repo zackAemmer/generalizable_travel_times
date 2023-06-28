@@ -120,23 +120,6 @@ def get_date_list(start, n_days):
     date_list = [base + timedelta(days=x) for x in range(n_days)]
     return [f"{date.strftime('%Y_%m_%d')}.pkl" for date in date_list]
 
-# def load_fold_data(data_folder, filename, fold_num, total_folds):
-#     ngrid = load_pkl(f"{data_folder}/../{filename}_ngrid.pkl")
-#     train_data = []
-#     contents = open(f"{data_folder}{filename}", "r").read()
-#     train_data.append([json.loads(str(item)) for item in contents.strip().split('\n')])
-#     train_data = list(itertools.chain.from_iterable(train_data))
-#     # Select all data that is not part of this testing fold
-#     n_per_fold = len(train_data) // total_folds
-#     mask = np.ones(len(train_data), bool)
-#     mask[fold_num*n_per_fold:(fold_num+1)*n_per_fold] = 0
-#     return ([item for item, keep in zip(train_data, mask) if keep], [item for item, keep in zip(train_data, mask) if not keep], ngrid)
-
-# def load_all_data(data_folder, filename):
-#     # ngrid = load_pkl(f"{data_folder}/../{filename}_ngrid.pkl")
-#     valid_data = []
-#     return valid_data, ngrid
-
 def load_all_inputs(run_folder, network_folder, file_num):
     with open(f"{run_folder}{network_folder}/deeptte_formatted/train_config.json") as f:
         config = json.load(f)
@@ -796,136 +779,27 @@ def extract_gen_results(city, gen_results):
         res.append(gen_df)
     return pd.concat(res, axis=0)
 
-def extract_deeptte_results(city, res_folder):
-    # Extract all fold and epoch losses from deeptte run
-    all_curve_data = []
-    all_fold_data = []
-    all_time_data = []
-    for res_file in os.listdir(res_folder):
-        res_labels = res_file.split("_")
-        if res_labels[1] == "CURVE":
-            res_preds = pd.read_csv(
-                f"{res_folder}/{res_file}",
-                delimiter=" ",
-                header=None,
-                names=["Label", "Pred"],
-                dtype={"Label": float, "Pred": float}
-            )
-            res_data = [
-                city,
-                res_labels[3],
-                "DEEPTTE",
-                "Test" if res_labels[2]=="TEST" else "Train",
-                res_labels[4].split(".")[0],
-                metrics.mean_absolute_error(res_preds['Label'], res_preds['Pred'])
-            ]
-            all_curve_data.append(res_data)
-        elif res_labels[1] == "FOLD":
-            res_preds = pd.read_csv(
-                f"{res_folder}/{res_file}",
-                delimiter=" ",
-                header=None,
-                names=["Label", "Pred"],
-                dtype={"Label": float, "Pred": float}
-            )
-            res_data = [
-                "DEEPTTE",
-                city,
-                res_labels[3].replace(),
-                metrics.mean_absolute_percentage_error(res_preds['Label'], res_preds['Pred']),
-                np.sqrt(metrics.mean_squared_error(res_preds['Label'], res_preds['Pred'])),
-                metrics.mean_absolute_error(res_preds['Label'], res_preds['Pred'])
-            ]
-            all_fold_data.append(res_data)
-        elif res_labels[1] == "time":
-            res_time = load_pkl(f"{res_folder}/{res_file}")
-            res_data = [
-                city,
-                res_labels[2].split(".")[0],
-                "DEEPTTE",
-                res_time
-            ]
-            all_time_data.append(res_data)
-    all_curve_data = pd.DataFrame(all_curve_data, columns=["City","Fold","Model","Loss Set","Epoch","Loss"])
-    all_fold_data = pd.DataFrame(all_fold_data, columns=["Model","City","Fold","MAPE","RMSE","MAE"])
-    all_time_data = pd.DataFrame(all_time_data, columns=["City","Fold","Model","Time"])
-    return all_fold_data, all_curve_data, all_time_data
-
-def extract_deeptte_gen_results(city, gen_folder):
-    # Extract all fold and epoch losses from deeptte run
-    all_run_data = []
-    for res_file in os.listdir(gen_folder):
-        res_preds = pd.read_csv(
-            f"{gen_folder}/{res_file}",
-            delimiter=" ",
-            header=None,
-            names=["Label", "Pred"],
-            dtype={"Label": float, "Pred": float}
-        )
-        # model_name, Loss name 1, Loss name 2, epoch_num
-        res_labels = res_file.split("_")
-        loss_name = f"{res_labels[1]}_{res_labels[2]}"
-        fold_num = res_labels[3]
-        res_data = [
-            "DeepTTE",
-            city,
-            loss_name,
-            fold_num,
-            metrics.mean_absolute_percentage_error(res_preds['Label'], res_preds['Pred']),
-            np.sqrt(metrics.mean_squared_error(res_preds['Label'], res_preds['Pred'])),
-            metrics.mean_absolute_error(res_preds['Label'], res_preds['Pred'])
-        ]
-        all_run_data.append(res_data)
-    all_run_data = pd.DataFrame(
-        all_run_data,
-        columns=[
-            "Model",
-            "City",
-            "Loss",
-            "Fold",
-            "MAPE",
-            "RMSE",
-            "MAE"
-        ]
-    )
-    all_run_data['Fold'] = all_run_data['Fold'].astype(int)
-    all_run_data['Loss'] = all_run_data['Loss'].replace(to_replace=["TRAIN_TRAIN","TRAIN_TEST","TRAIN_HOLDOUT","EXTRACT_TRAIN","EXTRACT_TEST","TUNE_TRAIN","TUNE_TEST"], value=["Train_Losses","Test_Losses","Holdout_Losses","Extract_Train_Losses","Extract_Test_Losses","Tune_Train_Losses","Tune_Test_Losses"])
-    return all_run_data.sort_values(['Fold'])
-
-def extract_all_dataloader(dataloader, sequential_flag=False):
-    """
-    Get all contents of a dataloader from batches.
-    """
-    all_context = []
-    all_X = []
-    all_y = []
-    seq_lens = []
-    for data in dataloader:
-        data, y = data
-        context, X = data[:2]
-        all_context.append(context)
-        all_X.append(X)
-        all_y.append(y)
-        if sequential_flag:
-            seq_lens.append(data[-1])
-    if sequential_flag:
-        # Pad batches to match batch w/longest sequence
-        max_len = max(torch.cat(seq_lens))
-        all_X = [torch.nn.functional.pad(tensor, (0, 0, 0, max_len - tensor.shape[1])) for tensor in all_X]
-        all_y = [torch.nn.functional.pad(tensor, (0, max_len - tensor.shape[1])) for tensor in all_y]
-        return torch.cat(all_context, dim=0), torch.cat(all_X, dim=0), torch.cat(all_y, dim=0), torch.cat(seq_lens, dim=0)
-    else:
-        return torch.cat(all_context, dim=0), torch.cat(all_X, dim=0), torch.cat(all_y, dim=0)
-
-def get_seq_info(seq_dataloader):
+def get_seq_info(seq_dataloader, preds):
     """
     Get lengths and mask for sequence lengths in data.
     """
-    context, X, y, seq_lens = extract_all_dataloader(seq_dataloader, sequential_flag=True)
-    seq_lens = list(seq_lens.numpy())
+    data = np.array(seq_dataloader.dataset.content)[seq_dataloader.sampler.indices]
+    # The last batch is dropped, so don't include in mask
+    data = data[:len(preds)]
+    seq_lens = [len(sample['lngs']) for sample in data]
     max_length = max(seq_lens)
     mask = [[1] * length + [0] * (max_length - length) for length in seq_lens]
     return seq_lens, np.array(mask, dtype='bool')
+
+def create_tensor_mask(seq_lens):
+    """
+    Create a mask based on a tensor of sequence lengths.
+    """
+    max_len = max(seq_lens)
+    mask = torch.zeros(len(seq_lens), max_len, dtype=torch.bool)
+    for i, seq_len in enumerate(seq_lens):
+        mask[i, :seq_len] = 1
+    return mask
 
 def pad_tensors(tensor_list, pad_dim):
     """
@@ -943,19 +817,6 @@ def pad_tensors(tensor_list, pad_dim):
     padded_tensor_list = torch.cat(padded_tensor_list, dim=0)
     return padded_tensor_list
 
-def convert_speeds_to_tts(speeds, dataloader, mask, config):
-    """
-    Convert a sequence of predicted speeds to travel times.
-    """
-    context, X, y, seq_lens = extract_all_dataloader(dataloader, sequential_flag=True)
-    dists = X[:,:,2].numpy()
-    dists = de_normalize(dists, config['dist_calc_km_mean'], config['dist_calc_km_std'])
-    # Replace speeds near 0.0 with small number
-    speeds[speeds<=0.0001] = 0.0001
-    travel_times = dists*1000.0 / speeds
-    res = aggregate_tts(travel_times, mask)
-    return res
-
 def aggregate_tts(tts, mask, drop_first=True):
     """
     Convert a sequence of predicted travel times to total travel time.
@@ -966,26 +827,6 @@ def aggregate_tts(tts, mask, drop_first=True):
     masked_tts = (tts*mask)
     total_tts = np.sum(masked_tts, axis=1)
     return total_tts
-
-def aggregate_cumulative_tts(tts, mask):
-    """
-    Convert a sequence of cumulative predicted travel times to total travel time.
-    """
-    # Take the final unmasked point
-    max_idxs = np.apply_along_axis(lambda x: np.max(np.where(x)), 1, mask)
-    max_idxs = max_idxs.reshape(len(max_idxs),1)
-    res = np.take_along_axis(tts, max_idxs, axis=1)
-    return res
-
-def create_tensor_mask(seq_lens):
-    """
-    Create a mask based on a tensor of sequence lengths.
-    """
-    max_len = max(seq_lens)
-    mask = torch.zeros(len(seq_lens), max_len, dtype=torch.bool)
-    for i, seq_len in enumerate(seq_lens):
-        mask[i, :seq_len] = 1
-    return mask
 
 def get_dataset_stats(data_folder, given_names):
     stats = {}

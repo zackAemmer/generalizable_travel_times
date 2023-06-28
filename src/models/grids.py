@@ -1,6 +1,7 @@
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from scipy import sparse
 
 from utils import data_utils
@@ -24,8 +25,6 @@ class NGridBetter:
     def digitize_points(self, x_vals, y_vals):
         xbin_idxs = np.digitize(x_vals, self.xbins, right=False)
         ybin_idxs = np.digitize(y_vals, self.ybins, right=False)
-        xbin_idxs = np.clip(xbin_idxs,0,len(self.xbins))
-        ybin_idxs = np.clip(ybin_idxs,0,len(self.ybins))
         return xbin_idxs, ybin_idxs
     def add_grid_content(self, data, trace_format=False):
         if trace_format:
@@ -35,13 +34,14 @@ class NGridBetter:
         else:
             self.points = np.concatenate((self.points, data), axis=0)
     def build_cell_lookup(self):
-        # Sort on time from high to low; no longer continuous shingles
+        # Sort on time from low to high; no longer continuous shingles
         self.points = self.points[np.argsort(self.points[:,0]),:]
         point_xbins, point_ybins = self.digitize_points(self.points[:,1], self.points[:,2])
         # Build lookup table for grid cells to sorted point lists
-        for x,xbin in enumerate(self.xbins):
-            for y,ybin in enumerate(self.ybins):
-                self.cell_lookup[x,y] = self.points[(point_xbins==x) & (point_ybins==y)]
+        lookup = pd.DataFrame(self.points, columns=['locationtime','x','y','speed_m_s','bearing'])
+        lookup['xbin'] = point_xbins
+        lookup['ybin'] = point_ybins
+        self.cell_lookup = lookup.groupby(['xbin','ybin']).apply(lambda x: x[['locationtime','x','y','speed_m_s','bearing']].values).to_dict()
     def get_grid_features(self, x_idxs, y_idxs, locationtimes, n_points=3, buffer=2):
         seq_len = len(x_idxs)
         grid_size = (2 * buffer) + 1
@@ -55,9 +55,6 @@ class NGridBetter:
         # Each element in each list is total enumeration of x,y cell indices for 1 point
         x_queries = np.concatenate([x[0].flatten() for x in buffer_range])
         y_queries = np.concatenate([y[1].flatten() for y in buffer_range])
-        x_queries = np.clip(x_queries,0,len(self.xbins))
-        y_queries = np.clip(y_queries,0,len(self.ybins))
-        # Limit to bounds of the grid
         t_queries = np.array(locationtimes).repeat(grid_size*grid_size)
         n_recent_points = self.get_recent_points(x_queries, y_queries, t_queries, n_points)
         n_recent_points = n_recent_points.reshape((seq_len,grid_size,grid_size,n_points,6))
@@ -83,12 +80,13 @@ class NGridBetter:
         cell_points = np.empty((num_cells, n_points, 6))
         cell_points.fill(np.nan)
         for i, (x, y, t) in enumerate(zip(x_idx, y_idx, locationtime)):
-            # Get lookup values for every pt/cell
-            cell = self.cell_lookup[(x,y)]
+            # Get lookup values for every pt/cell, default empty array
+            # If there are no points, or if buffer goes off edge of grid, return empty
+            cell = self.cell_lookup.get((x,y), np.array([]))
             if cell.size==0:
                 continue
             else:
-                # Get only values that occurred after the pt locationtime
+                # Get only n most recent values that occurred before the pt locationtime
                 idx = np.searchsorted(cell[:,0],t)
                 points = cell[:idx,:][-n_points:][::-1]
             cell_points[i,:points.shape[0],:5] = points

@@ -1,7 +1,6 @@
 #!/usr/bin python3
 
 
-import gc
 import json
 import random
 import time
@@ -13,7 +12,7 @@ from sklearn import metrics
 from sklearn.model_selection import KFold
 from tabulate import tabulate
 
-from models import avg_speed, grids, persistent, schedule
+from models import grids
 from utils import data_loader, data_utils, model_utils
 
 from torch.profiler import profile, record_function, ProfilerActivity
@@ -42,20 +41,15 @@ def run_models(run_folder, network_folder, **kwargs):
     if torch.cuda.is_available():
         device = torch.device("cuda")
         NUM_WORKERS = 8
+        PIN_MEMORY = True
     # elif torch.backends.mps.is_available():
     #     device = torch.device("mps")
     else:
         device = torch.device("cpu")
         NUM_WORKERS = 0
+        PIN_MEMORY = False
     print(f"DEVICE: {device}")
     print(f"WORKERS: {NUM_WORKERS}")
-
-    # Set hyperparameters
-    EPOCHS = kwargs['EPOCHS']
-    BATCH_SIZE = kwargs['BATCH_SIZE']
-    LEARN_RATE = kwargs['LEARN_RATE']
-    HIDDEN_SIZE = kwargs['HIDDEN_SIZE']
-    EPOCH_EVAL_FREQ = 10
 
     # Define embedded variables for network models
     embed_dict = {
@@ -88,7 +82,7 @@ def run_models(run_folder, network_folder, **kwargs):
         test_sampler = SubsetRandomSampler(test_idx)
 
         # Declare models
-        model_list = model_utils.make_all_models(HIDDEN_SIZE, BATCH_SIZE, embed_dict, device, config)
+        model_list = model_utils.make_all_models(kwargs['HIDDEN_SIZE'], kwargs['BATCH_SIZE'], embed_dict, device, config)
         model_names = [m.model_name for m in model_list]
         print(f"Model names: {model_names}")
         print(f"Model total parameters: {[sum(p.numel() for p in m.parameters()) for m in model_list if m.is_nn]}")
@@ -127,44 +121,44 @@ def run_models(run_folder, network_folder, **kwargs):
             print(f"Fold training for: {model.model_name}")
             dataset.add_grid_features = model.requires_grid
             dataset.grid = train_ngrid
-            loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS, drop_last=True)
+            loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=kwargs['BATCH_SIZE'], pin_memory=PIN_MEMORY, num_workers=NUM_WORKERS, drop_last=True)
             if not model.is_nn:
                 # Train base model on all fold data
                 model.train(loader, config)
                 print(f"Fold evaluation for: {model.model_name}")
                 dataset.grid = test_ngrid
-                loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS, drop_last=True)
+                loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=kwargs['BATCH_SIZE'], pin_memory=PIN_MEMORY, num_workers=NUM_WORKERS, drop_last=True)
                 labels, preds = model.evaluate(loader, config)
                 model_fold_results[model.model_name]["Labels"].extend(list(labels))
                 model_fold_results[model.model_name]["Preds"].extend(list(preds))
             else:
                 # Train NN model on all fold data for n epochs
-                optimizer = torch.optim.Adam(model.parameters(), lr=LEARN_RATE)
-                for epoch in range(EPOCHS):
+                optimizer = torch.optim.Adam(model.parameters(), lr=kwargs['LEARN_RATE'])
+                for epoch in range(kwargs['EPOCHS']):
                     print(f"NETWORK: {network_folder}, FOLD: {fold_num}, MODEL: {model.model_name}, EPOCH: {epoch}")
                     t0 = time.time()
                     avg_batch_loss = model_utils.train(model, loader, optimizer)
                     model.train_time += (time.time() - t0)
                     # Evaluate NN curves at regular epochs
-                    if epoch % EPOCH_EVAL_FREQ == 0 and model.is_nn:
+                    if epoch % kwargs['EPOCH_EVAL_FREQ'] == 0 and model.is_nn:
                         print(f"Curve evaluation for: {model.model_name} train data")
                         train_losses = 0.0
                         dataset.grid = train_ngrid
-                        loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS, drop_last=True)
+                        loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=kwargs['BATCH_SIZE'], pin_memory=PIN_MEMORY, num_workers=NUM_WORKERS, drop_last=True)
                         labels, preds = model.evaluate(loader, config)
                         train_losses += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
                         model_fold_curves[model.model_name]['Train'].append(train_losses)
                         print(f"Curve evaluation for: {model.model_name} test data")
                         test_losses = 0.0
                         dataset.grid = test_ngrid
-                        loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS, drop_last=True)
+                        loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=kwargs['BATCH_SIZE'], pin_memory=PIN_MEMORY, num_workers=NUM_WORKERS, drop_last=True)
                         labels, preds = model.evaluate(loader, config)
                         test_losses += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
                         model_fold_curves[model.model_name]['Test'].append(test_losses)
             # After model is trained, evaluate on test set for this fold
             print(f"Fold final evaluation for: {model.model_name}")
             dataset.grid = test_ngrid
-            loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=BATCH_SIZE, pin_memory=[True if NUM_WORKERS>0 else False], num_workers=NUM_WORKERS, drop_last=True)
+            loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=kwargs['BATCH_SIZE'], pin_memory=PIN_MEMORY, num_workers=NUM_WORKERS, drop_last=True)
             labels, preds = model.evaluate(loader, config)
             model_fold_results[model.model_name]["Labels"].extend(list(labels))
             model_fold_results[model.model_name]["Preds"].extend(list(preds))
@@ -241,12 +235,12 @@ if __name__=="__main__":
     run_models(
         run_folder="./results/small/",
         network_folder="kcm/",
-        EPOCHS=30,
+        EPOCHS=2,
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
         grid_s_size=500,
-        n_folds=5,
+        n_folds=2,
         holdout_routes=[100252,100139,102581,100341,102720]
     )
     random.seed(0)
@@ -255,11 +249,11 @@ if __name__=="__main__":
     run_models(
         run_folder="./results/small/",
         network_folder="atb/",
-        EPOCHS=30,
+        EPOCHS=2,
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
         grid_s_size=500,
-        n_folds=5,
+        n_folds=2,
         holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
     )
