@@ -41,7 +41,7 @@ def run_models(run_folder, network_folder, **kwargs):
     # Select device to train on, and number workers if GPU
     if torch.cuda.is_available():
         device = torch.device("cuda")
-        NUM_WORKERS = 0
+        NUM_WORKERS = 8
     # elif torch.backends.mps.is_available():
     #     device = torch.device("mps")
     else:
@@ -207,59 +207,59 @@ def run_models(run_folder, network_folder, **kwargs):
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
 
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/debug/",
-        network_folder="kcm/",
-        EPOCHS=2,
-        BATCH_SIZE=512,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
-        grid_s_size=500,
-        n_folds=2,
-        holdout_routes=[100252,100139,102581,100341,102720]
-    )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/debug/",
-        network_folder="atb/",
-        EPOCHS=2,
-        BATCH_SIZE=512,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
-        grid_s_size=500,
-        n_folds=2,
-        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
-    )
     # random.seed(0)
     # np.random.seed(0)
     # torch.manual_seed(0)
     # run_models(
-    #     run_folder="./results/small/",
+    #     run_folder="./results/debug/",
     #     network_folder="kcm/",
-    #     EPOCHS=30,
+    #     EPOCHS=2,
     #     BATCH_SIZE=512,
     #     LEARN_RATE=1e-3,
     #     HIDDEN_SIZE=32,
     #     grid_s_size=500,
-    #     n_folds=5,
+    #     n_folds=2,
     #     holdout_routes=[100252,100139,102581,100341,102720]
     # )
     # random.seed(0)
     # np.random.seed(0)
     # torch.manual_seed(0)
     # run_models(
-    #     run_folder="./results/small/",
+    #     run_folder="./results/debug/",
     #     network_folder="atb/",
-    #     EPOCHS=30,
+    #     EPOCHS=2,
     #     BATCH_SIZE=512,
     #     LEARN_RATE=1e-3,
     #     HIDDEN_SIZE=32,
     #     grid_s_size=500,
-    #     n_folds=5,
+    #     n_folds=2,
     #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
     # )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_models(
+        run_folder="./results/small/",
+        network_folder="kcm/",
+        EPOCHS=30,
+        BATCH_SIZE=512,
+        LEARN_RATE=1e-3,
+        HIDDEN_SIZE=32,
+        grid_s_size=500,
+        n_folds=5,
+        holdout_routes=[100252,100139,102581,100341,102720]
+    )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_models(
+        run_folder="./results/small/",
+        network_folder="atb/",
+        EPOCHS=30,
+        BATCH_SIZE=512,
+        LEARN_RATE=1e-3,
+        HIDDEN_SIZE=32,
+        grid_s_size=500,
+        n_folds=5,
+        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
+    )

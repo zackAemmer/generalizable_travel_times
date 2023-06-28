@@ -75,63 +75,6 @@ def run(run_folder, train_network_folder, **kwargs):
         #     train_time = (time.time() - t0)
         #     print(train_time)
 
-        with record_function("map from deeptte"):
-            d = data_utils.map_from_deeptte(dataset.content, ["locationtime","x","y","speed_m_s","bearing"])
-        with record_function("digitize"):
-            xbin_idxs, ybin_idxs = grid.digitize_points(d[:,1], d[:,2])
-        with record_function("setup feature queries"):
-            x_idxs = xbin_idxs
-            y_idxs = ybin_idxs
-            locationtimes = d[:,0]
-            n_points=3
-            buffer=2
-            seq_len = len(x_idxs)
-            grid_size = (2 * buffer) + 1
-            # For every point, want grid buffer in x and y
-            x_range = np.arange(grid_size)
-            y_range = np.arange(grid_size)
-            x_buffer_range = x_idxs[:, np.newaxis] - buffer + x_range
-            y_buffer_range = y_idxs[:, np.newaxis] - buffer + y_range
-            # For every 1d set of X,Y grid ranges, want a 2d buffer
-            buffer_range = [np.meshgrid(arr1,arr2) for arr1,arr2 in zip(x_buffer_range,y_buffer_range)]
-            # Each element in each list is total enumeration of x,y cell indices for 1 point
-            x_queries = np.concatenate([x[0].flatten() for x in buffer_range])
-            y_queries = np.concatenate([y[1].flatten() for y in buffer_range])
-            x_queries = np.clip(x_queries,0,len(grid.xbins))
-            y_queries = np.clip(y_queries,0,len(grid.ybins))
-            # Limit to bounds of the grid
-            t_queries = np.array(locationtimes).repeat(grid_size*grid_size)
-        with record_function("set up response to queries"):
-            x_idx = x_queries
-            y_idx = y_queries
-            locationtime = t_queries
-            num_cells = len(x_idx)
-            cell_points = np.empty((num_cells, n_points, 6))
-            cell_points.fill(np.nan)
-        with record_function("query dict"):
-            for i, (x,y,t) in enumerate(zip(x_idx, y_idx, locationtime)):
-                # Get lookup values for every pt/cell
-                cell = grid.cell_lookup[(x,y)]
-                if cell.size==0:
-                    continue
-                else:
-                    idx = np.searchsorted(cell[:,0],t)
-                    points = cell[:idx,:][-n_points:][::-1]
-
-                cell_points[i,:points.shape[0],:5] = points
-
-        # with record_function("add obs age"):
-        #     # Add obs_age feature
-        #     cell_points[:,:,-1] = np.repeat(np.expand_dims(np.array(locationtime),1),n_points,1) - cell_points[:,:,0]
-        #     n_recent_points = cell_points
-        # with record_function("cleanup"):
-        #     n_recent_points = n_recent_points.reshape((seq_len,grid_size,grid_size,n_points,6))
-        #     # TxXxYxNxC -> TxCxYxNxX -> TxCxNxYxX
-        #     n_recent_points = np.swapaxes(n_recent_points, 1, 4)
-        #     grid_features = np.swapaxes(n_recent_points, 2, 3)
-        # with record_function("apply grid norm"):
-        #     grid_features = data_loader.apply_grid_normalization(grid_features, config)
-
             # dataset.grid = grid
             # dataset.add_grid_features = True
             # t0 = time.time()
