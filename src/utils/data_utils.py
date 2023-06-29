@@ -367,26 +367,30 @@ def get_scheduled_arrival(trip_ids, x, y, gtfs_data):
     gtfs_data: merged GTFS files
     Returns: (distance to closest stop in km, scheduled arrival time at that stop).
     """
-    data = np.column_stack([x, y, trip_ids, np.arange(len(x))])
     gtfs_data_ary = gtfs_data[['stop_x','stop_y','trip_id','arrival_s','stop_sequence','stop_x_cent','stop_y_cent','route_id','service_id','direction_id']].values
+    gtfs_data_coords = gtfs_data[['stop_x','stop_y']].values.astype(float)
+    gtfs_data_trips = gtfs_data[['trip_id']].values.flatten().tolist()
+    data_coords = np.column_stack([x, y, np.arange(len(x))]).astype(float)
     # Create dictionary mapping trip_ids to lists of points in gtfs
     id_to_stops = {}
-    for point in gtfs_data_ary:
+    for i, tripid in enumerate(gtfs_data_trips):
         # If the key does not exist, insert the second argument. Otherwise return the value. Append afterward regardless.
-        id_to_stops.setdefault(point[2],[]).append(point)
+        id_to_stops.setdefault(tripid,[]).append((gtfs_data_coords[i], gtfs_data_ary[i]))
     # Repeat for trips in the data
     id_to_data = {}
-    for point in data:
-        id_to_data.setdefault(point[2],[]).append(point)
+    for i, tripid in enumerate(trip_ids):
+        id_to_data.setdefault(tripid,[]).append(data_coords[i])
     # Iterate over each unique trip, getting closest stops for all points from that trip, and aggregating
     # Adding closest stop distance, and sequence number to the end of gtfs_data features
     result_counter = 0
-    result = np.zeros((len(data), gtfs_data_ary.shape[1]+2), dtype=object)
+    result = np.zeros((len(data_coords), gtfs_data_ary.shape[1]+2), dtype=object)
     for key, value in id_to_data.items():
         trip_data = np.vstack(value)
-        stop_data = np.vstack(id_to_stops[key])
-        stop_dists, stop_idxs = shape_utils.get_closest_point(stop_data[:,:2], trip_data[:,:2])
-        result[result_counter:result_counter+len(stop_idxs),:-2] = stop_data[stop_idxs]
+        stop_data = id_to_stops[key]
+        stop_coords = np.vstack([x[0] for x in stop_data])
+        stop_feats = np.vstack([x[1] for x in stop_data])
+        stop_dists, stop_idxs = shape_utils.get_closest_point(stop_coords[:,:2], trip_data[:,:2])
+        result[result_counter:result_counter+len(stop_idxs),:-2] = stop_feats[stop_idxs]
         result[result_counter:result_counter+len(stop_idxs),-2] = stop_dists
         result[result_counter:result_counter+len(stop_idxs),-1] = trip_data[:,-1]
         result_counter += len(stop_idxs)
