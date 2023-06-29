@@ -18,14 +18,11 @@ class GenericDataset(Dataset):
         self.holdout_routes = holdout_routes
         self.keep_only_holdout = keep_only_holdout
         self.add_grid_features = add_grid_features
-        # # Need to map to numpy
-        # self.content = np.zeros((100000,12))
-        # with open(self.file_path, "r") as f:
-        #     for i, line in enumerate(f):
-        #         z = json.loads(line)
-        #         self.content[i,0] = z['time_gap'][2]
+        self.content = []
         # Filter out (or keep exclusively) any routes that are used for generalization tests
-        self.content  = list(map(lambda x: json.loads(x), open(self.file_path, "r").readlines()))
+        for network_path in self.file_path:
+            content = list(map(lambda x: json.loads(x), open(network_path, "r").readlines()))
+            self.content.extend(content)
         if self.holdout_routes is not None:
             is_holdout = [x['route_id'] in holdout_routes for x in self.content]
             if self.keep_only_holdout==True:

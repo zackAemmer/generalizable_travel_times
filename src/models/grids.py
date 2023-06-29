@@ -87,9 +87,9 @@ class NGridBetter:
                 continue
             else:
                 # Get only n most recent values that occurred before the pt locationtime
-                idx = np.searchsorted(cell[:,0],t)
-                points = cell[:idx,:][-n_points:][::-1]
-            cell_points[i,:points.shape[0],:5] = points
+                idx = np.searchsorted(cell[:,0],t) #SLOW
+                points = cell[:idx,:][-n_points:][::-1] #SLOW
+            cell_points[i,:points.shape[0],:5] = points #SLOW
         # Add obs_age feature
         cell_points[:,:,-1] = np.repeat(np.expand_dims(np.array(locationtime),1),n_points,1) - cell_points[:,:,0]
         return cell_points

@@ -8,6 +8,7 @@ import pickle
 from datetime import date, datetime, timedelta
 from multiprocessing import Pool
 from random import sample
+import shutil
 
 import numpy as np
 import pandas as pd
@@ -31,9 +32,12 @@ GTFS_TYPES = [str,str,float,float,str]
 GTFS_LOOKUP = dict(zip(GTFS_NAMES, GTFS_TYPES))
 
 
-def load_pkl(path):
+def load_pkl(path, is_pandas=False):
     with open(path, 'rb') as f:
-        data = pickle.load(f)
+        if is_pandas:
+            data = pd.read_pickle(f)
+        else:
+            data = pickle.load(f)
     return data
 
 def write_pkl(data, path):
@@ -123,7 +127,7 @@ def get_date_list(start, n_days):
 def load_all_inputs(run_folder, network_folder, file_num):
     with open(f"{run_folder}{network_folder}/deeptte_formatted/train_config.json") as f:
         config = json.load(f)
-    train_traces = load_pkl(f"{run_folder}{network_folder}train{file_num}_traces.pkl")
+    train_traces = load_pkl(f"{run_folder}{network_folder}train{file_num}_traces.pkl", is_pandas=True)
     train_data = list(map(lambda x: json.loads(x), open(f"{run_folder}{network_folder}deeptte_formatted/train", "r").readlines()))
     return {
         "config": config,
@@ -142,29 +146,31 @@ def combine_config_files(cfg_folder, n_save_files, train_or_test):
         # Delete existing config
         os.remove(f"{cfg_folder}{train_or_test}{i}_config.json")
     # Set up train config
+    summary_config = combine_config_list(temp)
+    # Save final configs
+    with open(f"{cfg_folder}{train_or_test}_config.json", mode="a") as out_file:
+        json.dump(summary_config, out_file)
+
+def combine_config_list(temp):
     summary_config = {}
     for k in temp[0].keys():
         if k[-4:]=="mean":
             values = [x[k] for x in temp]
-            weights = [x["n_points"] for x in temp]
+            weights = [x["n_samples"] for x in temp]
             wtd_mean = float(DescrStatsW(values, weights=weights, ddof=len(weights)).mean)
             summary_config.update({k:wtd_mean})
         elif k[-3:]=="std":
             values = [x[k]**2 for x in temp]
-            weights = [x["n_points"] for x in temp]
+            weights = [x["n_samples"] for x in temp]
             wtd_std = float(np.sqrt(DescrStatsW(values, weights=weights, ddof=len(weights)).mean))
             summary_config.update({k:wtd_std})
-    summary_config["n_points"] = int(np.sum([x['n_points'] for x in temp]))
-    summary_config["n_samples"] = int(np.sum([x['n_samples'] for x in temp]))
-    summary_config["gtfs_folder"] = temp[0]["gtfs_folder"]
-    summary_config["n_save_files"] = temp[0]["n_save_files"]
-    summary_config["epsg"] = temp[0]["epsg"]
-    summary_config["grid_bounds"] = temp[0]["grid_bounds"]
-    summary_config["train_set"] = temp[0]["train_set"]
-    summary_config["test_set"] = temp[0]["test_set"]
-    # Save final configs
-    with open(f"{cfg_folder}{train_or_test}_config.json", mode="a") as out_file:
-        json.dump(summary_config, out_file)
+        elif k[:1]=="n":
+            values = int(np.sum([x[k] for x in temp]))
+            summary_config.update({k:values})
+        else:
+            values = [x[k] for x in temp]
+            summary_config.update({k:values})
+    return summary_config
 
 def combine_pkl_data(folder, file_list, given_names):
     """
@@ -179,7 +185,7 @@ def combine_pkl_data(folder, file_list, given_names):
     no_data_list = []
     for file in file_list:
         try:
-            data = load_pkl(folder + "/" + file)
+            data = load_pkl(folder + "/" + file, is_pandas=True)
             data['file'] = file
             # Get unified column names
             data = data[given_names]
@@ -612,23 +618,28 @@ def extract_operator(old_folder, new_folder, source_col, op_name):
     """
     files = os.listdir(old_folder)
     for file in files:
+        print(f"Extracting {op_name} from {old_folder}{file} to {new_folder}{file}...")
         if file != ".DS_Store":
-            with open(f"{old_folder}{file}", 'rb') as f:
-                data = pickle.load(f)
-                data = data[data[source_col]==op_name]
-            with open(f"{new_folder}{file}", 'wb') as f:
-                pickle.dump(data, f)
+            data = load_pkl(f"{old_folder}{file}", is_pandas=True)
+            data = data[data[source_col]==op_name]
+            write_pkl(data,f"{new_folder}{file}" )
 
 def extract_operator_gtfs(old_folder, new_folder, source_col_trips, source_col_stop_times, op_name):
     """
-    First make a copy of the GTFS directory, then this function will overwrite the key files.
-    Example SCP with ipv6: scp -6 ./test.file osis@\[2001:db8:0:1\]:/home/osis/test.file
+    First makes a copy of the GTFS directory, then overwrite the key files.
+    Example SCP with ipv6: scp -6 ./2023_04_21.zip zack@\[address incl brackets]:/home/zack/2023_04_21.zip
     """
     gtfs_folders = os.listdir(old_folder)
     for file in gtfs_folders:
         if file != ".DS_Store" and len(file)==10:
-            z = pd.read_csv(f"{old_folder}{file}/trips.txt", low_memory=False, dtype=GTFS_LOOKUP)
-            st = pd.read_csv(f"{old_folder}{file}/stop_times.txt", low_memory=False, dtype=GTFS_LOOKUP)
+            print(f"Extracting {op_name} from {old_folder}{file} to {new_folder}{file}...")
+            # Delete and remake folder if already exists
+            if file in os.listdir(f"{new_folder}"):
+                shutil.rmtree(f"{new_folder}{file}")
+            shutil.copytree(f"{old_folder}{file}", f"{new_folder}{file}")
+            # Read in and overwrite relevant files in new directory
+            z = pd.read_csv(f"{new_folder}{file}/trips.txt", low_memory=False, dtype=GTFS_LOOKUP)
+            st = pd.read_csv(f"{new_folder}{file}/stop_times.txt", low_memory=False, dtype=GTFS_LOOKUP)
             z = z[z[source_col_trips].str[:3]==op_name]
             st = st[st[source_col_stop_times].str[:3]==op_name]
             z.to_csv(f"{new_folder}{file}/trips.txt")
