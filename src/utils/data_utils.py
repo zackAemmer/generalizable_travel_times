@@ -903,18 +903,6 @@ def extract_gen_results(city, gen_results):
         res.append(gen_df)
     return pd.concat(res, axis=0)
 
-def get_seq_info(seq_dataloader, preds):
-    """
-    Get lengths and mask for sequence lengths in data.
-    """
-    data = np.array(seq_dataloader.dataset.content)[seq_dataloader.sampler.indices]
-    # The last batch is dropped, so don't include in mask
-    data = data[:len(preds)]
-    seq_lens = [len(sample['lngs']) for sample in data]
-    max_length = max(seq_lens)
-    mask = [[1] * length + [0] * (max_length - length) for length in seq_lens]
-    return seq_lens, np.array(mask, dtype='bool')
-
 def create_tensor_mask(seq_lens):
     """
     Create a mask based on a tensor of sequence lengths.

@@ -40,9 +40,9 @@ def run_models(run_folder, network_folder, **kwargs):
     print(f"NETWORK: '{network_folder}'")
 
     # Create folder structure; delete older results
-    if len(network_folder)==0:
+    if len(network_folder)==1:
         # Don't want to overwrite data for non-mixed training so more selective deletes
-        base_folder = f"{run_folder}{network_folder}"
+        base_folder = f"{run_folder}{network_folder[0]}"
         if "model_results_temp.pkl" in os.listdir(f"{base_folder}"):
             os.remove(f"{base_folder}model_results_temp.pkl")
         if "model_results.pkl" in os.listdir(f"{base_folder}"):
@@ -228,81 +228,51 @@ def run_models(run_folder, network_folder, **kwargs):
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
 
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
-    # run_models(
-    #     run_folder="./results/debug/",
-    #     network_folder=["kcm/"],
-    #     EPOCHS=2,
-    #     BATCH_SIZE=512,
-    #     LEARN_RATE=1e-3,
-    #     HIDDEN_SIZE=32,
-    #     EPOCH_EVAL_FREQ=10,
-    #     grid_s_size=500,
-    #     n_folds=2,
-    #     holdout_routes=[100252,100139,102581,100341,102720],
-    #     skip_gtfs=True
-    # )
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
-    # run_models(
-    #     run_folder="./results/debug/",
-    #     network_folder=["atb/"],
-    #     EPOCHS=2,
-    #     BATCH_SIZE=512,
-    #     LEARN_RATE=1e-3,
-    #     HIDDEN_SIZE=32,
-    #     EPOCH_EVAL_FREQ=10,
-    #     grid_s_size=500,
-    #     n_folds=2,
-    #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
-    #     skip_gtfs=True
-    # )
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
-    # run_models(
-    #     run_folder="./results/debug/",
-    #     network_folder=["kcm/", "atb/"],
-    #     EPOCHS=2,
-    #     BATCH_SIZE=512,
-    #     LEARN_RATE=1e-3,
-    #     HIDDEN_SIZE=32,
-    #     EPOCH_EVAL_FREQ=10,
-    #     grid_s_size=500,
-    #     n_folds=2,
-    #     holdout_routes=[],
-    #     skip_gtfs=True
-    # )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/small/",
-        network_folder="kcm/",
-        EPOCHS=50,
+        run_folder="./results/debug/",
+        network_folder=["kcm/"],
+        EPOCHS=2,
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
         EPOCH_EVAL_FREQ=10,
         grid_s_size=500,
-        n_folds=5,
+        n_folds=2,
         holdout_routes=[100252,100139,102581,100341,102720],
+        skip_gtfs=False
     )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/small/",
-        network_folder="atb/",
-        EPOCHS=50,
+        run_folder="./results/debug/",
+        network_folder=["atb/"],
+        EPOCHS=2,
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
         EPOCH_EVAL_FREQ=10,
         grid_s_size=500,
-        n_folds=5,
-        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
+        n_folds=2,
+        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
+        skip_gtfs=False
+    )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_models(
+        run_folder="./results/debug/",
+        network_folder=["kcm/", "atb/"],
+        EPOCHS=2,
+        BATCH_SIZE=512,
+        LEARN_RATE=1e-3,
+        HIDDEN_SIZE=32,
+        EPOCH_EVAL_FREQ=10,
+        grid_s_size=500,
+        n_folds=2,
+        holdout_routes=[],
+        skip_gtfs=True
     )

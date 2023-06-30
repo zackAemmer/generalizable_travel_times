@@ -111,9 +111,12 @@ def basic_collate(batch):
     X_ct = torch.from_numpy(X_ct)
     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
     sorted_slens = sorted_slens.int()
-    X_em = X_em[sorted_indices,:].int()
-    X_ct = X_ct[sorted_indices,:].float()
-    y = y[sorted_indices].float()
+    # X_em = X_em[sorted_indices,:].int()
+    # X_ct = X_ct[sorted_indices,:].float()
+    # y = y[sorted_indices].float()
+    X_em = X_em.int()
+    X_ct = X_ct.float()
+    y = y.float()
     return [X_em, X_ct], y
 
 def basic_collate_nosch(batch):
@@ -138,9 +141,12 @@ def basic_collate_nosch(batch):
     X_ct = torch.from_numpy(X_ct)
     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
     sorted_slens = sorted_slens.int()
-    X_em = X_em[sorted_indices,:].int()
-    X_ct = X_ct[sorted_indices,:].float()
-    y = y[sorted_indices].float()
+    # X_em = X_em[sorted_indices,:].int()
+    # X_ct = X_ct[sorted_indices,:].float()
+    # y = y[sorted_indices].float()
+    X_em = X_em.int()
+    X_ct = X_ct.float()
+    y = y.float()
     return [X_em, X_ct], y
 
 def basic_grid_collate(batch):
@@ -173,10 +179,14 @@ def basic_grid_collate(batch):
     X_gr = torch.from_numpy(X_gr)
     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
     sorted_slens = sorted_slens.int()
-    X_em = X_em[sorted_indices,:].int()
-    X_ct = X_ct[sorted_indices,:].float()
-    X_gr = X_gr[sorted_indices,:].float()
-    y = y[sorted_indices].float()
+    # X_em = X_em[sorted_indices,:].int()
+    # X_ct = X_ct[sorted_indices,:].float()
+    # X_gr = X_gr[sorted_indices,:].float()
+    # y = y[sorted_indices].float()
+    X_em = X_em.int()
+    X_ct = X_ct.float()
+    X_gr = X_gr.float()
+    y = y.float()
     return [X_em, X_ct, X_gr], y
 
 def basic_grid_collate_nosch(batch):
@@ -204,10 +214,14 @@ def basic_grid_collate_nosch(batch):
     X_gr = torch.from_numpy(X_gr)
     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
     sorted_slens = sorted_slens.int()
-    X_em = X_em[sorted_indices,:].int()
-    X_ct = X_ct[sorted_indices,:].float()
-    X_gr = X_gr[sorted_indices,:].float()
-    y = y[sorted_indices].float()
+    # X_em = X_em[sorted_indices,:].int()
+    # X_ct = X_ct[sorted_indices,:].float()
+    # X_gr = X_gr[sorted_indices,:].float()
+    # y = y[sorted_indices].float()
+    X_em = X_em.int()
+    X_ct = X_ct.float()
+    X_gr = X_gr.float()
+    y = y.float()
     return [X_em, X_ct, X_gr], y
 
 def sequential_collate(batch):
@@ -234,9 +248,12 @@ def sequential_collate(batch):
     # Sort all by sequence length descending, for potential packing of each batch
     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
     sorted_slens = sorted_slens.int()
-    X_em = X_em[sorted_indices,:].int()
-    X_ct = X_ct[sorted_indices,:,:].float()
-    y = y[sorted_indices,:].float()
+    # X_em = X_em[sorted_indices,:].int()
+    # X_ct = X_ct[sorted_indices,:,:].float()
+    # y = y[sorted_indices,:].float()
+    X_em = X_em.int()
+    X_ct = X_ct.float()
+    y = y.float()
     return [X_em, X_ct, sorted_slens], y
 
 def sequential_collate_nosch(batch):
@@ -257,9 +274,12 @@ def sequential_collate_nosch(batch):
     # Sort all by sequence length descending, for potential packing of each batch
     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
     sorted_slens = sorted_slens.int()
-    X_em = X_em[sorted_indices,:].int()
-    X_ct = X_ct[sorted_indices,:,:].float()
-    y = y[sorted_indices,:].float()
+    # X_em = X_em[sorted_indices,:].int()
+    # X_ct = X_ct[sorted_indices,:,:].float()
+    # y = y[sorted_indices,:].float()
+    X_em = X_em.int()
+    X_ct = X_ct.float()
+    y = y.float()
     return [X_em, X_ct, sorted_slens], y
 
 def sequential_grid_collate(batch):
@@ -289,10 +309,14 @@ def sequential_grid_collate(batch):
     # Sort all by sequence length descending, for potential packing of each batch
     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
     sorted_slens = sorted_slens.int()
-    X_em = X_em[sorted_indices,:].int()
-    X_ct = X_ct[sorted_indices,:,:].float()
-    X_gr = X_gr[sorted_indices,:,:].float()
-    y = y[sorted_indices,:].float()
+    # X_em = X_em[sorted_indices,:].int()
+    # X_ct = X_ct[sorted_indices,:,:].float()
+    # X_gr = X_gr[sorted_indices,:,:].float()
+    # y = y[sorted_indices,:].float()
+    X_em = X_em.int()
+    X_ct = X_ct.float()
+    X_gr = X_gr.float()
+    y = y.float()
     return [X_em, X_ct, X_gr, sorted_slens], y
 
 def sequential_grid_collate_nosch(batch):
@@ -316,10 +340,14 @@ def sequential_grid_collate_nosch(batch):
     # Sort all by sequence length descending, for potential packing of each batch
     sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
     sorted_slens = sorted_slens.int()
-    X_em = X_em[sorted_indices,:].int()
-    X_ct = X_ct[sorted_indices,:,:].float()
-    X_gr = X_gr[sorted_indices,:,:].float()
-    y = y[sorted_indices,:].float()
+    # X_em = X_em[sorted_indices,:].int()
+    # X_ct = X_ct[sorted_indices,:,:].float()
+    # X_gr = X_gr[sorted_indices,:,:].float()
+    # y = y[sorted_indices,:].float()
+    X_em = X_em.int()
+    X_ct = X_ct.float()
+    X_gr = X_gr.float()
+    y = y.float()
     return [X_em, X_ct, X_gr, sorted_slens], y
 
 def deeptte_collate(data):

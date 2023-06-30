@@ -58,12 +58,12 @@ class TRSF(nn.Module):
         preds = self(inputs)
         mask = data_utils.create_tensor_mask(inputs[2]).to(self.device)
         loss = self.loss_fn(preds, labels, mask)
-        return labels, preds, loss
+        return labels, preds, loss, inputs[-1]
     def evaluate(self, test_dataloader, config):
-        labels, preds, avg_batch_loss = model_utils.predict(self, test_dataloader, sequential_flag=True)
+        labels, preds, avg_batch_loss, seq_lens = model_utils.predict(self, test_dataloader, sequential_flag=True)
         labels = data_utils.de_normalize(labels, config['time_calc_s_mean'], config['time_calc_s_std'])
         preds = data_utils.de_normalize(preds, config['time_calc_s_mean'], config['time_calc_s_std'])
-        _, mask = data_utils.get_seq_info(test_dataloader, preds)
+        mask = data_utils.create_tensor_mask(torch.cat(seq_lens)).numpy()
         preds = data_utils.aggregate_tts(preds, mask)
         labels = data_utils.aggregate_tts(labels, mask)
         return labels, preds
@@ -132,12 +132,12 @@ class TRSF_GRID(nn.Module):
         preds = self(inputs)
         mask = data_utils.create_tensor_mask(inputs[-1]).to(self.device)
         loss = self.loss_fn(preds, labels, mask)
-        return labels, preds, loss
+        return labels, preds, loss, inputs[-1]
     def evaluate(self, test_dataloader, config):
-        labels, preds, avg_batch_loss = model_utils.predict(self, test_dataloader, sequential_flag=True)
+        labels, preds, avg_batch_loss, seq_lens = model_utils.predict(self, test_dataloader, sequential_flag=True)
         labels = data_utils.de_normalize(labels, config['time_calc_s_mean'], config['time_calc_s_std'])
         preds = data_utils.de_normalize(preds, config['time_calc_s_mean'], config['time_calc_s_std'])
-        _, mask = data_utils.get_seq_info(test_dataloader, preds)
+        mask = data_utils.create_tensor_mask(torch.cat(seq_lens)).numpy()
         preds = data_utils.aggregate_tts(preds, mask)
         labels = data_utils.aggregate_tts(labels, mask)
         return labels, preds
@@ -205,12 +205,12 @@ class TRSF_GRID_ATTN(nn.Module):
         preds = self(inputs)
         mask = data_utils.create_tensor_mask(inputs[-1]).to(self.device)
         loss = self.loss_fn(preds, labels, mask)
-        return labels, preds, loss
+        return labels, preds, loss, inputs[-1]
     def evaluate(self, test_dataloader, config):
-        labels, preds, avg_batch_loss = model_utils.predict(self, test_dataloader, sequential_flag=True)
+        labels, preds, avg_batch_loss, seq_lens = model_utils.predict(self, test_dataloader, sequential_flag=True)
         labels = data_utils.de_normalize(labels, config['time_calc_s_mean'], config['time_calc_s_std'])
         preds = data_utils.de_normalize(preds, config['time_calc_s_mean'], config['time_calc_s_std'])
-        _, mask = data_utils.get_seq_info(test_dataloader, preds)
+        mask = data_utils.create_tensor_mask(torch.cat(seq_lens)).numpy()
         preds = data_utils.aggregate_tts(preds, mask)
         labels = data_utils.aggregate_tts(labels, mask)
         return labels, preds
