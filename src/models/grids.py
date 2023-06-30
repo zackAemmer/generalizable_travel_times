@@ -13,11 +13,13 @@ class NGridBetter:
         self.grid_s_size = grid_s_size
         self.points = None
         # Create grid boundaries and cells
-        x_resolution = (grid_bounds[2] - grid_bounds[0]) // grid_s_size
-        y_resolution = (grid_bounds[3] - grid_bounds[1]) // grid_s_size
-        xbins = np.linspace(grid_bounds[0], grid_bounds[2], x_resolution)
+        if len(grid_bounds) > 1:
+            self.grid_bounds = grid_bounds[0]
+        x_resolution = (self.grid_bounds[2] - self.grid_bounds[0]) // grid_s_size
+        y_resolution = (self.grid_bounds[3] - self.grid_bounds[1]) // grid_s_size
+        xbins = np.linspace(self.grid_bounds[0], self.grid_bounds[2], x_resolution)
         # xbins = np.append(xbins, xbins[-1]+.0000001)
-        ybins = np.linspace(grid_bounds[1], grid_bounds[3], y_resolution)
+        ybins = np.linspace(self.grid_bounds[1], self.grid_bounds[3], y_resolution)
         # ybins = np.append(ybins, ybins[-1]+.0000001)
         self.xbins=xbins
         self.ybins=ybins
