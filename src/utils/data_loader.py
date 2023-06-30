@@ -11,7 +11,7 @@ from utils import data_utils, shape_utils
 
 class GenericDataset(Dataset):
     def __init__(self, file_path, config, grid=None, subset=None, holdout_routes=None, keep_only_holdout=False, add_grid_features=False):
-        self.file_path = file_path
+        self.file_path = list(file_path)
         self.config = config
         self.grid=grid
         self.subset = subset
