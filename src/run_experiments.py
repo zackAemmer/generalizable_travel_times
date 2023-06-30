@@ -53,11 +53,6 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
     test_network_config = data_utils.combine_config_list([json.load(open(f"{run_folder}{n}deeptte_formatted/test_config.json", "r")) for n in test_network_folder])
     tune_network_config = data_utils.combine_config_list([json.load(open(f"{run_folder}{n}deeptte_formatted/train_config.json", "r")) for n in test_network_folder])
 
-    # if 'holdout_routes' in kwargs.keys():
-    #     holdout_routes = kwargs['holdout_routes']
-    # else:
-    #     holdout_routes = None
-
     print(f"Building grid on validation data from training network")
     train_network_dataset = data_loader.GenericDataset([f"{run_folder}{n}deeptte_formatted/train" for n in train_network_folder], train_network_config, holdout_routes=kwargs['holdout_routes'])
     train_network_ngrid = grids.NGridBetter(train_network_config['grid_bounds'],kwargs['grid_s_size'])
@@ -291,42 +286,42 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
 
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_experiments(
-        run_folder="./results/debug/",
-        train_network_folder=["kcm/"],
-        test_network_folder=["atb/"],
-        tune_network_folder=["atb/"],
-        TUNE_EPOCHS=4,
-        BATCH_SIZE=32,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
-        grid_s_size=500,
-        n_tune_samples=100,
-        n_folds=2,
-        holdout_routes=[100252,100139,102581,100341,102720],
-        skip_gtfs=False
-    )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_experiments(
-        run_folder="./results/debug/",
-        train_network_folder=["atb/"],
-        test_network_folder=["kcm/"],
-        tune_network_folder=["kcm/"],
-        TUNE_EPOCHS=4,
-        BATCH_SIZE=32,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
-        grid_s_size=500,
-        n_tune_samples=100,
-        n_folds=2,
-        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
-        skip_gtfs=False
-    )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_experiments(
+    #     run_folder="./results/debug/",
+    #     train_network_folder=["kcm/"],
+    #     test_network_folder=["atb/"],
+    #     tune_network_folder=["atb/"],
+    #     TUNE_EPOCHS=4,
+    #     BATCH_SIZE=32,
+    #     LEARN_RATE=1e-3,
+    #     HIDDEN_SIZE=32,
+    #     grid_s_size=500,
+    #     n_tune_samples=100,
+    #     n_folds=2,
+    #     holdout_routes=[100252,100139,102581,100341,102720],
+    #     skip_gtfs=False
+    # )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_experiments(
+    #     run_folder="./results/debug/",
+    #     train_network_folder=["atb/"],
+    #     test_network_folder=["kcm/"],
+    #     tune_network_folder=["kcm/"],
+    #     TUNE_EPOCHS=4,
+    #     BATCH_SIZE=32,
+    #     LEARN_RATE=1e-3,
+    #     HIDDEN_SIZE=32,
+    #     grid_s_size=500,
+    #     n_tune_samples=100,
+    #     n_folds=2,
+    #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
+    #     skip_gtfs=False
+    # )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
@@ -342,6 +337,6 @@ if __name__=="__main__":
         grid_s_size=500,
         n_tune_samples=100,
         n_folds=2,
-        holdout_routes=[],
+        holdout_routes=None,
         skip_gtfs=True
     )
