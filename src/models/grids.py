@@ -13,8 +13,7 @@ class NGridBetter:
         self.grid_s_size = grid_s_size
         self.points = None
         # Create grid boundaries and cells
-        if len(grid_bounds) > 1:
-            self.grid_bounds = grid_bounds[0]
+        self.grid_bounds = grid_bounds[0] # grid bounds always nested list for number of networks
         x_resolution = (self.grid_bounds[2] - self.grid_bounds[0]) // grid_s_size
         y_resolution = (self.grid_bounds[3] - self.grid_bounds[1]) // grid_s_size
         xbins = np.linspace(self.grid_bounds[0], self.grid_bounds[2], x_resolution)

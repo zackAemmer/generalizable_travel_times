@@ -6,6 +6,7 @@ import os
 import random
 import shutil
 import time
+import pathlib
 
 import numpy as np
 import torch
@@ -40,6 +41,7 @@ def run_models(run_folder, network_folder, **kwargs):
 
     # Create folder structure; delete older results
     if len(network_folder)==0:
+        # Don't want to overwrite data for non-mixed training so more selective deletes
         base_folder = f"{run_folder}{network_folder}"
         if "model_results_temp.pkl" in os.listdir(f"{base_folder}"):
             os.remove(f"{base_folder}model_results_temp.pkl")
@@ -49,6 +51,13 @@ def run_models(run_folder, network_folder, **kwargs):
             os.remove(f"{base_folder}model_generalization_results.pkl")
         shutil.rmtree(f"{base_folder}models")
         os.mkdir(f"{base_folder}models")
+    else:
+        # Training models on mixed data from multiple networks
+        base_folder = f"{run_folder}{'_'.join([n[:3] for n in network_folder])}/"
+        if os.path.exists(base_folder):
+            shutil.rmtree(base_folder)
+            os.mkdir(base_folder)
+            os.mkdir(f"{base_folder}models/")
 
     # Select device to train on, and number workers if GPU
     if torch.cuda.is_available():
@@ -153,7 +162,7 @@ def run_models(run_folder, network_folder, **kwargs):
                 # Train NN model on all fold data for n epochs
                 optimizer = torch.optim.Adam(model.parameters(), lr=kwargs['LEARN_RATE'])
                 for epoch in range(kwargs['EPOCHS']):
-                    print(f"NETWORK: {network_folder}, FOLD: {fold_num}, MODEL: {model.model_name}, EPOCH: {epoch}")
+                    print(f"NETWORK: {base_folder}, FOLD: {fold_num}, MODEL: {model.model_name}, EPOCH: {epoch}")
                     t0 = time.time()
                     avg_batch_loss = model_utils.train(model, loader, optimizer)
                     model.train_time += (time.time() - t0)
@@ -182,9 +191,9 @@ def run_models(run_folder, network_folder, **kwargs):
             model_fold_results[model.model_name]["Preds"].extend(list(preds))
             # Save model for this fold
             if not model.is_nn:
-                data_utils.write_pkl(model, f"{run_folder}{network_folder[0]}models/{model.model_name}_{fold_num}.pkl")
+                data_utils.write_pkl(model, f"{base_folder}models/{model.model_name}_{fold_num}.pkl")
             else:
-                torch.save(model.state_dict(), f"{run_folder}{network_folder[0]}models/{model.model_name}_{fold_num}.pt")
+                torch.save(model.state_dict(), f"{base_folder}models/{model.model_name}_{fold_num}.pt")
 
         # After all models have trained for this fold, calculate various losses
         train_times = [x.train_time for x in model_list]
@@ -207,11 +216,11 @@ def run_models(run_folder, network_folder, **kwargs):
         run_results.append(fold_results)
 
         # Save temp run results after each fold
-        data_utils.write_pkl(run_results, f"{run_folder}{network_folder[0]}model_results_temp.pkl")
+        data_utils.write_pkl(run_results, f"{base_folder}model_results_temp.pkl")
 
     # Save full run results
-    data_utils.write_pkl(run_results, f"{run_folder}{network_folder[0]}model_results.pkl")
-    print(f"MODEL RUN COMPLETED '{run_folder}{network_folder}'")
+    data_utils.write_pkl(run_results, f"{base_folder}model_results.pkl")
+    print(f"MODEL RUN COMPLETED '{base_folder}'")
 
     # prof.export_chrome_trace("profile.json")
     # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=20))
@@ -219,38 +228,38 @@ def run_models(run_folder, network_folder, **kwargs):
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
 
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/debug/",
-        network_folder=["kcm/"],
-        EPOCHS=2,
-        BATCH_SIZE=512,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
-        EPOCH_EVAL_FREQ=10,
-        grid_s_size=500,
-        n_folds=2,
-        holdout_routes=[100252,100139,102581,100341,102720],
-        skip_gtfs=True
-    )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/debug/",
-        network_folder=["atb/"],
-        EPOCHS=2,
-        BATCH_SIZE=512,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
-        EPOCH_EVAL_FREQ=10,
-        grid_s_size=500,
-        n_folds=2,
-        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
-        skip_gtfs=True
-    )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/debug/",
+    #     network_folder=["kcm/"],
+    #     EPOCHS=2,
+    #     BATCH_SIZE=512,
+    #     LEARN_RATE=1e-3,
+    #     HIDDEN_SIZE=32,
+    #     EPOCH_EVAL_FREQ=10,
+    #     grid_s_size=500,
+    #     n_folds=2,
+    #     holdout_routes=[100252,100139,102581,100341,102720],
+    #     skip_gtfs=True
+    # )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/debug/",
+    #     network_folder=["atb/"],
+    #     EPOCHS=2,
+    #     BATCH_SIZE=512,
+    #     LEARN_RATE=1e-3,
+    #     HIDDEN_SIZE=32,
+    #     EPOCH_EVAL_FREQ=10,
+    #     grid_s_size=500,
+    #     n_folds=2,
+    #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
+    #     skip_gtfs=True
+    # )
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
