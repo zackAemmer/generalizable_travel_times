@@ -170,7 +170,7 @@ def combine_config_list(temp, avoid_dup=False):
         else:
             # Use if key is same values for all configs in list
             if avoid_dup:
-                values = [x[k] for x in temp[0]]
+                values = temp[0][k]
             else:
                 values = [x[k] for x in temp]
             summary_config.update({k:values})
