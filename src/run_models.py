@@ -228,19 +228,68 @@ def run_models(run_folder, network_folder, **kwargs):
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
 
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/debug/",
+    #     network_folder=["kcm/"],
+    #     EPOCHS=2,
+    #     BATCH_SIZE=512,
+    #     LEARN_RATE=1e-3,
+    #     HIDDEN_SIZE=32,
+    #     EPOCH_EVAL_FREQ=10,
+    #     grid_s_size=500,
+    #     n_folds=2,
+    #     holdout_routes=[100252,100139,102581,100341,102720],
+    #     skip_gtfs=False
+    # )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/debug/",
+    #     network_folder=["atb/"],
+    #     EPOCHS=2,
+    #     BATCH_SIZE=512,
+    #     LEARN_RATE=1e-3,
+    #     HIDDEN_SIZE=32,
+    #     EPOCH_EVAL_FREQ=10,
+    #     grid_s_size=500,
+    #     n_folds=2,
+    #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
+    #     skip_gtfs=False
+    # )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/debug/",
+    #     network_folder=["kcm/", "atb/"],
+    #     EPOCHS=2,
+    #     BATCH_SIZE=512,
+    #     LEARN_RATE=1e-3,
+    #     HIDDEN_SIZE=32,
+    #     EPOCH_EVAL_FREQ=10,
+    #     grid_s_size=500,
+    #     n_folds=2,
+    #     holdout_routes=[],
+    #     skip_gtfs=True
+    # )
+
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/debug/",
+        run_folder="./results/small/",
         network_folder=["kcm/"],
-        EPOCHS=2,
+        EPOCHS=50,
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
         EPOCH_EVAL_FREQ=10,
         grid_s_size=500,
-        n_folds=2,
+        n_folds=5,
         holdout_routes=[100252,100139,102581,100341,102720],
         skip_gtfs=False
     )
@@ -248,15 +297,15 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/debug/",
+        run_folder="./results/small/",
         network_folder=["atb/"],
-        EPOCHS=2,
+        EPOCHS=50,
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
         EPOCH_EVAL_FREQ=10,
         grid_s_size=500,
-        n_folds=2,
+        n_folds=5,
         holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
         skip_gtfs=False
     )
@@ -264,15 +313,15 @@ if __name__=="__main__":
     np.random.seed(0)
     torch.manual_seed(0)
     run_models(
-        run_folder="./results/debug/",
+        run_folder="./results/small/",
         network_folder=["kcm/", "atb/"],
-        EPOCHS=2,
+        EPOCHS=50,
         BATCH_SIZE=512,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
         EPOCH_EVAL_FREQ=10,
         grid_s_size=500,
-        n_folds=2,
+        n_folds=5,
         holdout_routes=[],
         skip_gtfs=True
     )
