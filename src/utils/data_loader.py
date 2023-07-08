@@ -86,7 +86,7 @@ def apply_grid_normalization(grid_features, config):
 
 def basic_collate(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = [len(x['lats']) for x in batch]
+    seq_lens = torch.tensor([len(x['lats']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -109,8 +109,8 @@ def basic_collate(batch):
     # Sort all dataloaders so that they are consistent in the results
     X_em = torch.from_numpy(X_em)
     X_ct = torch.from_numpy(X_ct)
-    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    sorted_slens = sorted_slens.int()
+    # sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
+    # sorted_slens = sorted_slens.int()
     # X_em = X_em[sorted_indices,:].int()
     # X_ct = X_ct[sorted_indices,:].float()
     # y = y[sorted_indices].float()
@@ -121,7 +121,7 @@ def basic_collate(batch):
 
 def basic_collate_nosch(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = [len(x['lats']) for x in batch]
+    seq_lens = torch.tensor([len(x['lats']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -139,8 +139,8 @@ def basic_collate_nosch(batch):
     # Sort all dataloaders so that they are consistent in the results
     X_em = torch.from_numpy(X_em)
     X_ct = torch.from_numpy(X_ct)
-    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    sorted_slens = sorted_slens.int()
+    # sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
+    # sorted_slens = sorted_slens.int()
     # X_em = X_em[sorted_indices,:].int()
     # X_ct = X_ct[sorted_indices,:].float()
     # y = y[sorted_indices].float()
@@ -151,7 +151,7 @@ def basic_collate_nosch(batch):
 
 def basic_grid_collate(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = [len(x['lats']) for x in batch]
+    seq_lens = torch.tensor([len(x['lats']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -177,8 +177,8 @@ def basic_grid_collate(batch):
     X_em = torch.from_numpy(X_em)
     X_ct = torch.from_numpy(X_ct)
     X_gr = torch.from_numpy(X_gr)
-    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    sorted_slens = sorted_slens.int()
+    # sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
+    # sorted_slens = sorted_slens.int()
     # X_em = X_em[sorted_indices,:].int()
     # X_ct = X_ct[sorted_indices,:].float()
     # X_gr = X_gr[sorted_indices,:].float()
@@ -191,7 +191,7 @@ def basic_grid_collate(batch):
 
 def basic_grid_collate_nosch(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = [len(x['lats']) for x in batch]
+    seq_lens = torch.tensor([len(x['lats']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -212,8 +212,8 @@ def basic_grid_collate_nosch(batch):
     X_em = torch.from_numpy(X_em)
     X_ct = torch.from_numpy(X_ct)
     X_gr = torch.from_numpy(X_gr)
-    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    sorted_slens = sorted_slens.int()
+    # sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
+    # sorted_slens = sorted_slens.int()
     # X_em = X_em[sorted_indices,:].int()
     # X_ct = X_ct[sorted_indices,:].float()
     # X_gr = X_gr[sorted_indices,:].float()
@@ -226,7 +226,7 @@ def basic_grid_collate_nosch(batch):
 
 def sequential_collate(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = [len(x['lats']) for x in batch]
+    seq_lens = torch.tensor([len(x['lats']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -246,19 +246,19 @@ def sequential_collate(batch):
     # Target feature
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
     # Sort all by sequence length descending, for potential packing of each batch
-    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    sorted_slens = sorted_slens.int()
+    # sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
+    # sorted_slens = sorted_slens.int()
     # X_em = X_em[sorted_indices,:].int()
     # X_ct = X_ct[sorted_indices,:,:].float()
     # y = y[sorted_indices,:].float()
     X_em = X_em.int()
     X_ct = X_ct.float()
     y = y.float()
-    return [X_em, X_ct, sorted_slens], y
+    return [X_em, X_ct, seq_lens], y
 
 def sequential_collate_nosch(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = [len(x['lats']) for x in batch]
+    seq_lens = torch.tensor([len(x['lats']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -272,19 +272,19 @@ def sequential_collate_nosch(batch):
     # Target feature
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
     # Sort all by sequence length descending, for potential packing of each batch
-    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    sorted_slens = sorted_slens.int()
+    # sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
+    # sorted_slens = sorted_slens.int()
     # X_em = X_em[sorted_indices,:].int()
     # X_ct = X_ct[sorted_indices,:,:].float()
     # y = y[sorted_indices,:].float()
     X_em = X_em.int()
     X_ct = X_ct.float()
     y = y.float()
-    return [X_em, X_ct, sorted_slens], y
+    return [X_em, X_ct, seq_lens], y
 
 def sequential_grid_collate(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = [len(x['lats']) for x in batch]
+    seq_lens = torch.tensor([len(x['lats']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -307,8 +307,8 @@ def sequential_grid_collate(batch):
     # Target feature
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
     # Sort all by sequence length descending, for potential packing of each batch
-    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    sorted_slens = sorted_slens.int()
+    # sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
+    # sorted_slens = sorted_slens.int()
     # X_em = X_em[sorted_indices,:].int()
     # X_ct = X_ct[sorted_indices,:,:].float()
     # X_gr = X_gr[sorted_indices,:,:].float()
@@ -317,11 +317,11 @@ def sequential_grid_collate(batch):
     X_ct = X_ct.float()
     X_gr = X_gr.float()
     y = y.float()
-    return [X_em, X_ct, X_gr, sorted_slens], y
+    return [X_em, X_ct, X_gr, seq_lens], y
 
 def sequential_grid_collate_nosch(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = [len(x['lats']) for x in batch]
+    seq_lens = torch.tensor([len(x['lats']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -338,8 +338,8 @@ def sequential_grid_collate_nosch(batch):
     # Target feature
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
     # Sort all by sequence length descending, for potential packing of each batch
-    sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    sorted_slens = sorted_slens.int()
+    # sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
+    # sorted_slens = sorted_slens.int()
     # X_em = X_em[sorted_indices,:].int()
     # X_ct = X_ct[sorted_indices,:,:].float()
     # X_gr = X_gr[sorted_indices,:,:].float()
@@ -348,7 +348,7 @@ def sequential_grid_collate_nosch(batch):
     X_ct = X_ct.float()
     X_gr = X_gr.float()
     y = y.float()
-    return [X_em, X_ct, X_gr, sorted_slens], y
+    return [X_em, X_ct, X_gr, seq_lens], y
 
 def deeptte_collate(data):
     stat_attrs = ['dist', 'time']
