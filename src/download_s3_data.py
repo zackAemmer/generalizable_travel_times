@@ -25,7 +25,7 @@ def download_new_s3_files(data_folder, bucket_name):
         new_files = [x for x in available_files if x not in downloaded_files]
         print(f"Found {len(new_files)} new files to download out of {len(available_files)} files in the specified bucket")
         # Download all new files to same data folder
-        for i,file in enumerate(new_files):
+        for i,file in enumerate(new_files[:60]):
             print(f"Downloading file {i} out of {len(new_files)}")
             cli.download_file(bucket_name, file, f"{data_folder}{file}")
     except ValueError:
@@ -33,13 +33,13 @@ def download_new_s3_files(data_folder, bucket_name):
     return None
 
 if __name__ == "__main__":
-    load_dotenv()
-    print(f"Downloading new files...")
-    download_new_s3_files("./data/kcm_all_new/", "gtfs-collection-kcm")
-    download_new_s3_files("./data/nwy_all_new/", "gtfs-collection-nwy")
-    print(f"Extracting operators from downloaded files...")
-    data_utils.extract_operator("./data/nwy_all_new/", "./data/atb_all_new/", "operator_id", "ATB")
-    data_utils.extract_operator("./data/nwy_all_new/", "./data/rut_all_new/", "operator_id", "RUT")
-    # print(f"Extracting operators from GTFS files...")
-    # data_utils.extract_operator_gtfs("./data/nwy_gtfs/", "./data/atb_gtfs/", "trip_id", "trip_id", "ATB")
-    # data_utils.extract_operator_gtfs("./data/nwy_gtfs/", "./data/rut_gtfs/", "trip_id", "trip_id", "RUT")
+    # load_dotenv()
+    # print(f"Downloading new files...")
+    # download_new_s3_files("./data/kcm_all_new/", "gtfs-collection-kcm")
+    # download_new_s3_files("./data/nwy_all_new/", "gtfs-collection-nwy")
+    # print(f"Extracting operators from downloaded files...")
+    # data_utils.extract_operator("./data/nwy_all_new/", "./data/atb_all_new/", "operator_id", "ATB")
+    # data_utils.extract_operator("./data/nwy_all_new/", "./data/rut_all_new/", "operator_id", "RUT")
+    print(f"Extracting operators from GTFS files...")
+    data_utils.extract_operator_gtfs("./data/nwy_gtfs/", "./data/atb_gtfs/", "trip_id", "trip_id", "ATB")
+    data_utils.extract_operator_gtfs("./data/nwy_gtfs/", "./data/rut_gtfs/", "trip_id", "trip_id", "RUT")

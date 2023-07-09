@@ -80,7 +80,8 @@ def calculate_gps_dist(end_x, end_y, start_x, start_y):
     x_diff = (end_x - start_x)
     y_diff = (end_y - start_y)
     dists = np.sqrt(x_diff**2 + y_diff**2)
-    # Measured in degrees from the positive x axis, + is 1/4 quadrants, - is 2/3 quadrants
+    # Measured in degrees from the positive x axis
+    # E==0, N==90, W==180, S==-90
     bearings = np.arctan2(y_diff, x_diff)*180/np.pi
     return dists, bearings
 
@@ -574,7 +575,7 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, skip_gtfs):
         out_file.write(result_json_string)
     return trace_data
 
-def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg, grid_bounds, skip_gtfs):
+def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg, grid_bounds, coord_ref_center, skip_gtfs):
     """
     Get a dict of means and sds which are used to normalize data by DeepTTE.
     trace_data: pandas dataframe with unified columns and calculated distances
@@ -643,6 +644,7 @@ def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg, grid_bounds,
             "n_save_files": n_save_files,
             "epsg": epsg,
             "grid_bounds": grid_bounds,
+            "coord_ref_center": coord_ref_center,
             "train_set": ["train"+str(x) for x in range(0,n_save_files)],
             "test_set": ["test"+str(x) for x in range(0,n_save_files)]
         }
@@ -707,17 +709,21 @@ def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg, grid_bounds,
             "n_save_files": n_save_files,
             "epsg": epsg,
             "grid_bounds": grid_bounds,
+            "coord_ref_center": coord_ref_center,
             "train_set": ["train"+str(x) for x in range(0,n_save_files)],
             "test_set": ["test"+str(x) for x in range(0,n_save_files)]
         }
     return summary_dict
 
 def map_from_deeptte(datalist, keys):
-    lengths = [len(x['lngs']) for x in datalist]
+    lengths = [len(x['lats']) for x in datalist]
     res = np.ones((sum(lengths), len(keys)))
     for i,key in enumerate(keys):
         vals = [sample[key] for sample in datalist]
-        vals = [item for sublist in vals for item in sublist]
+        if isinstance(vals[0], list):
+            vals = [item for sublist in vals for item in sublist]
+        else:
+            vals = np.concatenate([np.repeat(vals[i], lengths[i]) for i, val in enumerate(vals)])
         res[:,i] = vals
     return res
 
@@ -953,3 +959,55 @@ def get_dataset_stats(data_folder, given_names):
         stats["num_obs"] += len(data)
         stats["num_traj"] += len(np.unique(data.trip_id))
     return stats
+
+def create_grid_of_shingles(point_resolution, grid_bounds, coord_ref_center):
+    # Create grid of coordinates to use as inference inputs
+    x_val = np.linspace(grid_bounds[0], grid_bounds[2], point_resolution)
+    y_val = np.linspace(grid_bounds[1], grid_bounds[3], point_resolution)
+    X,Y = np.meshgrid(x_val,y_val)
+    x_spacing = (grid_bounds[2] - grid_bounds[0]) / point_resolution
+    y_spacing = (grid_bounds[3] - grid_bounds[1]) / point_resolution
+    # Create shingle samples with only geometric variables
+    shingles = []
+    # All horizontal shingles W-E and E-W
+    for i in range(X.shape[0]):
+        curr_shingle = {}
+        curr_shingle["x"] = list(X[i,:])
+        curr_shingle["y"] = list(Y[i,:])
+        curr_shingle["dist_calc_km"] = [x_spacing/1000 for x in curr_shingle["x"]]
+        curr_shingle["bearing"] = [0 for x in curr_shingle["x"]]
+        shingles.append(curr_shingle)
+        rev_shingle = {}
+        rev_shingle["x"] = list(np.flip(X[i,:]))
+        rev_shingle["y"] = list(np.flip(Y[i,:]))
+        rev_shingle["dist_calc_km"] = [x_spacing/1000 for x in rev_shingle["x"]]
+        rev_shingle["bearing"] = [180 for x in rev_shingle["x"]]
+        shingles.append(rev_shingle)
+    # All vertical shingles N-S and S-N
+    for j in range(X.shape[1]):
+        curr_shingle = {}
+        curr_shingle["x"] = list(X[:,j])
+        curr_shingle["y"] = list(Y[:,j])
+        curr_shingle["dist_calc_km"] = [y_spacing/1000 for x in curr_shingle["x"]]
+        curr_shingle["bearing"] = [-90 for x in curr_shingle["x"]]
+        shingles.append(curr_shingle)
+        rev_shingle = {}
+        rev_shingle["x"] = list(np.flip(X[:,j]))
+        rev_shingle["y"] = list(np.flip(Y[:,j]))
+        rev_shingle["dist_calc_km"] = [y_spacing/1000 for x in rev_shingle["x"]]
+        rev_shingle["bearing"] = [90 for x in rev_shingle["x"]]
+        shingles.append(rev_shingle)
+    # Add dummy and calculated variables
+    shingle_id = 0
+    for curr_shingle in shingles:
+        curr_shingle['shingle_id'] = shingle_id
+        curr_shingle['timeID'] = 60*9
+        curr_shingle['weekID'] = 3
+        curr_shingle['x_cent'] = [x - coord_ref_center[0] for x in curr_shingle['x']]
+        curr_shingle['y_cent'] = [y - coord_ref_center[1] for y in curr_shingle['y']]
+        curr_shingle['lats'] = curr_shingle['y']
+        curr_shingle['lngs'] = curr_shingle['x']
+        curr_shingle['locationtime'] = [1 for x in curr_shingle['lngs']]
+        curr_shingle['time_calc_s'] = [1 for x in curr_shingle['lngs']]
+        shingle_id += 1
+    return shingles

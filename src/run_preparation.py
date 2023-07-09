@@ -62,7 +62,7 @@ def clean_data(dates, n_save_files, train_or_test, base_folder, **kwargs):
             continue
         print(f"Saving {len(traces)} samples to run folder, retained {np.round(len(traces)/num_raw_points, 2)*100}% of original data points...")
         traces = data_utils.map_to_deeptte(traces, f"{base_folder}deeptte_formatted/{train_or_test}", kwargs['skip_gtfs'])
-        summary_config = data_utils.get_summary_config(traces, kwargs['gtfs_folder'], n_save_files, kwargs['epsg'], kwargs['grid_bounds'], kwargs['skip_gtfs'])
+        summary_config = data_utils.get_summary_config(traces, kwargs['gtfs_folder'], n_save_files, kwargs['epsg'], kwargs['grid_bounds'], kwargs['coord_ref_center'], kwargs['skip_gtfs'])
         # Save config, and traces to file for notebook analyses
         with open(f"{base_folder}deeptte_formatted/{train_or_test}{file_num}_config.json", mode="a") as out_file:
             json.dump(summary_config, out_file)
@@ -103,29 +103,29 @@ def prepare_run(overwrite, run_name, network_name, train_dates, test_dates, **kw
     print(f"RUN PREPARATION COMPLETED '{run_name}/{network_name}'")
 
 if __name__=="__main__":
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
-    # prepare_run(
-    #     overwrite=True,
-    #     run_name="debug",
-    #     network_name="kcm",
-    #     train_dates=data_utils.get_date_list("2023_03_15", 3),
-    #     test_dates=data_utils.get_date_list("2023_03_21", 3),
-    #     num_train_files=2,
-    #     num_test_files=2,
-    #     n_jobs=2,
-    #     n_trace_splits=2,
-    #     data_dropout=0.2,
-    #     gtfs_folder="./data/kcm_gtfs/",
-    #     raw_data_folder="./data/kcm_all_new/",
-    #     timezone="America/Los_Angeles",
-    #     epsg="32148",
-    #     grid_bounds = [369903,37911,409618,87758],
-    #     coord_ref_center = [386910,69022],
-    #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
-    #     skip_gtfs=False
-    # )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    prepare_run(
+        overwrite=True,
+        run_name="debug",
+        network_name="kcm",
+        train_dates=data_utils.get_date_list("2023_03_15", 3),
+        test_dates=data_utils.get_date_list("2023_03_21", 3),
+        num_train_files=2,
+        num_test_files=2,
+        n_jobs=2,
+        n_trace_splits=2,
+        data_dropout=0.2,
+        gtfs_folder="./data/kcm_gtfs/",
+        raw_data_folder="./data/kcm_all_new/",
+        timezone="America/Los_Angeles",
+        epsg="32148",
+        grid_bounds = [369903,37911,409618,87758],
+        coord_ref_center = [386910,69022],
+        given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
+        skip_gtfs=True
+    )
     # random.seed(0)
     # np.random.seed(0)
     # torch.manual_seed(0)
@@ -147,7 +147,7 @@ if __name__=="__main__":
     #     grid_bounds = [550869,7012847,579944,7039521],
     #     coord_ref_center = [569472,7034350],
     #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
-    #     skip_gtfs=False
+    #     skip_gtfs=True
     # )
     # random.seed(0)
     # np.random.seed(0)
@@ -173,72 +173,72 @@ if __name__=="__main__":
     #     skip_gtfs=True
     # )
 
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    prepare_run(
-        overwrite=True,
-        run_name="small",
-        network_name="kcm",
-        train_dates=data_utils.get_date_list("2023_03_15", 28),
-        test_dates=data_utils.get_date_list("2023_05_15", 7),
-        num_train_files=5,
-        num_test_files=5,
-        n_jobs=8,
-        n_trace_splits=8,
-        data_dropout=0.2,
-        gtfs_folder="./data/kcm_gtfs/",
-        raw_data_folder="./data/kcm_all_new/",
-        timezone="America/Los_Angeles",
-        epsg="32148",
-        grid_bounds = [369903,37911,409618,87758],
-        coord_ref_center = [386910,69022],
-        given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
-        skip_gtfs=False
-    )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    prepare_run(
-        overwrite=True,
-        run_name="small",
-        network_name="atb",
-        train_dates=data_utils.get_date_list("2023_03_15", 28),
-        test_dates=data_utils.get_date_list("2023_05_15", 7),
-        num_train_files=5,
-        num_test_files=5,
-        n_jobs=8,
-        n_trace_splits=8,
-        data_dropout=0.2,
-        gtfs_folder="./data/atb_gtfs/",
-        raw_data_folder="./data/atb_all_new/",
-        timezone="Europe/Oslo",
-        epsg="32632",
-        grid_bounds = [550869,7012847,579944,7039521],
-        coord_ref_center = [569472,7034350],
-        given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
-        skip_gtfs=False
-    )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    prepare_run(
-        overwrite=True,
-        run_name="small",
-        network_name="rut",
-        train_dates=data_utils.get_date_list("2023_03_15", 28),
-        test_dates=data_utils.get_date_list("2023_05_15", 7),
-        num_train_files=5,
-        num_test_files=5,
-        n_jobs=8,
-        n_trace_splits=8,
-        data_dropout=0.2,
-        gtfs_folder="./data/rut_gtfs/",
-        raw_data_folder="./data/rut_all_new/",
-        timezone="Europe/Oslo",
-        epsg="32632",
-        grid_bounds = [589080,6631314,604705,6648420],
-        coord_ref_center = [597427,6642805],
-        given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
-        skip_gtfs=True
-    )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # prepare_run(
+    #     overwrite=True,
+    #     run_name="small",
+    #     network_name="kcm",
+    #     train_dates=data_utils.get_date_list("2023_03_15", 28),
+    #     test_dates=data_utils.get_date_list("2023_05_15", 7),
+    #     num_train_files=5,
+    #     num_test_files=5,
+    #     n_jobs=8,
+    #     n_trace_splits=8,
+    #     data_dropout=0.2,
+    #     gtfs_folder="./data/kcm_gtfs/",
+    #     raw_data_folder="./data/kcm_all_new/",
+    #     timezone="America/Los_Angeles",
+    #     epsg="32148",
+    #     grid_bounds = [369903,37911,409618,87758],
+    #     coord_ref_center = [386910,69022],
+    #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
+    #     skip_gtfs=False
+    # )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # prepare_run(
+    #     overwrite=True,
+    #     run_name="small",
+    #     network_name="atb",
+    #     train_dates=data_utils.get_date_list("2023_03_15", 28),
+    #     test_dates=data_utils.get_date_list("2023_05_15", 7),
+    #     num_train_files=5,
+    #     num_test_files=5,
+    #     n_jobs=8,
+    #     n_trace_splits=8,
+    #     data_dropout=0.2,
+    #     gtfs_folder="./data/atb_gtfs/",
+    #     raw_data_folder="./data/atb_all_new/",
+    #     timezone="Europe/Oslo",
+    #     epsg="32632",
+    #     grid_bounds = [550869,7012847,579944,7039521],
+    #     coord_ref_center = [569472,7034350],
+    #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
+    #     skip_gtfs=False
+    # )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # prepare_run(
+    #     overwrite=True,
+    #     run_name="small",
+    #     network_name="rut",
+    #     train_dates=data_utils.get_date_list("2023_03_15", 28),
+    #     test_dates=data_utils.get_date_list("2023_05_15", 7),
+    #     num_train_files=5,
+    #     num_test_files=5,
+    #     n_jobs=8,
+    #     n_trace_splits=8,
+    #     data_dropout=0.2,
+    #     gtfs_folder="./data/rut_gtfs/",
+    #     raw_data_folder="./data/rut_all_new/",
+    #     timezone="Europe/Oslo",
+    #     epsg="32632",
+    #     grid_bounds = [589080,6631314,604705,6648420],
+    #     coord_ref_center = [597427,6642805],
+    #     given_names=['trip_id','file','locationtime','lat','lon','vehicle_id'],
+    #     skip_gtfs=True
+    # )
