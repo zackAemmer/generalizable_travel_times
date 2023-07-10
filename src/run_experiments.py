@@ -1,7 +1,6 @@
 #!/usr/bin python3
 
 
-import gc
 import json
 import random
 
@@ -18,6 +17,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
     print("="*30)
     print(f"RUN EXPERIMENTS: '{run_folder}'")
     print(f"TRAINED ON NETWORK: '{train_network_folder}'")
+    print(f"TUNE ON NETWORK: '{tune_network_folder}'")
     print(f"TEST ON NETWORK: '{test_network_folder}'")
 
     # Select device to train on, and number workers if GPU
@@ -47,37 +47,38 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
     }
 
     # Data loading and fold setup
-    train_network_folder_saveloc = f"{run_folder}{'_'.join([n[:3] for n in train_network_folder])}/"
-    print(f"DATA: '{train_network_folder_saveloc}'")
-    train_network_config = data_utils.combine_config_list([json.load(open(f"{run_folder}{n}deeptte_formatted/train_config.json", "r")) for n in train_network_folder])
-    test_network_config = data_utils.combine_config_list([json.load(open(f"{run_folder}{n}deeptte_formatted/test_config.json", "r")) for n in test_network_folder])
-    tune_network_config = data_utils.combine_config_list([json.load(open(f"{run_folder}{n}deeptte_formatted/train_config.json", "r")) for n in test_network_folder])
+    with open(f"{run_folder}{train_network_folder}deeptte_formatted/train_config.json", "r") as f:
+        train_network_config = json.load(f)
+    with open(f"{run_folder}{test_network_folder}deeptte_formatted/test_config.json", "r") as f:
+        test_network_config = json.load(f)
+    with open(f"{run_folder}{tune_network_folder}deeptte_formatted/train_config.json", "r") as f:
+        tune_network_config = json.load(f)
 
     print(f"Building grid on validation data from training network")
-    train_network_dataset = data_loader.GenericDataset([f"{run_folder}{n}deeptte_formatted/train" for n in train_network_folder], train_network_config, holdout_routes=kwargs['holdout_routes'])
-    train_network_ngrid = grids.NGridBetter(train_network_config['grid_bounds'],kwargs['grid_s_size'])
-    train_network_ngrid.add_grid_content(data_utils.map_from_deeptte([x for i,x in enumerate(train_network_dataset.content) if True],["locationtime","x","y","speed_m_s","bearing"]))
+    train_network_dataset = data_loader.GenericDataset(f"{run_folder}{train_network_folder}deeptte_formatted/test", train_network_config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
+    train_network_ngrid = grids.NGridBetter(train_network_config['grid_bounds'][0],kwargs['grid_s_size'])
+    train_network_ngrid.add_grid_content(train_network_dataset.pq_dataset.to_table().to_pandas(), trace_format=True)
     train_network_ngrid.build_cell_lookup()
     train_network_dataset.grid = train_network_ngrid
     print(f"Building grid on validation data from testing network")
-    test_network_dataset = data_loader.GenericDataset([f"{run_folder}{n}deeptte_formatted/test" for n in test_network_folder], test_network_config, holdout_routes=kwargs['holdout_routes'])
-    test_network_ngrid = grids.NGridBetter(test_network_config['grid_bounds'],kwargs['grid_s_size'])
-    test_network_ngrid.add_grid_content(data_utils.map_from_deeptte([x for i,x in enumerate(test_network_dataset.content) if True],["locationtime","x","y","speed_m_s","bearing"]))
+    test_network_dataset = data_loader.GenericDataset(f"{run_folder}{test_network_folder}deeptte_formatted/test", test_network_config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
+    test_network_ngrid = grids.NGridBetter(test_network_config['grid_bounds'][0],kwargs['grid_s_size'])
+    test_network_ngrid.add_grid_content(test_network_dataset.pq_dataset.to_table().to_pandas(), trace_format=True)
     test_network_ngrid.build_cell_lookup()
     test_network_dataset.grid = test_network_ngrid
     print(f"Building tune grid on training data from testing network")
-    tune_network_dataset = data_loader.GenericDataset([f"{run_folder}{n}deeptte_formatted/train" for n in test_network_folder], tune_network_config, subset=kwargs['n_tune_samples'], holdout_routes=kwargs['holdout_routes'])
-    tune_network_ngrid = grids.NGridBetter(tune_network_config['grid_bounds'],kwargs['grid_s_size'])
-    tune_network_ngrid.add_grid_content(data_utils.map_from_deeptte([x for i,x in enumerate(tune_network_dataset.content) if True],["locationtime","x","y","speed_m_s","bearing"]))
+    tune_network_dataset = data_loader.GenericDataset(f"{run_folder}{tune_network_folder}deeptte_formatted/train", tune_network_config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
+    tune_network_ngrid = grids.NGridBetter(tune_network_config['grid_bounds'][0],kwargs['grid_s_size'])
+    tune_network_ngrid.add_grid_content(tune_network_dataset.pq_dataset.to_table().to_pandas(), trace_format=True)
     tune_network_ngrid.build_cell_lookup()
     tune_network_dataset.grid = tune_network_ngrid
     if not kwargs['skip_gtfs']:
         print(f"Building route holdout grid on validation data from training network")
-        holdout_route_dataset = data_loader.GenericDataset([f"{run_folder}{n}deeptte_formatted/test" for n in train_network_folder], train_network_config, holdout_routes=kwargs['holdout_routes'])
-        holdout_network_ngrid = grids.NGridBetter(train_network_config['grid_bounds'],kwargs['grid_s_size'])
-        holdout_network_ngrid.add_grid_content(data_utils.map_from_deeptte([x for i,x in enumerate(train_network_dataset.content) if True],["locationtime","x","y","speed_m_s","bearing"]))
+        holdout_network_dataset = data_loader.GenericDataset(f"{run_folder}{train_network_folder}deeptte_formatted/test", train_network_config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
+        holdout_network_ngrid = grids.NGridBetter(train_network_config['grid_bounds'][0],kwargs['grid_s_size'])
+        holdout_network_ngrid.add_grid_content(holdout_network_dataset.pq_dataset.to_table().to_pandas(), trace_format=True)
         holdout_network_ngrid.build_cell_lookup()
-        holdout_route_dataset.grid = holdout_network_ngrid
+        holdout_network_dataset.grid = holdout_network_ngrid
 
     run_results = []
 
@@ -91,13 +92,13 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
         test_network_sampler = SubsetRandomSampler(np.arange(len(test_network_dataset)))
         tune_network_sampler = SubsetRandomSampler(np.arange(len(tune_network_dataset)))
         if not kwargs['skip_gtfs']:
-            holdout_route_sampler = SubsetRandomSampler(np.arange(len(holdout_route_dataset)))
+            holdout_network_sampler = SubsetRandomSampler(np.arange(len(holdout_network_dataset)))
 
         # Declare models
         if not kwargs['skip_gtfs']:
-            model_list = model_utils.make_all_models(kwargs['HIDDEN_SIZE'], kwargs['BATCH_SIZE'], embed_dict, device, train_network_config, load_weights=True, weight_folder=f"{train_network_folder_saveloc}models/", fold_num=fold_num)
+            model_list = model_utils.make_all_models(kwargs['HIDDEN_SIZE'], kwargs['BATCH_SIZE'], embed_dict, device, train_network_config, load_weights=True, weight_folder=f"{run_folder}{train_network_folder}models/", fold_num=fold_num)
         else:
-            model_list = model_utils.make_all_models_nosch(kwargs['HIDDEN_SIZE'], kwargs['BATCH_SIZE'], embed_dict, device, train_network_config, load_weights=True, weight_folder=f"{train_network_folder_saveloc}/models/", fold_num=fold_num)
+            model_list = model_utils.make_all_models_nosch(kwargs['HIDDEN_SIZE'], kwargs['BATCH_SIZE'], embed_dict, device, train_network_config, load_weights=True, weight_folder=f"{run_folder}{train_network_folder}models/", fold_num=fold_num)
         model_names = [m.model_name for m in model_list]
 
         print(f"Model names: {model_names}")
@@ -147,15 +148,15 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             print(f"Evaluating {run_folder}{train_network_folder} on holdout routes from {train_network_folder}")
             for model in model_list:
                 print(f"Evaluating: {model.model_name}")
-                holdout_route_dataset.add_grid_features = model.requires_grid
-                loader = DataLoader(holdout_route_dataset, sampler=holdout_route_sampler, collate_fn=model.collate_fn, batch_size=kwargs['BATCH_SIZE'], pin_memory=PIN_MEMORY, num_workers=NUM_WORKERS, drop_last=True)
+                holdout_network_dataset.add_grid_features = model.requires_grid
+                loader = DataLoader(holdout_network_dataset, sampler=holdout_network_sampler, collate_fn=model.collate_fn, batch_size=kwargs['BATCH_SIZE'], pin_memory=PIN_MEMORY, num_workers=NUM_WORKERS, drop_last=True)
                 labels, preds = model.evaluate(loader, train_network_config)
                 model_fold_results[model.model_name]["Holdout_Labels"].extend(list(labels))
                 model_fold_results[model.model_name]["Holdout_Preds"].extend(list(preds))
 
             print(f"EXPERIMENT: FINE TUNING")
             # Re-declare models with original weights
-            model_list = model_utils.make_all_models(kwargs['HIDDEN_SIZE'], kwargs['BATCH_SIZE'], embed_dict, device, train_network_config, load_weights=True, weight_folder=f"{train_network_folder_saveloc}models/", fold_num=fold_num)
+            model_list = model_utils.make_all_models(kwargs['HIDDEN_SIZE'], kwargs['BATCH_SIZE'], embed_dict, device, train_network_config, load_weights=True, weight_folder=f"{run_folder}{train_network_folder}models/", fold_num=fold_num)
             # Tune model on tuning network
             for model in model_list:
                 print(f"Tuning model {model.model_name} on {tune_network_folder}")
@@ -184,13 +185,13 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             print(f"Fold {fold_num} fine tuning complete, saving model states and metrics...")
             for model in model_list:
                 if model.is_nn:
-                    torch.save(model.state_dict(), f"{train_network_folder_saveloc}models/{model.model_name}_tuned_{fold_num}.pt")
+                    torch.save(model.state_dict(), f"{run_folder}{train_network_folder}models/{model.model_name}_tuned_{fold_num}.pt")
                 else:
-                    model.save_to(f"{train_network_folder_saveloc}models/{model.model_name}_tuned_{fold_num}.pkl")
+                    model.save_to(f"{run_folder}{train_network_folder}models/{model.model_name}_tuned_{fold_num}.pkl")
 
             print(f"EXPERIMENT: FEATURE EXTRACTION")
             # Re-declare models with original weights
-            model_list = model_utils.make_all_models(kwargs['HIDDEN_SIZE'], kwargs['BATCH_SIZE'], embed_dict, device, train_network_config, load_weights=True, weight_folder=f"{train_network_folder_saveloc}models/", fold_num=fold_num)
+            model_list = model_utils.make_all_models(kwargs['HIDDEN_SIZE'], kwargs['BATCH_SIZE'], embed_dict, device, train_network_config, load_weights=True, weight_folder=f"{run_folder}{train_network_folder}models/", fold_num=fold_num)
             # Tune model on tuning network
             for model in model_list:
                 print(f"Tuning model {model.model_name} on {tune_network_folder}")
@@ -221,9 +222,9 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             print(f"Fold {fold_num} fine tuning complete, saving model states and metrics...")
             for model in model_list:
                 if model.is_nn:
-                    torch.save(model.state_dict(), f"{train_network_folder_saveloc}models/{model.model_name}_tuned_{fold_num}.pt")
+                    torch.save(model.state_dict(), f"{run_folder}{train_network_folder}models/{model.model_name}_tuned_{fold_num}.pt")
                 else:
-                    model.save_to(f"{train_network_folder_saveloc}models/{model.model_name}_tuned_{fold_num}.pkl")
+                    model.save_to(f"{run_folder}{train_network_folder}models/{model.model_name}_tuned_{fold_num}.pkl")
 
         # Calculate various losses:
         fold_results = {
@@ -279,58 +280,60 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
         run_results.append(fold_results)
 
     # Save run results
-    data_utils.write_pkl(run_results, f"{train_network_folder_saveloc}model_generalization_results.pkl")
+    data_utils.write_pkl(run_results, f"{run_folder}{train_network_folder}model_generalization_results.pkl")
     print(f"EXPERIMENTS COMPLETED '{run_folder}{train_network_folder}'")
 
 
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
 
+    # DEBUG
     random.seed(0)
     np.random.seed(0)
     torch.manual_seed(0)
     run_experiments(
         run_folder="./results/debug/",
-        train_network_folder=["kcm/"],
-        test_network_folder=["atb/"],
-        tune_network_folder=["atb/"],
-        TUNE_EPOCHS=4,
+        train_network_folder="kcm/",
+        test_network_folder="atb/",
+        tune_network_folder="atb/",
+        TUNE_EPOCHS=2,
         BATCH_SIZE=32,
         LEARN_RATE=1e-3,
         HIDDEN_SIZE=32,
         grid_s_size=500,
         n_tune_samples=100,
         n_folds=2,
-        holdout_routes=None,
-        skip_gtfs=True
+        holdout_routes=[100252,100139,102581,100341,102720],
+        skip_gtfs=False
     )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_experiments(
+        run_folder="./results/debug/",
+        train_network_folder="atb/",
+        test_network_folder="kcm/",
+        tune_network_folder="kcm/",
+        TUNE_EPOCHS=2,
+        BATCH_SIZE=32,
+        LEARN_RATE=1e-3,
+        HIDDEN_SIZE=32,
+        grid_s_size=500,
+        n_tune_samples=100,
+        n_folds=2,
+        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
+        skip_gtfs=False
+    )
+    # # DEBUG MIXED
     # random.seed(0)
     # np.random.seed(0)
     # torch.manual_seed(0)
     # run_experiments(
-    #     run_folder="./results/debug/",
-    #     train_network_folder=["atb/"],
-    #     test_network_folder=["kcm/"],
-    #     tune_network_folder=["kcm/"],
-    #     TUNE_EPOCHS=4,
-    #     BATCH_SIZE=32,
-    #     LEARN_RATE=1e-3,
-    #     HIDDEN_SIZE=32,
-    #     grid_s_size=500,
-    #     n_tune_samples=100,
-    #     n_folds=2,
-    #     holdout_routes=None,
-    #     skip_gtfs=True
-    # )
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
-    # run_experiments(
-    #     run_folder="./results/debug/",
-    #     train_network_folder=["kcm/","atb/"],
-    #     test_network_folder=["rut/"],
-    #     tune_network_folder=["rut/"],
-    #     TUNE_EPOCHS=4,
+    #     run_folder="./results/debug_nosch/",
+    #     train_network_folder="kcm_atb/",
+    #     test_network_folder="rut/",
+    #     tune_network_folder="rut/",
+    #     TUNE_EPOCHS=2,
     #     BATCH_SIZE=32,
     #     LEARN_RATE=1e-3,
     #     HIDDEN_SIZE=32,

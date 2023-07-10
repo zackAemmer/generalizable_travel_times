@@ -172,9 +172,9 @@ class Net(nn.Module):
 
         if self.training:
             # get the mean/std of each local path
-            mean, std = (self.kernel_size - 1) * config['time_gap_mean'], (self.kernel_size - 1) * config['time_gap_std']
+            mean, std = (self.kernel_size - 1) * config['time_calc_s_mean'], (self.kernel_size - 1) * config['time_calc_s_std']
             # get ground truth of each local path
-            local_label = deeptte_utils.get_local_seq(traj['time_gap'], self.kernel_size, mean, std)
+            local_label = deeptte_utils.get_local_seq(traj['time_calc_s'], self.kernel_size, mean, std)
             local_loss = self.local_estimate.eval_on_batch(local_out, local_length, local_label, mean, std)
 
             return pred_dict['label'], pred_dict['pred'], (1 - self.alpha) * entire_loss + self.alpha * local_loss   ### According to eqn 8 of paper

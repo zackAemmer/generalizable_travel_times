@@ -19,8 +19,8 @@ Features associated with entire trip i.e. len(dict[key]) == 1 (categorical unles
 6. time - continuous (ground truth, total travel time) 
 
 Features associated with each ping i.e. len(dict[key]) >= 1(all continuous)
-1. lats
-2. lngs
+1. lat
+2. lon
 3. dist_gap
 4. time_gap
 5. states (optional)
@@ -36,7 +36,7 @@ class MySet(Dataset):
             ### json.loads() returns each string as a dict, content is now a map object i.e. list of dicts
             self.content = list(map(lambda x: json.loads(x), self.content))
             ### gets the number of trajectories in each trip, lengths is a map object i.e. list of int 
-            self.lengths = list(map(lambda x: len(x['lngs']), self.content))
+            self.lengths = list(map(lambda x: len(x['lon']), self.content))
         # Limit to data from this fold if training
         if keep_chunks=="train":
             n_per_fold = len(self.content) // n_folds
@@ -77,15 +77,15 @@ class MySet(Dataset):
 def collate_fn(data):
     stat_attrs = ['dist', 'time']
     info_attrs = ['weekID', 'timeID']
-    traj_attrs = ['lngs', 'lats', 'time_gap', 'dist_gap']
+    traj_attrs = ['lon', 'lat', 'time_gap', 'dist_gap']
     # Add additional features
-    traj_attrs = ['lngs','lats','time_gap','dist_gap','bearing','scheduled_time_s','stop_dist_km','stop_x_cent','stop_y_cent','passed_stops_n']
+    traj_attrs = ['lon','lat','time_gap','dist_gap','bearing','scheduled_time_s','stop_dist_km','stop_x_cent','stop_y_cent','passed_stops_n']
 
     attr, traj = {}, {}
 
-    ### item refers to each trip, len(item['lngs']) would return length of each trip
+    ### item refers to each trip, len(item['lon']) would return length of each trip
     ### lens is an array of length of each trip in the batch
-    lens = np.asarray([len(item['lngs']) for item in data])
+    lens = np.asarray([len(item['lon']) for item in data])
 
     ### Since these features are continuous, then normalise them
     for key in stat_attrs:

@@ -15,7 +15,7 @@ class PersistentTimeSeqModel:
         return None
     def evaluate(self, dataloader, config):
         data = np.array(dataloader.dataset.content)[dataloader.sampler.indices]
-        preds = np.array([len(sample['time_gap'])*30 for sample in data])
+        preds = np.array([len(sample['time_calc_s'])*30 for sample in data])
         labels = np.array([sample['time'] for sample in data])
         return labels, preds
     def save_to(self, path):

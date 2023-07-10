@@ -19,13 +19,13 @@ from utils import data_utils
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
 
-def apply_bbox(lats, lons, bbox):
+def apply_bbox(lat, lons, bbox):
     min_lat = bbox[0]
     min_lon = bbox[1]
     max_lat = bbox[2]
     max_lon = bbox[3]
-    a = [lats>=min_lat]
-    b = [lats>=min_lat]
+    a = [lat>=min_lat]
+    b = [lat>=min_lat]
     c = [lons>=min_lon]
     d = [lons>=min_lon]
     return [a and b and c and d]

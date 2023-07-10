@@ -74,7 +74,7 @@ if __name__ == "__main__":
     trip_ids = [str(x['MonitoredVehicleJourney']['FramedVehicleJourneyRef']['DatedVehicleJourneyRef']) for x in data]
     vehicle_ids = [str(x['MonitoredVehicleJourney']['VehicleRef']) for x in data]
     operator_ids = [str(x['MonitoredVehicleJourney']['DataSource']) for x in data]
-    lats = [str(x['MonitoredVehicleJourney']['VehicleLocation']['Latitude']) for x in data]
+    lat = [str(x['MonitoredVehicleJourney']['VehicleLocation']['Latitude']) for x in data]
     lons = [str(x['MonitoredVehicleJourney']['VehicleLocation']['Longitude']) for x in data]
     try:
         schedule_deviations = [str(x['MonitoredVehicleJourney']['Delay']) for x in data]
@@ -84,7 +84,7 @@ if __name__ == "__main__":
         "trip_id": trip_ids,
         "vehicle_id": vehicle_ids,
         "operator_id": operator_ids,
-        "lat": lats,
+        "lat": lat,
         "lon": lons,
         "scheduleDeviation": schedule_deviations,
         "locationtime": locationtimes

@@ -2,6 +2,10 @@ import json
 from random import sample
 
 import numpy as np
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
+import pyarrow.dataset as ds
 import torch
 from torch.utils.data import Dataset, DataLoader, IterableDataset
 
@@ -10,19 +14,20 @@ from utils import data_utils, shape_utils
 
 
 class GenericDataset(Dataset):
-    def __init__(self, file_path, config, grid=None, subset=None, holdout_routes=None, keep_only_holdout=False, add_grid_features=False):
-        self.file_path = list(file_path)
+    def __init__(self, file_path, config, grid=None, subset=None, holdout_routes=None, keep_only_holdout=False, add_grid_features=False, skip_gtfs=False):
+        self.file_path = file_path
         self.config = config
         self.grid = grid
         self.subset = subset
         self.holdout_routes = holdout_routes
         self.keep_only_holdout = keep_only_holdout
         self.add_grid_features = add_grid_features
-        self.content = []
+        self.skip_gtfs = skip_gtfs
+        # Point to a parquet datafile
+        self.pq_dataset = ds.dataset(self.file_path, format="parquet")
+        # Read all into memory and reformat
+        self.content = data_utils.map_to_records(self.pq_dataset.to_table().to_pandas(), self.skip_gtfs)
         # Filter out (or keep exclusively) any routes that are used for generalization tests
-        for network_path in self.file_path:
-            content = list(map(lambda x: json.loads(x), open(network_path, "r").readlines()))
-            self.content.extend(content)
         if self.holdout_routes is not None:
             is_holdout = [x['route_id'] in holdout_routes for x in self.content]
             if self.keep_only_holdout==True:
@@ -35,18 +40,40 @@ class GenericDataset(Dataset):
             else:
                 self.content = sample(self.content, self.subset)
         # Save length of all shingles
-        self.lengths = list(map(lambda x: len(x['lngs']), self.content))
+        self.lengths = list(map(lambda x: len(x['lon']), self.content))
+        # if self.holdout_routes is not None:
+        #     if self.keep_only_holdout==True:
+        #         data = data[data["route_id"].isin(self.holdout_routes)]
+        #     else:
+        #         data = data[~data["route_id"].isin(self.holdout_routes)]
+        # if self.subset is not None:
+        #     if self.subset < 1:
+        #         keep_amnt = int(len(pd.unique(data["shingle_id"])) * self.subset)
+        #         keep_ids = np.random.choice(pd.unique(data["shingle_id"]), keep_amnt)
+        #         data = data[data["shingle_id"].isin(keep_ids)]
+        #     else:
+        #         keep_ids = np.random.choice(pd.unique(data["shingle_id"]), self.subset)
+        #         data = data[data["shingle_id"].isin(keep_ids)]
+
     def __getitem__(self, index):
+        # If precomputing:
         sample = self.content[index].copy()
+        # # If trying to read partially:
+        # sample = self.pq_dataset.to_table(filter=ds.field("shingle_id")==index).to_pandas()
+        # sample = data_utils.map_to_records(sample, self.skip_gtfs)[0]
+        # Add grid if applicable
         if self.grid is not None and self.add_grid_features:
             xbin_idxs, ybin_idxs = self.grid.digitize_points(sample['x'], sample['y'])
-            grid_features = self.grid.get_grid_features(xbin_idxs, ybin_idxs, [sample['trip_start_locationtime'] for x in sample['lngs']])
+            grid_features = self.grid.get_grid_features(xbin_idxs, ybin_idxs, [sample['locationtime'][0] for x in sample['lon']])
             grid_features = apply_grid_normalization(grid_features, self.config)
             sample['grid_features'] = grid_features
         sample = apply_normalization(sample, self.config)
         return sample
     def __len__(self):
+        # If precomputing:
         return len(self.content)
+        # # If trying to read partially:
+        # data = self.pq_dataset.to_table(filter=ds.field("shingle_id")==index).to_pandas()
 
 def apply_normalization(sample, config):
     for var_name in sample.keys():
@@ -86,7 +113,7 @@ def apply_grid_normalization(grid_features, config):
 
 def basic_collate(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['lats']) for x in batch]).int()
+    seq_lens = torch.tensor([len(x['lat']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -109,11 +136,6 @@ def basic_collate(batch):
     # Sort all dataloaders so that they are consistent in the results
     X_em = torch.from_numpy(X_em)
     X_ct = torch.from_numpy(X_ct)
-    # sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    # sorted_slens = sorted_slens.int()
-    # X_em = X_em[sorted_indices,:].int()
-    # X_ct = X_ct[sorted_indices,:].float()
-    # y = y[sorted_indices].float()
     X_em = X_em.int()
     X_ct = X_ct.float()
     y = y.float()
@@ -121,7 +143,7 @@ def basic_collate(batch):
 
 def basic_collate_nosch(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['lats']) for x in batch]).int()
+    seq_lens = torch.tensor([len(x['lat']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -139,11 +161,6 @@ def basic_collate_nosch(batch):
     # Sort all dataloaders so that they are consistent in the results
     X_em = torch.from_numpy(X_em)
     X_ct = torch.from_numpy(X_ct)
-    # sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    # sorted_slens = sorted_slens.int()
-    # X_em = X_em[sorted_indices,:].int()
-    # X_ct = X_ct[sorted_indices,:].float()
-    # y = y[sorted_indices].float()
     X_em = X_em.int()
     X_ct = X_ct.float()
     y = y.float()
@@ -151,7 +168,7 @@ def basic_collate_nosch(batch):
 
 def basic_grid_collate(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['lats']) for x in batch]).int()
+    seq_lens = torch.tensor([len(x['lat']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -177,12 +194,6 @@ def basic_grid_collate(batch):
     X_em = torch.from_numpy(X_em)
     X_ct = torch.from_numpy(X_ct)
     X_gr = torch.from_numpy(X_gr)
-    # sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    # sorted_slens = sorted_slens.int()
-    # X_em = X_em[sorted_indices,:].int()
-    # X_ct = X_ct[sorted_indices,:].float()
-    # X_gr = X_gr[sorted_indices,:].float()
-    # y = y[sorted_indices].float()
     X_em = X_em.int()
     X_ct = X_ct.float()
     X_gr = X_gr.float()
@@ -191,7 +202,7 @@ def basic_grid_collate(batch):
 
 def basic_grid_collate_nosch(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['lats']) for x in batch]).int()
+    seq_lens = torch.tensor([len(x['lat']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -212,12 +223,6 @@ def basic_grid_collate_nosch(batch):
     X_em = torch.from_numpy(X_em)
     X_ct = torch.from_numpy(X_ct)
     X_gr = torch.from_numpy(X_gr)
-    # sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    # sorted_slens = sorted_slens.int()
-    # X_em = X_em[sorted_indices,:].int()
-    # X_ct = X_ct[sorted_indices,:].float()
-    # X_gr = X_gr[sorted_indices,:].float()
-    # y = y[sorted_indices].float()
     X_em = X_em.int()
     X_ct = X_ct.float()
     X_gr = X_gr.float()
@@ -226,7 +231,7 @@ def basic_grid_collate_nosch(batch):
 
 def sequential_collate(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['lats']) for x in batch]).int()
+    seq_lens = torch.tensor([len(x['lat']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -245,12 +250,6 @@ def sequential_collate(batch):
     X_ct[:,:,9] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['passed_stops_n']) for x in batch], batch_first=True)
     # Target feature
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
-    # Sort all by sequence length descending, for potential packing of each batch
-    # sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    # sorted_slens = sorted_slens.int()
-    # X_em = X_em[sorted_indices,:].int()
-    # X_ct = X_ct[sorted_indices,:,:].float()
-    # y = y[sorted_indices,:].float()
     X_em = X_em.int()
     X_ct = X_ct.float()
     y = y.float()
@@ -258,7 +257,7 @@ def sequential_collate(batch):
 
 def sequential_collate_nosch(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['lats']) for x in batch]).int()
+    seq_lens = torch.tensor([len(x['lat']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -271,12 +270,6 @@ def sequential_collate_nosch(batch):
     X_ct[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
     # Target feature
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
-    # Sort all by sequence length descending, for potential packing of each batch
-    # sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    # sorted_slens = sorted_slens.int()
-    # X_em = X_em[sorted_indices,:].int()
-    # X_ct = X_ct[sorted_indices,:,:].float()
-    # y = y[sorted_indices,:].float()
     X_em = X_em.int()
     X_ct = X_ct.float()
     y = y.float()
@@ -284,7 +277,7 @@ def sequential_collate_nosch(batch):
 
 def sequential_grid_collate(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['lats']) for x in batch]).int()
+    seq_lens = torch.tensor([len(x['lat']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -306,13 +299,6 @@ def sequential_grid_collate(batch):
     X_gr = torch.nn.utils.rnn.pad_sequence(z, batch_first=True)
     # Target feature
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
-    # Sort all by sequence length descending, for potential packing of each batch
-    # sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    # sorted_slens = sorted_slens.int()
-    # X_em = X_em[sorted_indices,:].int()
-    # X_ct = X_ct[sorted_indices,:,:].float()
-    # X_gr = X_gr[sorted_indices,:,:].float()
-    # y = y[sorted_indices,:].float()
     X_em = X_em.int()
     X_ct = X_ct.float()
     X_gr = X_gr.float()
@@ -321,7 +307,7 @@ def sequential_grid_collate(batch):
 
 def sequential_grid_collate_nosch(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['lats']) for x in batch]).int()
+    seq_lens = torch.tensor([len(x['lat']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -337,13 +323,6 @@ def sequential_grid_collate_nosch(batch):
     X_gr = torch.nn.utils.rnn.pad_sequence(z, batch_first=True)
     # Target feature
     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
-    # Sort all by sequence length descending, for potential packing of each batch
-    # sorted_slens, sorted_indices = torch.sort(torch.tensor(seq_lens), descending=True)
-    # sorted_slens = sorted_slens.int()
-    # X_em = X_em[sorted_indices,:].int()
-    # X_ct = X_ct[sorted_indices,:,:].float()
-    # X_gr = X_gr[sorted_indices,:,:].float()
-    # y = y[sorted_indices,:].float()
     X_em = X_em.int()
     X_ct = X_ct.float()
     X_gr = X_gr.float()
@@ -353,10 +332,9 @@ def sequential_grid_collate_nosch(batch):
 def deeptte_collate(data):
     stat_attrs = ['dist', 'time']
     info_attrs = ['weekID', 'timeID']
-    traj_attrs = ['lngs', 'lats', 'time_gap', 'dist_gap']
-    traj_attrs = ['lngs','lats','time_gap','dist_gap','bearing','scheduled_time_s','stop_dist_km','stop_x_cent','stop_y_cent','passed_stops_n']
+    traj_attrs = ['y_cent','x_cent','time_calc_s','dist_calc_km','bearing','scheduled_time_s','stop_dist_km','stop_x_cent','stop_y_cent','passed_stops_n']
     attr, traj = {}, {}
-    lens = np.asarray([len(item['lngs']) for item in data])
+    lens = np.asarray([len(item['lon']) for item in data])
     for key in stat_attrs:
         attr[key] = torch.FloatTensor([item[key] for item in data])
     for key in info_attrs:
@@ -375,10 +353,9 @@ def deeptte_collate(data):
 def deeptte_collate_nosch(data):
     stat_attrs = ['dist', 'time']
     info_attrs = ['weekID', 'timeID']
-    traj_attrs = ['lngs', 'lats', 'time_gap', 'dist_gap','bearing']
-    # traj_attrs = ['lngs','lats','time_gap','dist_gap','bearing','scheduled_time_s','stop_dist_km','stop_x_cent','stop_y_cent','passed_stops_n']
+    traj_attrs = ['y_cent', 'x_cent', 'time_calc_s', 'dist_calc_km']
     attr, traj = {}, {}
-    lens = np.asarray([len(item['lngs']) for item in data])
+    lens = np.asarray([len(item['lon']) for item in data])
     for key in stat_attrs:
         attr[key] = torch.FloatTensor([item[key] for item in data])
     for key in info_attrs:

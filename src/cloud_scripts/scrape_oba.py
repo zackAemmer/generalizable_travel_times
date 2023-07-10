@@ -39,7 +39,7 @@ if __name__ == "__main__":
     locationtimes = [str(x['lastLocationUpdateTime'])[:-3] for x in data]
     trip_ids = [str(x['tripStatus']['activeTripId'])[2:] for x in data]
     vehicle_ids = [str(x['vehicleId'])[2:] for x in data]
-    lats = [str(x['location']['lat']) for x in data]
+    lat = [str(x['location']['lat']) for x in data]
     lons = [str(x['location']['lon']) for x in data]
     orientations = [str(x['tripStatus']['orientation']) for x in data]
     try:
@@ -53,7 +53,7 @@ if __name__ == "__main__":
     data = pd.DataFrame({
         "trip_id": trip_ids,
         "vehicle_id": vehicle_ids,
-        "lat": lats,
+        "lat": lat,
         "lon": lons,
         "orientation": orientations,
         "scheduleDeviation": schedule_deviations,

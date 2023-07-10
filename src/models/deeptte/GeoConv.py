@@ -22,10 +22,10 @@ class Net(nn.Module):
         self.conv = nn.Conv1d(16, self.num_filter, self.kernel_size)
 
     def forward(self, traj, config):
-        lngs = torch.unsqueeze(traj['lngs'], dim = 2)
-        lats = torch.unsqueeze(traj['lats'], dim = 2)
+        lon = torch.unsqueeze(traj['y_cent'], dim = 2)
+        lat = torch.unsqueeze(traj['x_cent'], dim = 2)
 
-        locs = torch.cat((lngs, lats), dim = 2)   ### Remove states 
+        locs = torch.cat((lon, lat), dim = 2)   ### Remove states 
 
         # map the coords into 16-dim vector
         locs = torch.tanh(self.process_coords(locs))   ### size [batch, max len of trajectory in batch, 16]
@@ -35,7 +35,7 @@ class Net(nn.Module):
         conv_locs = conv_locs.permute(0, 2, 1)   ### size [batch, max len - kernel_size + 1, num_filter]
 
         # calculate the dist for local paths
-        local_dist = deeptte_utils.get_local_seq(traj['dist_gap'], self.kernel_size, config['dist_gap_mean'], config['dist_gap_std'])
+        local_dist = deeptte_utils.get_local_seq(traj['dist_calc_km'], self.kernel_size, config['dist_calc_km_mean'], config['dist_calc_km_std'])
         local_dist = torch.unsqueeze(local_dist, dim = 2)   ### ### size [batch, max len - kernel_size + 1, 1]
 
         conv_locs = torch.cat((conv_locs, local_dist), dim = 2)   ### size [batch, max len - kernel_size + 1, num_filter + 1]

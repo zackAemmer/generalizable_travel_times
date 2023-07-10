@@ -369,7 +369,7 @@ def get_scheduled_arrival(trip_ids, x, y, gtfs_data):
     """
     Find the nearest stop to a set of trip-coordinates, and return the scheduled arrival time.
     trip_ids: list of trip_ids
-    lons/lats: lists of places where the bus will be arriving (end point of traj)
+    lons/lat: lists of places where the bus will be arriving (end point of traj)
     gtfs_data: merged GTFS files
     Returns: (distance to closest stop in km, scheduled arrival time at that stop).
     """
@@ -456,7 +456,7 @@ def remap_ids(df_list, id_col):
         df[f"{id_col}_recode"] = recode
     return (df_list, len(pd.unique(all_ids)), mapping)
 
-def map_to_deeptte(trace_data, deeptte_formatted_path, skip_gtfs):
+def map_to_records(trace_data, skip_gtfs):
     """
     Reshape pandas dataframe to the json format needed to use deeptte.
     trace_data: dataframe with bus trajectories
@@ -466,14 +466,6 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, skip_gtfs):
     # These will be trip-totals
     trace_data['dist'] = trace_data['dist_cumulative_km']
     trace_data['time'] = trace_data['time_cumulative_s']
-    # Cumulative values
-    trace_data['dist_gap'] = trace_data['dist_cumulative_km']
-    trace_data['time_gap'] = trace_data['time_cumulative_s']
-    # Lists
-    trace_data['lats'] = trace_data['lat']
-    trace_data['lngs'] = trace_data['lon']
-    trace_data['trip_start_locationtime'] = trace_data['locationtime']
-    trace_data['trip_start_timeID_s'] = trace_data['timeID_s']
 
     # Gather by shingle
     groups = trace_data.groupby('shingle_id')
@@ -481,101 +473,58 @@ def map_to_deeptte(trace_data, deeptte_formatted_path, skip_gtfs):
     # Get necessary features as scalar or lists
     if not skip_gtfs:
         result = groups.agg({
-            # Cumulative point time/dist
-            'time_gap': lambda x: x.tolist(),
-            'dist_gap': lambda x: x.tolist(),
-            # Trip time/dist
-            'time': 'max',
+            # Totals
             'dist': 'max',
-            # IDs
+            'time': 'max',
+            # GPS features
+            'shingle_id': 'min',
             'weekID': 'min',
             'timeID': 'min',
-            'dateID': 'min',
-            'trip_id': 'min',
-            'file': 'min',
-            'route_id': 'min',
-            'service_id': 'min',
-            'direction_id': 'min',
-            # Individual point time/dist
-            'lats': lambda x: x.tolist(),
-            'lngs': lambda x: x.tolist(),
+            'timeID_s': lambda x: x.tolist(),
+            'locationtime': lambda x: x.tolist(),
+            'lon': lambda x: x.tolist(),
+            'lat': lambda x: x.tolist(),
             'x': lambda x: x.tolist(),
             'y': lambda y: y.tolist(),
             'x_cent': lambda x: x.tolist(),
             'y_cent': lambda y: y.tolist(),
-            'speed_m_s': lambda x: x.tolist(),
-            'time_calc_s': lambda x: x.tolist(),
             'dist_calc_km': lambda x: x.tolist(),
+            'time_calc_s': lambda x: x.tolist(),
+            'speed_m_s': lambda x: x.tolist(),
             'bearing': lambda x: x.tolist(),
-            # Trip start time
-            'trip_start_timeID_s': 'min',
-            'trip_start_locationtime': 'min',
-            # Trip ongoing time
-            'timeID_s': lambda x: x.tolist(),
-            'locationtime': lambda x: x.tolist(),
-            # Nearest stop
-            'stop_x': lambda x: x.tolist(),
-            'stop_y': lambda x: x.tolist(),
+            # GTFS Features
+            'route_id': 'min',
             'stop_x_cent': lambda x: x.tolist(),
             'stop_y_cent': lambda x: x.tolist(),
-            'stop_dist_km': lambda x: x.tolist(),
             'scheduled_time_s': lambda x: x.tolist(),
-            'passed_stops_n': lambda x: x.tolist(),
-            # # Grid
-            # 'xbin_idx': lambda x: x.tolist(),
-            # 'ybin_idx': lambda x: x.tolist()
+            'stop_dist_km': lambda x: x.tolist(),
+            'passed_stops_n': lambda x: x.tolist()
         })
     else:
         result = groups.agg({
-            # Cumulative point time/dist
-            'time_gap': lambda x: x.tolist(),
-            'dist_gap': lambda x: x.tolist(),
-            # Trip time/dist
-            'time': 'max',
+            # Totals
             'dist': 'max',
-            # IDs
+            'time': 'max',
+            # GPS features
+            'shingle_id': 'min',
             'weekID': 'min',
             'timeID': 'min',
-            'dateID': 'min',
-            'trip_id': 'min',
-            'file': 'min',
-            # 'route_id': 'min',
-            # 'service_id': 'min',
-            # 'direction_id': 'min',
-            # Individual point time/dist
-            'lats': lambda x: x.tolist(),
-            'lngs': lambda x: x.tolist(),
+            'timeID_s': lambda x: x.tolist(),
+            'locationtime': lambda x: x.tolist(),
+            'lon': lambda x: x.tolist(),
+            'lat': lambda x: x.tolist(),
             'x': lambda x: x.tolist(),
             'y': lambda y: y.tolist(),
             'x_cent': lambda x: x.tolist(),
             'y_cent': lambda y: y.tolist(),
-            'speed_m_s': lambda x: x.tolist(),
-            'time_calc_s': lambda x: x.tolist(),
             'dist_calc_km': lambda x: x.tolist(),
-            'bearing': lambda x: x.tolist(),
-            # Trip start time
-            'trip_start_timeID_s': 'min',
-            'trip_start_locationtime': 'min',
-            # Trip ongoing time
-            'timeID_s': lambda x: x.tolist(),
-            'locationtime': lambda x: x.tolist(),
-            # # Nearest stop
-            # 'stop_x': lambda x: x.tolist(),
-            # 'stop_y': lambda x: x.tolist(),
-            # 'stop_x_cent': lambda x: x.tolist(),
-            # 'stop_y_cent': lambda x: x.tolist(),
-            # 'stop_dist_km': lambda x: x.tolist(),
-            # 'scheduled_time_s': lambda x: x.tolist(),
-            # 'passed_stops_n': lambda x: x.tolist(),
+            'time_calc_s': lambda x: x.tolist(),
+            'speed_m_s': lambda x: x.tolist(),
+            'bearing': lambda x: x.tolist()
         })
+    return result.to_dict(orient="records")
 
-    # Convert the DataFrame to a dictionary with the original format
-    result_json_string = result.to_json(orient='records', lines=True)
-    with open(deeptte_formatted_path, mode='a') as out_file:
-        out_file.write(result_json_string)
-    return trace_data
-
-def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg, grid_bounds, coord_ref_center, skip_gtfs):
+def get_summary_config(trace_data, gtfs_folder, epsg, grid_bounds, coord_ref_center, skip_gtfs):
     """
     Get a dict of means and sds which are used to normalize data by DeepTTE.
     trace_data: pandas dataframe with unified columns and calculated distances
@@ -585,26 +534,17 @@ def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg, grid_bounds,
     grouped = trace_data.groupby('shingle_id')
     if not skip_gtfs:
         summary_dict = {
-            # DeepTTE variables:
             # Total trip values
             "time_mean": np.mean(grouped.max()[['time_cumulative_s']].values.flatten()),
             "time_std": np.std(grouped.max()[['time_cumulative_s']].values.flatten()),
             "dist_mean": np.mean(grouped.max()[['dist_cumulative_km']].values.flatten()),
             'dist_std': np.std(grouped.max()[['dist_cumulative_km']].values.flatten()),
             # Individual point values (no cumulative)
-            'time_gap_mean': np.mean(trace_data['time_calc_s']),
-            'time_gap_std': np.std(trace_data['time_calc_s']),
-            'dist_gap_mean': np.mean(trace_data['dist_calc_km']),
-            'dist_gap_std': np.std(trace_data['dist_calc_km']),
-            'lngs_mean': np.mean(trace_data['lon']),
-            'lngs_std': np.std(trace_data['lon']),
-            'lats_mean': np.mean(trace_data['lat']),
-            "lats_std": np.std(trace_data['lat']),
+            'lons_mean': np.mean(trace_data['lon']),
+            'lons_std': np.std(trace_data['lon']),
+            'lat_mean': np.mean(trace_data['lat']),
+            "lat_std": np.std(trace_data['lat']),
             # Other variables:
-            "x_mean": np.mean(trace_data['x']),
-            "x_std": np.std(trace_data['x']),
-            "y_mean": np.mean(trace_data['y']),
-            "y_std": np.std(trace_data['y']),
             "x_cent_mean": np.mean(trace_data['x_cent']),
             "x_cent_std": np.std(trace_data['x_cent']),
             "y_cent_mean": np.mean(trace_data['y_cent']),
@@ -614,19 +554,11 @@ def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg, grid_bounds,
             "bearing_mean": np.mean(trace_data['bearing']),
             "bearing_std": np.std(trace_data['bearing']),
             # Normalization for both cumulative and individual time/dist values
-            "dist_cumulative_km_mean": np.mean(trace_data['dist_cumulative_km']),
-            "dist_cumulative_km_std": np.std(trace_data['dist_cumulative_km']),
-            "time_cumulative_s_mean": np.mean(trace_data['time_cumulative_s']),
-            "time_cumulative_s_std": np.std(trace_data['time_cumulative_s']),
             "dist_calc_km_mean": np.mean(trace_data['dist_calc_km']),
             "dist_calc_km_std": np.std(trace_data['dist_calc_km']),
             "time_calc_s_mean": np.mean(trace_data['time_calc_s']),
             "time_calc_s_std": np.std(trace_data['time_calc_s']),
             # Nearest stop
-            "stop_x_mean": np.mean(trace_data['stop_x']),
-            "stop_x_std": np.std(trace_data['stop_x']),
-            "stop_y_mean": np.mean(trace_data['stop_y']),
-            "stop_y_std": np.std(trace_data['stop_y']),
             "stop_x_cent_mean": np.mean(trace_data['stop_x_cent']),
             "stop_x_cent_std": np.std(trace_data['stop_x_cent']),
             "stop_y_cent_mean": np.mean(trace_data['stop_y_cent']),
@@ -641,35 +573,23 @@ def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg, grid_bounds,
             "n_points": len(trace_data),
             "n_samples": len(grouped),
             "gtfs_folder": gtfs_folder,
-            "n_save_files": n_save_files,
             "epsg": epsg,
             "grid_bounds": grid_bounds,
-            "coord_ref_center": coord_ref_center,
-            "train_set": ["train"+str(x) for x in range(0,n_save_files)],
-            "test_set": ["test"+str(x) for x in range(0,n_save_files)]
+            "coord_ref_center": coord_ref_center
         }
     else:
         summary_dict = {
-            # DeepTTE variables:
             # Total trip values
             "time_mean": np.mean(grouped.max()[['time_cumulative_s']].values.flatten()),
             "time_std": np.std(grouped.max()[['time_cumulative_s']].values.flatten()),
             "dist_mean": np.mean(grouped.max()[['dist_cumulative_km']].values.flatten()),
             'dist_std': np.std(grouped.max()[['dist_cumulative_km']].values.flatten()),
             # Individual point values (no cumulative)
-            'time_gap_mean': np.mean(trace_data['time_calc_s']),
-            'time_gap_std': np.std(trace_data['time_calc_s']),
-            'dist_gap_mean': np.mean(trace_data['dist_calc_km']),
-            'dist_gap_std': np.std(trace_data['dist_calc_km']),
-            'lngs_mean': np.mean(trace_data['lon']),
-            'lngs_std': np.std(trace_data['lon']),
-            'lats_mean': np.mean(trace_data['lat']),
-            "lats_std": np.std(trace_data['lat']),
+            'lons_mean': np.mean(trace_data['lon']),
+            'lons_std': np.std(trace_data['lon']),
+            'lat_mean': np.mean(trace_data['lat']),
+            "lat_std": np.std(trace_data['lat']),
             # Other variables:
-            "x_mean": np.mean(trace_data['x']),
-            "x_std": np.std(trace_data['x']),
-            "y_mean": np.mean(trace_data['y']),
-            "y_std": np.std(trace_data['y']),
             "x_cent_mean": np.mean(trace_data['x_cent']),
             "x_cent_std": np.std(trace_data['x_cent']),
             "y_cent_mean": np.mean(trace_data['y_cent']),
@@ -679,19 +599,11 @@ def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg, grid_bounds,
             "bearing_mean": np.mean(trace_data['bearing']),
             "bearing_std": np.std(trace_data['bearing']),
             # Normalization for both cumulative and individual time/dist values
-            "dist_cumulative_km_mean": np.mean(trace_data['dist_cumulative_km']),
-            "dist_cumulative_km_std": np.std(trace_data['dist_cumulative_km']),
-            "time_cumulative_s_mean": np.mean(trace_data['time_cumulative_s']),
-            "time_cumulative_s_std": np.std(trace_data['time_cumulative_s']),
             "dist_calc_km_mean": np.mean(trace_data['dist_calc_km']),
             "dist_calc_km_std": np.std(trace_data['dist_calc_km']),
             "time_calc_s_mean": np.mean(trace_data['time_calc_s']),
             "time_calc_s_std": np.std(trace_data['time_calc_s']),
             # # Nearest stop
-            # "stop_x_mean": np.mean(trace_data['stop_x']),
-            # "stop_x_std": np.std(trace_data['stop_x']),
-            # "stop_y_mean": np.mean(trace_data['stop_y']),
-            # "stop_y_std": np.std(trace_data['stop_y']),
             # "stop_x_cent_mean": np.mean(trace_data['stop_x_cent']),
             # "stop_x_cent_std": np.std(trace_data['stop_x_cent']),
             # "stop_y_cent_mean": np.mean(trace_data['stop_y_cent']),
@@ -706,17 +618,14 @@ def get_summary_config(trace_data, gtfs_folder, n_save_files, epsg, grid_bounds,
             "n_points": len(trace_data),
             "n_samples": len(grouped),
             "gtfs_folder": gtfs_folder,
-            "n_save_files": n_save_files,
             "epsg": epsg,
             "grid_bounds": grid_bounds,
-            "coord_ref_center": coord_ref_center,
-            "train_set": ["train"+str(x) for x in range(0,n_save_files)],
-            "test_set": ["test"+str(x) for x in range(0,n_save_files)]
+            "coord_ref_center": coord_ref_center
         }
     return summary_dict
 
 def map_from_deeptte(datalist, keys):
-    lengths = [len(x['lats']) for x in datalist]
+    lengths = [len(x['lat']) for x in datalist]
     res = np.ones((sum(lengths), len(keys)))
     for i,key in enumerate(keys):
         vals = [sample[key] for sample in datalist]
@@ -1005,9 +914,9 @@ def create_grid_of_shingles(point_resolution, grid_bounds, coord_ref_center):
         curr_shingle['weekID'] = 3
         curr_shingle['x_cent'] = [x - coord_ref_center[0] for x in curr_shingle['x']]
         curr_shingle['y_cent'] = [y - coord_ref_center[1] for y in curr_shingle['y']]
-        curr_shingle['lats'] = curr_shingle['y']
-        curr_shingle['lngs'] = curr_shingle['x']
-        curr_shingle['locationtime'] = [1 for x in curr_shingle['lngs']]
-        curr_shingle['time_calc_s'] = [1 for x in curr_shingle['lngs']]
+        curr_shingle['lat'] = curr_shingle['y']
+        curr_shingle['lons'] = curr_shingle['x']
+        curr_shingle['locationtime'] = [1 for x in curr_shingle['lons']]
+        curr_shingle['time_calc_s'] = [1 for x in curr_shingle['lons']]
         shingle_id += 1
     return shingles

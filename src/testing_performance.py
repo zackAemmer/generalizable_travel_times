@@ -67,7 +67,7 @@ def run(run_folder, train_network_folder, **kwargs):
     dataset.grid = grid
     
     print(len(dataset.content))
-    print(sum([len(x['lngs']) for x in dataset.content]))
+    print(sum([len(x['lon']) for x in dataset.content]))
 
     # Prefetch
     # reverse sort
