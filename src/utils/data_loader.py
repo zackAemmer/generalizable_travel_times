@@ -26,6 +26,7 @@ class GenericDataset(Dataset):
         # Point to a parquet datafile
         self.pq_dataset = ds.dataset(self.file_path, format="parquet")
         # Read all into memory and reformat
+        print(f"Dataset is mapping parquet to records...")
         self.content = data_utils.map_to_records(self.pq_dataset.to_table().to_pandas(), self.skip_gtfs)
         # Filter out (or keep exclusively) any routes that are used for generalization tests
         if self.holdout_routes is not None:

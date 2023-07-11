@@ -7,12 +7,11 @@ from utils import data_utils, model_utils
 
 
 class FF(nn.Module):
-    def __init__(self, model_name, n_features, hidden_size, batch_size, collate_fn, embed_dict, device):
+    def __init__(self, model_name, n_features, collate_fn, hyperparameter_dict, embed_dict, device):
         super(FF, self).__init__()
         self.model_name = model_name
         self.n_features = n_features
-        self.hidden_size = hidden_size
-        self.batch_size = batch_size
+        self.hyperparameter_dict = hyperparameter_dict
         self.collate_fn = collate_fn
         self.embed_dict = embed_dict
         self.device = device
@@ -25,14 +24,14 @@ class FF(nn.Module):
         self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
         # Feedforward
-        self.linear_relu_stack = nn.Sequential(
-            nn.Linear(self.n_features + self.embed_total_dims, self.hidden_size),
-            nn.ReLU(),
-            nn.Linear(self.hidden_size, self.hidden_size),
-            nn.ReLU(),
-            nn.Dropout(p=0.1),
-        )
-        self.feature_extract = nn.Linear(self.hidden_size, 1)
+        self.linear_relu_stack = nn.Sequential()
+        self.linear_relu_stack.append(nn.Linear(self.n_features + self.embed_total_dims, self.hyperparameter_dict['HIDDEN_SIZE']))
+        self.linear_relu_stack.append(nn.ReLU())
+        for i in range(self.hyperparameter_dict['NUM_LAYERS']):
+            self.linear_relu_stack.append(nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], self.hyperparameter_dict['HIDDEN_SIZE']))
+            self.linear_relu_stack.append(nn.ReLU())
+        self.linear_relu_stack.append(nn.Dropout(p=self.hyperparameter_dict['DROPOUT_RATE']))
+        self.feature_extract = nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], 1)
         self.feature_extract_activation = nn.ReLU()
     def forward(self, x):
         x_em = x[0]
@@ -60,14 +59,13 @@ class FF(nn.Module):
         return labels, preds
 
 class FF_GRID(nn.Module):
-    def __init__(self, model_name, n_features, n_grid_features, hidden_size, grid_compression_size, batch_size, collate_fn, embed_dict, device):
+    def __init__(self, model_name, n_features, n_grid_features, grid_compression_size, collate_fn, hyperparameter_dict, embed_dict, device):
         super(FF_GRID, self).__init__()
         self.model_name = model_name
         self.n_features = n_features
         self.n_grid_features = n_grid_features
-        self.hidden_size = hidden_size
         self.grid_compression_size = grid_compression_size
-        self.batch_size = batch_size
+        self.hyperparameter_dict = hyperparameter_dict
         self.collate_fn = collate_fn
         self.embed_dict = embed_dict
         self.device = device
@@ -81,20 +79,20 @@ class FF_GRID(nn.Module):
         self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
         # Grid Feedforward
         self.linear_relu_stack_grid = nn.Sequential(
-            nn.Linear(self.n_grid_features, self.hidden_size),
+            nn.Linear(self.n_grid_features, self.hyperparameter_dict['HIDDEN_SIZE']),
             nn.ReLU(),
-            nn.Linear(self.hidden_size, self.grid_compression_size),
+            nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], self.grid_compression_size),
             nn.ReLU()
         )
         # Feedforward
-        self.linear_relu_stack = nn.Sequential(
-            nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, self.hidden_size),
-            nn.ReLU(),
-            nn.Linear(self.hidden_size, self.hidden_size),
-            nn.ReLU(),
-            nn.Dropout(p=0.1),
-        )
-        self.feature_extract = nn.Linear(self.hidden_size, 1)
+        self.linear_relu_stack = nn.Sequential()
+        self.linear_relu_stack.append(nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, self.hyperparameter_dict['HIDDEN_SIZE']))
+        self.linear_relu_stack.append(nn.ReLU())
+        for i in range(self.hyperparameter_dict['NUM_LAYERS']):
+            self.linear_relu_stack.append(nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], self.hyperparameter_dict['HIDDEN_SIZE']))
+            self.linear_relu_stack.append(nn.ReLU())
+        self.linear_relu_stack.append(nn.Dropout(p=self.hyperparameter_dict['DROPOUT_RATE']))
+        self.feature_extract = nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], 1)
         self.feature_extract_activation = nn.ReLU()
     def forward(self, x):
         x_em = x[0]
@@ -125,15 +123,14 @@ class FF_GRID(nn.Module):
         return labels, preds
 
 class FF_GRID_ATTN(nn.Module):
-    def __init__(self, model_name, n_features, n_grid_features, n_channels, hidden_size, grid_compression_size, batch_size, collate_fn, embed_dict, device):
+    def __init__(self, model_name, n_features, n_grid_features, n_channels, grid_compression_size, collate_fn, hyperparameter_dict, embed_dict, device):
         super(FF_GRID_ATTN, self).__init__()
         self.model_name = model_name
         self.n_features = n_features
         self.n_grid_features = n_grid_features
         self.n_channels = n_channels
-        self.hidden_size = hidden_size
         self.grid_compression_size = grid_compression_size
-        self.batch_size = batch_size
+        self.hyperparameter_dict = hyperparameter_dict
         self.collate_fn = collate_fn
         self.embed_dict = embed_dict
         self.device = device
@@ -148,24 +145,24 @@ class FF_GRID_ATTN(nn.Module):
         # 2d positional encoding
         self.pos_enc = pos_encodings.PositionalEncodingPermute2D(self.n_channels)
         # Grid attention
-        encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_grid_features, nhead=4, dim_feedforward=self.hidden_size, batch_first=True)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_grid_features, nhead=4, dim_feedforward=self.hyperparameter_dict['HIDDEN_SIZE'], batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
         # Grid Feedforward
         self.linear_relu_stack_grid = nn.Sequential(
-            nn.Linear(self.n_grid_features, self.hidden_size),
+            nn.Linear(self.n_grid_features, self.hyperparameter_dict['HIDDEN_SIZE']),
             nn.ReLU(),
-            nn.Linear(self.hidden_size, self.grid_compression_size),
+            nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], self.grid_compression_size),
             nn.ReLU()
         )
         # Feedforward
-        self.linear_relu_stack = nn.Sequential(
-            nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, self.hidden_size),
-            nn.ReLU(),
-            nn.Linear(self.hidden_size, self.hidden_size),
-            nn.ReLU(),
-            nn.Dropout(p=0.1),
-        )
-        self.feature_extract = nn.Linear(self.hidden_size, 1)
+        self.linear_relu_stack = nn.Sequential()
+        self.linear_relu_stack.append(nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, self.hyperparameter_dict['HIDDEN_SIZE']))
+        self.linear_relu_stack.append(nn.ReLU())
+        for i in range(self.hyperparameter_dict['NUM_LAYERS']):
+            self.linear_relu_stack.append(nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], self.hyperparameter_dict['HIDDEN_SIZE']))
+            self.linear_relu_stack.append(nn.ReLU())
+        self.linear_relu_stack.append(nn.Dropout(p=self.hyperparameter_dict['DROPOUT_RATE']))
+        self.feature_extract = nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], 1)
         self.feature_extract_activation = nn.ReLU()
     def forward(self, x):
         x_em = x[0]

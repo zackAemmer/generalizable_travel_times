@@ -85,11 +85,12 @@ class LocalEstimator(nn.Module):
 
 
 class Net(nn.Module):
-    def __init__(self, model_name, collate_fn, device, config, kernel_size = 3, num_filter = 32, pooling_method = 'attention', num_final_fcs = 3, final_fc_size = 128, alpha = 0.3, cfg=None):
+    def __init__(self, model_name, hyperparameter_dict, collate_fn, device, config, kernel_size = 3, num_filter = 32, pooling_method = 'attention', num_final_fcs = 3, final_fc_size = 128, alpha = 0.3, cfg=None):
         super(Net, self).__init__()
 
         # Training configurations
         self.model_name = model_name
+        self.hyperparameter_dict = hyperparameter_dict
         self.collate_fn = collate_fn
         self.device = device
         self.is_nn = True

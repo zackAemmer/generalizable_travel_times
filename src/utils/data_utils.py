@@ -13,6 +13,7 @@ import shutil
 import numpy as np
 import pandas as pd
 import pyproj
+import pyarrow.dataset as ds
 from sklearn import metrics
 from statsmodels.stats.weightstats import DescrStatsW
 import torch
@@ -125,15 +126,13 @@ def get_date_list(start, n_days):
     date_list = [base + timedelta(days=x) for x in range(n_days)]
     return [f"{date.strftime('%Y_%m_%d')}.pkl" for date in date_list]
 
-def load_all_inputs(run_folder, network_folder, file_num):
+def load_all_inputs(run_folder, network_folder):
     with open(f"{run_folder}{network_folder}/deeptte_formatted/train_config.json") as f:
         config = json.load(f)
-    train_traces = load_pkl(f"{run_folder}{network_folder}train{file_num}_traces.pkl", is_pandas=True)
-    train_data = list(map(lambda x: json.loads(x), open(f"{run_folder}{network_folder}deeptte_formatted/train", "r").readlines()))
+    train_traces = ds.dataset(f"{run_folder}{network_folder}/deeptte_formatted/train", format="parquet")
     return {
         "config": config,
-        "train_traces": train_traces,
-        "train_data": train_data,
+        "train_traces": train_traces.to_table().to_pandas(),
     }
 
 def combine_config_files(cfg_folder, n_save_files, train_or_test):

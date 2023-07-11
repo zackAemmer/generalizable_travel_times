@@ -62,19 +62,19 @@ class NGridBetter:
         n_recent_points = np.swapaxes(n_recent_points, 1, 4)
         n_recent_points = np.swapaxes(n_recent_points, 2, 3)
         return n_recent_points
-    def get_full_grid(self, grid_t_size, n_points=3):
-        tbins = np.arange(np.min(self.points[:,0]),np.max(self.points[:,0]), grid_t_size)
-        tbins = np.append(tbins, tbins[-1]+1)
-        all_res = np.ones((len(tbins), n_points, 3, len(self.xbins), len(self.ybins)))
-        all_res[:] = np.nan
-        for t, tbin in enumerate(tbins):
-            for x, xbin in enumerate(self.xbins):
-                for y, ybin in enumerate(self.ybins):
-                    all_res[t,:,:,x,y] = self.get_recent_points(x,y,tbin,n_points)
-        # tsteps X channels X samples X height X width
-        all_res = np.swapaxes(all_res, 1, 2)
-        all_res = np.swapaxes(all_res, 3, 4)
-        return all_res
+    # def get_full_grid(self, grid_t_size, n_points=3):
+    #     tbins = np.arange(np.min(self.points[:,0]),np.max(self.points[:,0]), grid_t_size)
+    #     tbins = np.append(tbins, tbins[-1]+1)
+    #     all_res = np.ones((len(tbins), n_points, 3, len(self.xbins), len(self.ybins)))
+    #     all_res[:] = np.nan
+    #     for t, tbin in enumerate(tbins):
+    #         for x, xbin in enumerate(self.xbins):
+    #             for y, ybin in enumerate(self.ybins):
+    #                 all_res[t,:,:,x,y] = self.get_recent_points(x,y,tbin,n_points)
+    #     # tsteps X channels X samples X height X width
+    #     all_res = np.swapaxes(all_res, 1, 2)
+    #     all_res = np.swapaxes(all_res, 3, 4)
+    #     return all_res
     def get_recent_points(self, x_idx, y_idx, locationtime, n_points):
         num_cells = len(x_idx)
         cell_points = np.empty((num_cells, n_points, 6))
@@ -96,7 +96,7 @@ class NGridBetter:
 
 def save_grid_anim(data, file_name):
     # Plot first 4 channels of second axis
-    fig, axes = plt.subplots(2,2)
+    fig, axes = plt.subplots(1, data.shape[1])
     axes = axes.reshape(-1)
     fig.tight_layout()
     # Define the update function that will be called for each frame of the animation

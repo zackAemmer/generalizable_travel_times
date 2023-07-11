@@ -9,13 +9,12 @@ from models import masked_loss, pos_encodings
 
 
 class TRSF(nn.Module):
-    def __init__(self, model_name, n_features, hidden_size, batch_size, collate_fn, embed_dict, device):
+    def __init__(self, model_name, n_features, collate_fn, hyperparameter_dict, embed_dict, device):
         super(TRSF, self).__init__()
         self.model_name = model_name
         self.n_features = n_features
-        self.hidden_size = hidden_size
-        self.batch_size = batch_size
         self.collate_fn = collate_fn
+        self.hyperparameter_dict = hyperparameter_dict
         self.embed_dict = embed_dict
         self.device = device
         self.is_nn = True
@@ -31,8 +30,8 @@ class TRSF(nn.Module):
         # Positional encoding layer
         self.pos_encoder = pos_encodings.PositionalEncoding1D(self.n_features)
         # Encoder layer
-        encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features, nhead=2, dim_feedforward=self.hidden_size, batch_first=True)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features, nhead=2, dim_feedforward=self.hyperparameter_dict['HIDDEN_SIZE'], batch_first=True, dropout=self.hyperparameter_dict['DROPOUT_RATE'])
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=self.hyperparameter_dict['NUM_LAYERS'])
         # Linear compression layer
         self.feature_extract = nn.Linear(self.n_features + self.embed_total_dims, 1)
         self.feature_extract_activation = nn.ReLU()
@@ -69,15 +68,14 @@ class TRSF(nn.Module):
         return labels, preds
 
 class TRSF_GRID(nn.Module):
-    def __init__(self, model_name, n_features, n_grid_features, hidden_size, grid_compression_size, batch_size, collate_fn, embed_dict, device):
+    def __init__(self, model_name, n_features, n_grid_features, grid_compression_size, collate_fn, hyperparameter_dict, embed_dict, device):
         super(TRSF_GRID, self).__init__()
         self.model_name = model_name
         self.n_features = n_features
         self.n_grid_features = n_grid_features
-        self.hidden_size = hidden_size
         self.grid_compression_size = grid_compression_size
-        self.batch_size = batch_size
         self.collate_fn = collate_fn
+        self.hyperparameter_dict = hyperparameter_dict
         self.embed_dict = embed_dict
         self.device = device
         self.is_nn = True
@@ -92,16 +90,16 @@ class TRSF_GRID(nn.Module):
         self.activation = nn.ReLU()
         # Grid Feedforward
         self.linear_relu_stack_grid = nn.Sequential(
-            nn.Linear(self.n_grid_features, self.hidden_size),
+            nn.Linear(self.n_grid_features, self.hyperparameter_dict['HIDDEN_SIZE']),
             nn.ReLU(),
-            nn.Linear(self.hidden_size, self.grid_compression_size),
+            nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], self.grid_compression_size),
             nn.ReLU()
         )
         # Positional encoding layer
         self.pos_encoder = pos_encodings.PositionalEncoding1D(self.n_features + self.grid_compression_size)
         # Encoder layer
-        encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features + self.grid_compression_size, nhead=2, dim_feedforward=self.hidden_size, batch_first=True)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_features + self.grid_compression_size, nhead=2, dim_feedforward=self.hyperparameter_dict['HIDDEN_SIZE'], batch_first=True, dropout=self.hyperparameter_dict['DROPOUT_RATE'])
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=self.hyperparameter_dict['NUM_LAYERS'])
         # Linear compression layer
         self.feature_extract = nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, 1)
         self.feature_extract_activation = nn.ReLU()
@@ -143,16 +141,15 @@ class TRSF_GRID(nn.Module):
         return labels, preds
 
 class TRSF_GRID_ATTN(nn.Module):
-    def __init__(self, model_name, n_features, n_grid_features, n_channels, hidden_size, grid_compression_size, batch_size, collate_fn, embed_dict, device):
+    def __init__(self, model_name, n_features, n_grid_features, n_channels, grid_compression_size, collate_fn, hyperparameter_dict, embed_dict, device):
         super(TRSF_GRID_ATTN, self).__init__()
         self.model_name = model_name
         self.n_features = n_features
         self.n_grid_features = n_grid_features
         self.n_channels = n_channels
-        self.hidden_size = hidden_size
         self.grid_compression_size = grid_compression_size
-        self.batch_size = batch_size
         self.collate_fn = collate_fn
+        self.hyperparameter_dict = hyperparameter_dict
         self.embed_dict = embed_dict
         self.device = device
         self.is_nn = True
@@ -167,13 +164,13 @@ class TRSF_GRID_ATTN(nn.Module):
         self.grid_pos_encoder = pos_encodings.PositionalEncoding3D(self.n_channels)
         self.cross_attn = nn.MultiheadAttention(embed_dim=self.n_features, num_heads=2, dropout=0.1, batch_first=True, kdim=self.n_grid_features, vdim=self.n_grid_features)
         self.activation = nn.ReLU()
-        self.trsf_ff = nn.Linear(in_features=self.n_features, out_features=self.hidden_size)
+        self.trsf_ff = nn.Linear(in_features=self.n_features, out_features=self.hyperparameter_dict['HIDDEN_SIZE'])
         # Encoder layer
-        self.seq_pos_encoder = pos_encodings.PositionalEncoding1D(self.hidden_size)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=self.hidden_size, nhead=2, dim_feedforward=self.hidden_size, batch_first=True)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
+        self.seq_pos_encoder = pos_encodings.PositionalEncoding1D(self.hyperparameter_dict['HIDDEN_SIZE'])
+        encoder_layer = nn.TransformerEncoderLayer(d_model=self.hyperparameter_dict['HIDDEN_SIZE'], nhead=2, dim_feedforward=self.hyperparameter_dict['HIDDEN_SIZE'], batch_first=True, dropout=self.hyperparameter_dict['DROPOUT_RATE'])
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=self.hyperparameter_dict['NUM_LAYERS'])
         # Linear compression layer
-        self.feature_extract = nn.Linear(self.hidden_size + self.embed_total_dims, 1)
+        self.feature_extract = nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'] + self.embed_total_dims, 1)
         self.feature_extract_activation = nn.ReLU()
     def forward(self, x):
         x_em = x[0]

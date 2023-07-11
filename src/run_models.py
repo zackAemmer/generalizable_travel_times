@@ -48,6 +48,10 @@ def run_models(run_folder, network_folder, **kwargs):
         os.remove(f"{base_folder}model_results.pkl")
     if "model_generalization_results.pkl" in os.listdir(f"{base_folder}"):
         os.remove(f"{base_folder}model_generalization_results.pkl")
+    if "param_search_dict.pkl" in os.listdir(f"{base_folder}"):
+        os.remove(f"{base_folder}param_search_dict.pkl")
+    if "param_search_dict_sample.pkl" in os.listdir(f"{base_folder}"):
+        os.remove(f"{base_folder}param_search_dict_sample.pkl")
     shutil.rmtree(f"{base_folder}models")
     os.mkdir(f"{base_folder}models")
 
@@ -76,6 +80,70 @@ def run_models(run_folder, network_folder, **kwargs):
             'embed_dims': 4
         }
     }
+    # Sample parameter values for random search
+    if kwargs['is_param_search']:
+        hyperparameter_sample_dict = {
+            'N_PARAM_SAMPLES': 10,
+            'EPOCHS': [20, 40, 80],
+            'BATCH_SIZE': [16, 32, 128, 512],
+            'LEARN_RATE': [.1, .01, .001],
+            'HIDDEN_SIZE': [32, 64, 128],
+            'NUM_LAYERS': [2, 3, 4],
+            'DROPOUT_RATE': [.1, .2, .3]
+        }
+        # hyperparameter_sample_dict = {
+        #     'N_PARAM_SAMPLES': 1,
+        #     'EPOCHS': [2],
+        #     'BATCH_SIZE': [512],
+        #     'LEARN_RATE': [.001],
+        #     'HIDDEN_SIZE': [32],
+        #     'NUM_LAYERS': [2],
+        #     'DROPOUT_RATE': [.1]
+        # }
+        hyperparameter_dict = model_utils.random_param_search(hyperparameter_sample_dict, ["FF","CONV","GRU","TRSF"])
+        data_utils.write_pkl(hyperparameter_sample_dict, f"{base_folder}param_search_dict.pkl")
+        data_utils.write_pkl(hyperparameter_dict, f"{base_folder}param_search_dict_sample.pkl")
+    # Manually specified run without testing hyperparameters
+    else:
+        hyperparameter_dict = {
+            'FF': {
+                'EPOCHS': 2,
+                'BATCH_SIZE': 512,
+                'LEARN_RATE': .001,
+                'HIDDEN_SIZE': 32,
+                'NUM_LAYERS': 2,
+                'DROPOUT_RATE': .1
+            },
+            'CONV': {
+                'EPOCHS': 2,
+                'BATCH_SIZE': 512,
+                'LEARN_RATE': .001,
+                'HIDDEN_SIZE': 32,
+                'NUM_LAYERS': 2,
+                'DROPOUT_RATE': .1
+            },
+            'GRU': {
+                'EPOCHS': 2,
+                'BATCH_SIZE': 512,
+                'LEARN_RATE': .001,
+                'HIDDEN_SIZE': 32,
+                'NUM_LAYERS': 2,
+                'DROPOUT_RATE': .1
+            },
+            'TRSF': {
+                'EPOCHS': 2,
+                'BATCH_SIZE': 512,
+                'LEARN_RATE': .001,
+                'HIDDEN_SIZE': 32,
+                'NUM_LAYERS': 2,
+                'DROPOUT_RATE': .1
+            },
+            'DEEPTTE': {
+                'EPOCHS': 2,
+                'BATCH_SIZE': 512,
+                'LEARN_RATE': .001
+            }
+        }
 
     # Data loading and fold setup
     with open(f"{run_folder}{network_folder}deeptte_formatted/train_config.json", "r") as f:
@@ -94,10 +162,12 @@ def run_models(run_folder, network_folder, **kwargs):
         test_sampler = SubsetRandomSampler(test_idx)
 
         # Declare models
-        if not kwargs['skip_gtfs']:
-            model_list = model_utils.make_all_models(kwargs['HIDDEN_SIZE'], kwargs['BATCH_SIZE'], embed_dict, device, config)
+        if kwargs['is_param_search']:
+            model_list = model_utils.make_param_search_models(hyperparameter_dict, embed_dict, device, config)
+        elif not kwargs['skip_gtfs']:
+            model_list = model_utils.make_all_models(hyperparameter_dict, embed_dict, device, config)
         else:
-            model_list = model_utils.make_all_models_nosch(kwargs['HIDDEN_SIZE'], kwargs['BATCH_SIZE'], embed_dict, device, config)
+            model_list = model_utils.make_all_models_nosch(hyperparameter_dict, embed_dict, device, config)
         model_names = [m.model_name for m in model_list]
         print(f"Model names: {model_names}")
         print(f"Model total parameters: {[sum(p.numel() for p in m.parameters()) for m in model_list if m.is_nn]}")
@@ -135,22 +205,25 @@ def run_models(run_folder, network_folder, **kwargs):
         for model in model_list:
             print(f"Fold training for: {model.model_name}")
             dataset.add_grid_features = model.requires_grid
-            dataset.grid = train_ngrid
-            loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=kwargs['BATCH_SIZE'], pin_memory=PIN_MEMORY, num_workers=NUM_WORKERS, drop_last=True)
             if not model.is_nn:
                 # Train base model on all fold data
+                dataset.grid = train_ngrid
+                loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), pin_memory=PIN_MEMORY, num_workers=NUM_WORKERS, drop_last=True)
                 model.train(loader, config)
-                print(f"Fold evaluation for: {model.model_name}")
+                print(f"Fold final evaluation for: {model.model_name}")
                 dataset.grid = test_ngrid
-                loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=kwargs['BATCH_SIZE'], pin_memory=PIN_MEMORY, num_workers=NUM_WORKERS, drop_last=True)
+                loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), pin_memory=PIN_MEMORY, num_workers=NUM_WORKERS, drop_last=True)
                 labels, preds = model.evaluate(loader, config)
                 model_fold_results[model.model_name]["Labels"].extend(list(labels))
                 model_fold_results[model.model_name]["Preds"].extend(list(preds))
+                data_utils.write_pkl(model, f"{base_folder}models/{model.model_name}_{fold_num}.pkl")
             else:
                 # Train NN model on all fold data for n epochs
-                optimizer = torch.optim.Adam(model.parameters(), lr=kwargs['LEARN_RATE'])
-                for epoch in range(kwargs['EPOCHS']):
-                    print(f"NETWORK: {base_folder}, FOLD: {fold_num}, MODEL: {model.model_name}, EPOCH: {epoch}")
+                optimizer = torch.optim.Adam(model.parameters(), lr=model.hyperparameter_dict['LEARN_RATE'])
+                for epoch in range(model.hyperparameter_dict['EPOCHS']):
+                    print(f"NETWORK: {base_folder}, FOLD: {fold_num}/{kwargs['n_folds']-1}, MODEL: {model.model_name}, EPOCH: {epoch}/{model.hyperparameter_dict['EPOCHS']-1}")
+                    dataset.grid = train_ngrid
+                    loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), pin_memory=PIN_MEMORY, num_workers=NUM_WORKERS, drop_last=True)
                     t0 = time.time()
                     avg_batch_loss = model_utils.train(model, loader, optimizer)
                     model.train_time += (time.time() - t0)
@@ -159,28 +232,24 @@ def run_models(run_folder, network_folder, **kwargs):
                         print(f"Curve evaluation for: {model.model_name} train data")
                         train_losses = 0.0
                         dataset.grid = train_ngrid
-                        loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=kwargs['BATCH_SIZE'], pin_memory=PIN_MEMORY, num_workers=NUM_WORKERS, drop_last=True)
+                        loader = DataLoader(dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), pin_memory=PIN_MEMORY, num_workers=NUM_WORKERS, drop_last=True)
                         labels, preds = model.evaluate(loader, config)
                         train_losses += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
                         model_fold_curves[model.model_name]['Train'].append(train_losses)
                         print(f"Curve evaluation for: {model.model_name} test data")
                         test_losses = 0.0
                         dataset.grid = test_ngrid
-                        loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=kwargs['BATCH_SIZE'], pin_memory=PIN_MEMORY, num_workers=NUM_WORKERS, drop_last=True)
+                        loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), pin_memory=PIN_MEMORY, num_workers=NUM_WORKERS, drop_last=True)
                         labels, preds = model.evaluate(loader, config)
                         test_losses += np.round(np.sqrt(metrics.mean_squared_error(labels, preds)), 2)
                         model_fold_curves[model.model_name]['Test'].append(test_losses)
-            # After model is trained, evaluate on test set for this fold
-            print(f"Fold final evaluation for: {model.model_name}")
-            dataset.grid = test_ngrid
-            loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=kwargs['BATCH_SIZE'], pin_memory=PIN_MEMORY, num_workers=NUM_WORKERS, drop_last=True)
-            labels, preds = model.evaluate(loader, config)
-            model_fold_results[model.model_name]["Labels"].extend(list(labels))
-            model_fold_results[model.model_name]["Preds"].extend(list(preds))
-            # Save model for this fold
-            if not model.is_nn:
-                data_utils.write_pkl(model, f"{base_folder}models/{model.model_name}_{fold_num}.pkl")
-            else:
+                # After model is trained, evaluate on test set for this fold
+                print(f"Fold final evaluation for: {model.model_name}")
+                dataset.grid = test_ngrid
+                loader = DataLoader(dataset, sampler=test_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), pin_memory=PIN_MEMORY, num_workers=NUM_WORKERS, drop_last=True)
+                labels, preds = model.evaluate(loader, config)
+                model_fold_results[model.model_name]["Labels"].extend(list(labels))
+                model_fold_results[model.model_name]["Preds"].extend(list(preds))
                 torch.save(model.state_dict(), f"{base_folder}models/{model.model_name}_{fold_num}.pt")
 
         # After all models have trained for this fold, calculate various losses
@@ -223,15 +292,12 @@ if __name__=="__main__":
     run_models(
         run_folder="./results/debug/",
         network_folder="kcm/",
-        EPOCHS=2,
-        BATCH_SIZE=512,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
         EPOCH_EVAL_FREQ=10,
         grid_s_size=500,
         n_folds=2,
         holdout_routes=[100252,100139,102581,100341,102720],
-        skip_gtfs=False
+        skip_gtfs=False,
+        is_param_search=False
     )
     random.seed(0)
     np.random.seed(0)
@@ -239,15 +305,12 @@ if __name__=="__main__":
     run_models(
         run_folder="./results/debug/",
         network_folder="atb/",
-        EPOCHS=2,
-        BATCH_SIZE=512,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
         EPOCH_EVAL_FREQ=10,
         grid_s_size=500,
         n_folds=2,
         holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
-        skip_gtfs=False
+        skip_gtfs=False,
+        is_param_search=False
     )
     # DEBUG MIXED
     random.seed(0)
@@ -256,13 +319,40 @@ if __name__=="__main__":
     run_models(
         run_folder="./results/debug_nosch/",
         network_folder="kcm_atb/",
-        EPOCHS=2,
-        BATCH_SIZE=512,
-        LEARN_RATE=1e-3,
-        HIDDEN_SIZE=32,
         EPOCH_EVAL_FREQ=10,
         grid_s_size=500,
         n_folds=2,
         holdout_routes=None,
-        skip_gtfs=True
+        skip_gtfs=True,
+        is_param_search=False
     )
+
+    # PARAM SEARCH
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_models(
+        run_folder="./results/param_search/",
+        network_folder="kcm/",
+        EPOCH_EVAL_FREQ=10,
+        grid_s_size=500,
+        n_folds=5,
+        holdout_routes=None,
+        skip_gtfs=False,
+        is_param_search=True
+    )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_models(
+        run_folder="./results/param_search/",
+        network_folder="atb/",
+        EPOCH_EVAL_FREQ=10,
+        grid_s_size=500,
+        n_folds=5,
+        holdout_routes=None,
+        skip_gtfs=False,
+        is_param_search=True
+    )
+
+    # FULL RUN

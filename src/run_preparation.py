@@ -33,6 +33,8 @@ def process_data_parallel(date_list, i, **kwargs):
     if not kwargs['skip_gtfs']:
         traces = traces[[
             "shingle_id",
+            "file",
+            "trip_id",
             "weekID",
             "timeID",
             "timeID_s",
@@ -59,6 +61,8 @@ def process_data_parallel(date_list, i, **kwargs):
     else:
         traces = traces[[
             "shingle_id",
+            "file",
+            "trip_id",
             "weekID",
             "timeID",
             "timeID_s",
@@ -88,13 +92,13 @@ def process_data_parallel(date_list, i, **kwargs):
 def clean_data(dates, **kwargs):
     # Clean a set of dates (allocated to training or testing)
     print(f"Processing {kwargs['train_or_test']} data from {dates} across {kwargs['n_jobs']} jobs...")
-    date_splits = np.array_split(dates, kwargs['n_jobs'])
+    date_splits = np.array_split(dates, min(kwargs['n_jobs'],len(dates)-1))
     date_splits = [list(x) for x in date_splits]
     # Handle mixed network datasets
     j=0
     traces = []
     for i in range(len(kwargs['raw_data_folder'])):
-        trace_chunks = Parallel(n_jobs=kwargs['n_workers'])(delayed(process_data_parallel)(x, i, **kwargs) for x in date_splits)
+        trace_chunks = Parallel(n_jobs=min(kwargs['n_workers'], len(date_splits)))(delayed(process_data_parallel)(x, i, **kwargs) for x in date_splits)
         for chunk in trace_chunks:
             chunk["chunk"] = j
             j+=1
@@ -256,11 +260,11 @@ if __name__=="__main__":
     torch.manual_seed(0)
     prepare_run(
         overwrite=True,
-        run_name="debug",
+        run_name="param_search",
         network_name=["kcm"],
         train_dates=data_utils.get_date_list("2023_03_15", 60),
-        test_dates=data_utils.get_date_list("2023_05_16", 7),
-        n_workers=12,
+        test_dates=data_utils.get_date_list("2023_05_16", 12),
+        n_workers=8,
         n_jobs=12,
         data_dropout=0.2,
         gtfs_folder=["./data/kcm_gtfs/"],
@@ -277,11 +281,11 @@ if __name__=="__main__":
     torch.manual_seed(0)
     prepare_run(
         overwrite=True,
-        run_name="debug",
+        run_name="param_search",
         network_name=["atb"],
         train_dates=data_utils.get_date_list("2023_03_15", 60),
         test_dates=data_utils.get_date_list("2023_05_16", 7),
-        n_workers=12,
+        n_workers=8,
         n_jobs=12,
         data_dropout=0.2,
         gtfs_folder=["./data/atb_gtfs/"],
