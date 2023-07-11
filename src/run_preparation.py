@@ -91,7 +91,7 @@ def process_data_parallel(date_list, i, **kwargs):
 
 def clean_data(dates, **kwargs):
     # Clean a set of dates (allocated to training or testing)
-    print(f"Processing {kwargs['train_or_test']} data from {dates} across {kwargs['n_jobs']} jobs...")
+    print(f"Processing {kwargs['train_or_test']} data from {len(dates)} dates across {min(kwargs['n_jobs'],len(dates)-1)} jobs...")
     date_splits = np.array_split(dates, min(kwargs['n_jobs'],len(dates)-1))
     date_splits = [list(x) for x in date_splits]
     # Handle mixed network datasets
