@@ -42,6 +42,49 @@ class GenericDataset(Dataset):
                 self.content = sample(self.content, self.subset)
         # Save length of all shingles
         self.lengths = list(map(lambda x: len(x['lon']), self.content))
+
+    def __getitem__(self, index):
+        # If precomputing:
+        sample = self.content[index].copy()
+        # Add grid if applicable
+        if self.grid is not None and self.add_grid_features:
+            xbin_idxs, ybin_idxs = self.grid.digitize_points(sample['x'], sample['y'])
+            grid_features = self.grid.get_grid_features(xbin_idxs, ybin_idxs, [sample['locationtime'][0] for x in sample['lon']])
+            grid_features = apply_grid_normalization(grid_features, self.config)
+            sample['grid_features'] = grid_features
+        sample = apply_normalization(sample, self.config)
+        return sample
+    def __len__(self):
+        return len(self.content)
+
+class BetterGenericDataset(Dataset):
+    def __init__(self, file_path, config, grid=None, subset=None, holdout_routes=None, keep_only_holdout=False, add_grid_features=False, skip_gtfs=False):
+        self.file_path = file_path
+        self.config = config
+        self.grid = grid
+        self.subset = subset
+        self.holdout_routes = holdout_routes
+        self.keep_only_holdout = keep_only_holdout
+        self.add_grid_features = add_grid_features
+        self.skip_gtfs = skip_gtfs
+        # Point to a parquet datafile
+        self.pq_dataset = ds.dataset(self.file_path, format="parquet")
+        self.t = self.pq_dataset.to_table().to_pandas()
+        self.pq_file = pq.ParquetFile(self.file_path)
+        # # Filter out (or keep exclusively) any routes that are used for generalization tests
+        # if self.holdout_routes is not None:
+        #     is_holdout = [x['route_id'] in holdout_routes for x in self.content]
+        #     if self.keep_only_holdout==True:
+        #         self.content = [sample for (sample, is_holdout) in zip(self.content,is_holdout) if is_holdout]
+        #     else:
+        #         self.content = [sample for (sample, is_holdout) in zip(self.content,is_holdout) if not is_holdout]
+        # if self.subset is not None:
+        #     if self.subset < 1:
+        #         self.content = sample(self.content, int(len(self.content)*self.subset))
+        #     else:
+        #         self.content = sample(self.content, self.subset)
+        # Save length of all shingles
+        # self.lengths = list(map(lambda x: len(x['lon']), self.content))
         # if self.holdout_routes is not None:
         #     if self.keep_only_holdout==True:
         #         data = data[data["route_id"].isin(self.holdout_routes)]
@@ -57,24 +100,33 @@ class GenericDataset(Dataset):
         #         data = data[data["shingle_id"].isin(keep_ids)]
 
     def __getitem__(self, index):
-        # If precomputing:
-        sample = self.content[index].copy()
-        # # If trying to read partially:
+        stat_attrs = ['dist_cumulative_km', 'time_cumulative_s']
+        info_attrs = ['weekID', 'timeID']
+        traj_attrs = ['y_cent', 'x_cent', 'time_calc_s', 'dist_calc_km', 'scheduled_time_s','stop_dist_km','passed_stops_n','speed_m_s','bearing']
+        # If trying to read partially:
+        df = self.t.loc[self.t.shingle_id==index].copy()
+        res = {}
+        for k in stat_attrs:
+            res[k] = np.array(df[k])[-1]
+        for k in info_attrs:
+            res[k] = np.array(df[k])[0]
+        for k in traj_attrs:
+            res[k] = np.array(df[k])
+        res = apply_normalization(res, self.config)
+        # res = data_utils.map_to_records(res, self.skip_gtfs)[0]
         # sample = self.pq_dataset.to_table(filter=ds.field("shingle_id")==index).to_pandas()
-        # sample = data_utils.map_to_records(sample, self.skip_gtfs)[0]
-        # Add grid if applicable
-        if self.grid is not None and self.add_grid_features:
-            xbin_idxs, ybin_idxs = self.grid.digitize_points(sample['x'], sample['y'])
-            grid_features = self.grid.get_grid_features(xbin_idxs, ybin_idxs, [sample['locationtime'][0] for x in sample['lon']])
-            grid_features = apply_grid_normalization(grid_features, self.config)
-            sample['grid_features'] = grid_features
-        sample = apply_normalization(sample, self.config)
-        return sample
+        # sample = self.pq_file.read_row_group(index).to_pandas()
+        
+        # # Add grid if applicable
+        # if self.grid is not None and self.add_grid_features:
+        #     xbin_idxs, ybin_idxs = self.grid.digitize_points(sample['x'], sample['y'])
+        #     grid_features = self.grid.get_grid_features(xbin_idxs, ybin_idxs, [sample['locationtime'][0] for x in sample['lon']])
+        #     grid_features = apply_grid_normalization(grid_features, self.config)
+        #     sample['grid_features'] = grid_features
+        # sample = apply_normalization(sample, self.config)
+        return res
     def __len__(self):
-        # If precomputing:
-        return len(self.content)
-        # # If trying to read partially:
-        # data = self.pq_dataset.to_table(filter=ds.field("shingle_id")==index).to_pandas()
+        return len(pd.unique(self.t.shingle_id))
 
 def apply_normalization(sample, config):
     for var_name in sample.keys():
@@ -114,7 +166,7 @@ def apply_grid_normalization(grid_features, config):
 
 def basic_collate(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['lat']) for x in batch]).int()
+    seq_lens = torch.tensor([len(x['x_cent']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -144,7 +196,7 @@ def basic_collate(batch):
 
 def basic_collate_nosch(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['lat']) for x in batch]).int()
+    seq_lens = torch.tensor([len(x['x_cent']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -169,7 +221,7 @@ def basic_collate_nosch(batch):
 
 def basic_grid_collate(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['lat']) for x in batch]).int()
+    seq_lens = torch.tensor([len(x['x_cent']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -203,7 +255,7 @@ def basic_grid_collate(batch):
 
 def basic_grid_collate_nosch(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['lat']) for x in batch]).int()
+    seq_lens = torch.tensor([len(x['x_cent']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -232,7 +284,7 @@ def basic_grid_collate_nosch(batch):
 
 def sequential_collate(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['lat']) for x in batch]).int()
+    seq_lens = torch.tensor([len(x['x_cent']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -258,7 +310,7 @@ def sequential_collate(batch):
 
 def sequential_collate_nosch(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['lat']) for x in batch]).int()
+    seq_lens = torch.tensor([len(x['x_cent']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -278,7 +330,7 @@ def sequential_collate_nosch(batch):
 
 def sequential_grid_collate(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['lat']) for x in batch]).int()
+    seq_lens = torch.tensor([len(x['x_cent']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
@@ -308,7 +360,7 @@ def sequential_grid_collate(batch):
 
 def sequential_grid_collate_nosch(batch):
     # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['lat']) for x in batch]).int()
+    seq_lens = torch.tensor([len(x['x_cent']) for x in batch]).int()
     max_len = max(seq_lens)
     # Embedded context features
     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
