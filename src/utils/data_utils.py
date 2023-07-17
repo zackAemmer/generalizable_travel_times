@@ -523,7 +523,7 @@ def map_to_records(trace_data, skip_gtfs):
         })
     return result.to_dict(orient="records")
 
-def get_summary_config(trace_data, gtfs_folder, epsg, grid_bounds, coord_ref_center, skip_gtfs):
+def get_summary_config(trace_data, **kwargs):
     """
     Get a dict of means and sds which are used to normalize data by DeepTTE.
     trace_data: pandas dataframe with unified columns and calculated distances
@@ -531,7 +531,7 @@ def get_summary_config(trace_data, gtfs_folder, epsg, grid_bounds, coord_ref_cen
     """
     # config.json
     grouped = trace_data.groupby('shingle_id')
-    if not skip_gtfs:
+    if not kwargs['skip_gtfs']:
         summary_dict = {
             # Total trip values
             "time_mean": np.mean(grouped.max()[['time_cumulative_s']].values.flatten()),
@@ -571,10 +571,10 @@ def get_summary_config(trace_data, gtfs_folder, epsg, grid_bounds, coord_ref_cen
             # Not variables
             "n_points": len(trace_data),
             "n_samples": len(grouped),
-            "gtfs_folder": gtfs_folder,
-            "epsg": epsg,
-            "grid_bounds": grid_bounds,
-            "coord_ref_center": coord_ref_center
+            "gtfs_folder": kwargs['gtfs_folder'],
+            "epsg": kwargs['epsg'],
+            "grid_bounds": kwargs['grid_bounds'],
+            "coord_ref_center": kwargs['coord_ref_center']
         }
     else:
         summary_dict = {
@@ -616,10 +616,10 @@ def get_summary_config(trace_data, gtfs_folder, epsg, grid_bounds, coord_ref_cen
             # Not variables
             "n_points": len(trace_data),
             "n_samples": len(grouped),
-            "gtfs_folder": gtfs_folder,
-            "epsg": epsg,
-            "grid_bounds": grid_bounds,
-            "coord_ref_center": coord_ref_center
+            "gtfs_folder": kwargs['gtfs_folder'],
+            "epsg": kwargs['epsg'],
+            "grid_bounds": kwargs['grid_bounds'],
+            "coord_ref_center": kwargs['coord_ref_center']
         }
     return summary_dict
 
