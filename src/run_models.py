@@ -146,9 +146,9 @@ def run_models(run_folder, network_folder, **kwargs):
         }
 
     # Data loading and fold setup
-    with open(f"{run_folder}{network_folder}deeptte_formatted/train_config.json", "r") as f:
+    with open(f"{run_folder}{network_folder}deeptte_formatted/train_summary_config.json", "r") as f:
         config = json.load(f)
-    dataset = data_loader.GenericDataset(f"{run_folder}{network_folder}deeptte_formatted/train", config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
+    dataset = data_loader.BetterGenericDataset(f"{run_folder}{network_folder}deeptte_formatted/train", config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
     splits = KFold(kwargs['n_folds'], shuffle=True, random_state=0)
     run_results = []
 
@@ -189,16 +189,16 @@ def run_models(run_folder, network_folder, **kwargs):
                 }
 
         # Total run samples
-        print(f"{len(dataset.pq_dataset.to_table().to_pandas())} points in dataset, {len(dataset.content)} samples")
+        print(f"Training on {len(dataset)} samples")
 
         # Build grid using only data from this fold
         print(f"Building grid on fold training data")
         train_ngrid = grids.NGridBetter(config['grid_bounds'][0], kwargs['grid_s_size'])
-        train_ngrid.add_grid_content(dataset.pq_dataset.to_table(filter=ds.field("shingle_id").isin(train_idx)).to_pandas(), trace_format=True)
+        train_ngrid.add_grid_content(dataset.get_all_samples(train_idx, ['shingle_id','locationtime','x','y','speed_m_s','bearing']), trace_format=True)
         train_ngrid.build_cell_lookup()
         print(f"Building grid on fold testing data")
         test_ngrid = grids.NGridBetter(config['grid_bounds'][0], kwargs['grid_s_size'])
-        test_ngrid.add_grid_content(dataset.pq_dataset.to_table(filter=ds.field("shingle_id").isin(test_idx)).to_pandas(), trace_format=True)
+        test_ngrid.add_grid_content(dataset.get_all_samples(test_idx, ['shingle_id','locationtime','x','y','speed_m_s','bearing']), trace_format=True)
         test_ngrid.build_cell_lookup()
 
         # Train all models

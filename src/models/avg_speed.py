@@ -15,19 +15,19 @@ class AvgHourlySpeedModel:
         self.is_nn = False
         return None
     def train(self, dataloader, config):
-        data = np.array(dataloader.dataset.content)[dataloader.sampler.indices]
-        speeds = np.array([sample['speed_m_s'][0] for sample in data])
-        hours = np.array([sample['timeID']//60 for sample in data])
+        data = dataloader.dataset.get_all_samples(dataloader.sampler.indices, ['shingle_id','speed_m_s','timeID'])
+        speeds = np.array(data['speed_m_s'])
+        hours = np.array(data['timeID']//60)
         # Calculate average speed grouped by time of day
         self.speed_lookup = pd.DataFrame({"hour":hours, "speed":speeds}).groupby("hour").mean().to_dict()
         return None
     def evaluate(self, dataloader, config):
-        data = np.array(dataloader.dataset.content)[dataloader.sampler.indices]
-        hours = np.array([sample['timeID']//60 for sample in data])
-        dists = np.array([sample['dist'] for sample in data])
+        data = [x for x in dataloader]
+        hours = np.concatenate([x[0][0] for x in data])[:,0] // 60
+        dists = data_utils.de_normalize(np.concatenate([x[0][1] for x in data])[:,11], config['dist_mean'], config['dist_std'])
         speeds = np.array([self.get_speed_if_available(x) for x in hours])
         preds = dists*1000.0 / speeds
-        labels = np.array([sample['time'] for sample in data])
+        labels = data_utils.de_normalize(np.concatenate([x[1] for x in data]), config['time_mean'], config['time_std'])
         return labels, preds
     def get_speed_if_available(self, hour):
         # If no data was available for the requested hour, return the mean of all available hours

@@ -1,6 +1,8 @@
 import json
+import os
 from random import sample
 
+import h5py
 import numpy as np
 import pandas as pd
 import pyarrow as pa
@@ -13,49 +15,49 @@ from models import grids
 from utils import data_utils, shape_utils
 
 
-class GenericDataset(Dataset):
-    def __init__(self, file_path, config, grid=None, subset=None, holdout_routes=None, keep_only_holdout=False, add_grid_features=False, skip_gtfs=False):
-        self.file_path = file_path
-        self.config = config
-        self.grid = grid
-        self.subset = subset
-        self.holdout_routes = holdout_routes
-        self.keep_only_holdout = keep_only_holdout
-        self.add_grid_features = add_grid_features
-        self.skip_gtfs = skip_gtfs
-        # Point to a parquet datafile
-        self.pq_dataset = ds.dataset(self.file_path, format="parquet")
-        # Read all into memory and reformat
-        print(f"Dataset is mapping parquet to records...")
-        self.content = data_utils.map_to_records(self.pq_dataset.to_table().to_pandas(), self.skip_gtfs)
-        # Filter out (or keep exclusively) any routes that are used for generalization tests
-        if self.holdout_routes is not None:
-            is_holdout = [x['route_id'] in holdout_routes for x in self.content]
-            if self.keep_only_holdout==True:
-                self.content = [sample for (sample, is_holdout) in zip(self.content,is_holdout) if is_holdout]
-            else:
-                self.content = [sample for (sample, is_holdout) in zip(self.content,is_holdout) if not is_holdout]
-        if self.subset is not None:
-            if self.subset < 1:
-                self.content = sample(self.content, int(len(self.content)*self.subset))
-            else:
-                self.content = sample(self.content, self.subset)
-        # Save length of all shingles
-        self.lengths = list(map(lambda x: len(x['lon']), self.content))
+# class GenericDataset(Dataset):
+#     def __init__(self, file_path, config, grid=None, subset=None, holdout_routes=None, keep_only_holdout=False, add_grid_features=False, skip_gtfs=False):
+#         self.file_path = file_path
+#         self.config = config
+#         self.grid = grid
+#         self.subset = subset
+#         self.holdout_routes = holdout_routes
+#         self.keep_only_holdout = keep_only_holdout
+#         self.add_grid_features = add_grid_features
+#         self.skip_gtfs = skip_gtfs
+#         # Point to a parquet datafile
+#         self.pq_dataset = ds.dataset(self.file_path, format="parquet")
+#         # Read all into memory and reformat
+#         print(f"Dataset is mapping parquet to records...")
+#         self.content = data_utils.map_to_records(self.pq_dataset.to_table().to_pandas(), self.skip_gtfs)
+#         # Filter out (or keep exclusively) any routes that are used for generalization tests
+#         if self.holdout_routes is not None:
+#             is_holdout = [x['route_id'] in holdout_routes for x in self.content]
+#             if self.keep_only_holdout==True:
+#                 self.content = [sample for (sample, is_holdout) in zip(self.content,is_holdout) if is_holdout]
+#             else:
+#                 self.content = [sample for (sample, is_holdout) in zip(self.content,is_holdout) if not is_holdout]
+#         if self.subset is not None:
+#             if self.subset < 1:
+#                 self.content = sample(self.content, int(len(self.content)*self.subset))
+#             else:
+#                 self.content = sample(self.content, self.subset)
+#         # Save length of all shingles
+#         self.lengths = list(map(lambda x: len(x['lon']), self.content))
 
-    def __getitem__(self, index):
-        # If precomputing:
-        sample = self.content[index].copy()
-        # Add grid if applicable
-        if self.grid is not None and self.add_grid_features:
-            xbin_idxs, ybin_idxs = self.grid.digitize_points(sample['x'], sample['y'])
-            grid_features = self.grid.get_grid_features(xbin_idxs, ybin_idxs, [sample['locationtime'][0] for x in sample['lon']])
-            grid_features = apply_grid_normalization(grid_features, self.config)
-            sample['grid_features'] = grid_features
-        sample = apply_normalization(sample, self.config)
-        return sample
-    def __len__(self):
-        return len(self.content)
+#     def __getitem__(self, index):
+#         # If precomputing:
+#         sample = self.content[index].copy()
+#         # Add grid if applicable
+#         if self.grid is not None and self.add_grid_features:
+#             xbin_idxs, ybin_idxs = self.grid.digitize_points(sample['x'], sample['y'])
+#             grid_features = self.grid.get_grid_features(xbin_idxs, ybin_idxs, [sample['locationtime'][0] for x in sample['lon']])
+#             grid_features = apply_grid_normalization(grid_features, self.config)
+#             sample['grid_features'] = grid_features
+#         sample = apply_normalization(sample, self.config)
+#         return sample
+#     def __len__(self):
+#         return len(self.content)
 
 class BetterGenericDataset(Dataset):
     def __init__(self, file_path, config, grid=None, subset=None, holdout_routes=None, keep_only_holdout=False, add_grid_features=False, skip_gtfs=False):
@@ -67,66 +69,123 @@ class BetterGenericDataset(Dataset):
         self.keep_only_holdout = keep_only_holdout
         self.add_grid_features = add_grid_features
         self.skip_gtfs = skip_gtfs
-        # Point to a parquet datafile
-        self.pq_dataset = ds.dataset(self.file_path, format="parquet")
-        self.t = self.pq_dataset.to_table().to_pandas()
-        self.pq_file = pq.ParquetFile(self.file_path)
-        # # Filter out (or keep exclusively) any routes that are used for generalization tests
-        # if self.holdout_routes is not None:
-        #     is_holdout = [x['route_id'] in holdout_routes for x in self.content]
-        #     if self.keep_only_holdout==True:
-        #         self.content = [sample for (sample, is_holdout) in zip(self.content,is_holdout) if is_holdout]
-        #     else:
-        #         self.content = [sample for (sample, is_holdout) in zip(self.content,is_holdout) if not is_holdout]
-        # if self.subset is not None:
-        #     if self.subset < 1:
-        #         self.content = sample(self.content, int(len(self.content)*self.subset))
-        #     else:
-        #         self.content = sample(self.content, self.subset)
-        # Save length of all shingles
-        # self.lengths = list(map(lambda x: len(x['lon']), self.content))
-        # if self.holdout_routes is not None:
-        #     if self.keep_only_holdout==True:
-        #         data = data[data["route_id"].isin(self.holdout_routes)]
-        #     else:
-        #         data = data[~data["route_id"].isin(self.holdout_routes)]
-        # if self.subset is not None:
-        #     if self.subset < 1:
-        #         keep_amnt = int(len(pd.unique(data["shingle_id"])) * self.subset)
-        #         keep_ids = np.random.choice(pd.unique(data["shingle_id"]), keep_amnt)
-        #         data = data[data["shingle_id"].isin(keep_ids)]
-        #     else:
-        #         keep_ids = np.random.choice(pd.unique(data["shingle_id"]), self.subset)
-        #         data = data[data["shingle_id"].isin(keep_ids)]
-
+        # Defined in run preparation; should be made constant somewhere
+        # Necessary to convert from np array tabular format saved in h5 files
+        if not self.skip_gtfs:
+            self.col_names = [
+                "shingle_id",
+                "weekID",
+                "timeID",
+                "timeID_s",
+                "locationtime",
+                "lon",
+                "lat",
+                "x",
+                "y",
+                "x_cent",
+                "y_cent",
+                "dist_calc_km",
+                "time_calc_s",
+                "dist_cumulative_km",
+                "time_cumulative_s",
+                "speed_m_s",
+                "bearing",
+                "stop_x_cent",
+                "stop_y_cent",
+                "scheduled_time_s",
+                "stop_dist_km",
+                "passed_stops_n"
+            ]
+        else:
+            self.col_names = [
+                "shingle_id",
+                "weekID",
+                "timeID",
+                "timeID_s",
+                "locationtime",
+                "lon",
+                "lat",
+                "x",
+                "y",
+                "x_cent",
+                "y_cent",
+                "dist_calc_km",
+                "time_calc_s",
+                "dist_cumulative_km",
+                "time_cumulative_s",
+                "speed_m_s",
+                "bearing"
+            ]
+        # Point to a dataset
+        with open(f"{self.file_path}_shingle_config.json") as f:
+            # This contains all of the shingle information in the data file
+            self.shingle_lookup = json.load(f)
+            # This is a list of keys that will be filtered and each point to a sample
+            self.shingle_keys = list(self.shingle_lookup.keys())
+        # Filter out (or keep exclusively) any routes that are used for generalization tests
+        if self.holdout_routes is not None:
+            holdout_idxs = [self.shingle_lookup[x]['route_id'] in self.holdout_routes for x in self.shingle_lookup]
+            if self.keep_only_holdout==True:
+                self.shingle_keys = [i for (i,v) in zip(self.shingle_keys, holdout_idxs) if v]
+            else:
+                self.shingle_keys = [i for (i,v) in zip(self.shingle_keys, holdout_idxs) if not v]
     def __getitem__(self, index):
         stat_attrs = ['dist_cumulative_km', 'time_cumulative_s']
+        stat_names = ['dist', 'time']
         info_attrs = ['weekID', 'timeID']
-        traj_attrs = ['y_cent', 'x_cent', 'time_calc_s', 'dist_calc_km', 'scheduled_time_s','stop_dist_km','passed_stops_n','speed_m_s','bearing']
-        # If trying to read partially:
-        df = self.t.loc[self.t.shingle_id==index].copy()
+        traj_attrs = ['x','y','locationtime','y_cent', 'x_cent', 'time_calc_s', 'dist_calc_km', 'speed_m_s', 'bearing']
+        traj_attrs_gtfs = [
+            "stop_x_cent",
+            "stop_y_cent",
+            "scheduled_time_s",
+            "stop_dist_km",
+            "passed_stops_n"
+        ]
+        # Get information on shingle file location and lines; read from file
+        samp_dict = self.shingle_lookup[self.shingle_keys[index]]
+        with h5py.File(f"{self.file_path}_data_{samp_dict['network']}_{samp_dict['file_num']}.h5", 'r') as f:
+            database = f['tabular_data']
+            df = database[samp_dict['start_idx']:samp_dict['end_idx']]
+        # Convert from numpy array to pandas for ease of normalization and interface with past code
+        df = pd.DataFrame(df, columns=self.col_names)
         res = {}
-        for k in stat_attrs:
-            res[k] = np.array(df[k])[-1]
+        for k,n in zip(stat_attrs, stat_names):
+            res[n] = list(df[k])[-1]
         for k in info_attrs:
-            res[k] = np.array(df[k])[0]
+            res[k] = list(df[k])[0]
         for k in traj_attrs:
-            res[k] = np.array(df[k])
+            res[k] = list(df[k])
+        if not self.skip_gtfs:
+            for k in traj_attrs_gtfs:
+                res[k] = list(df[k])
+        # Add grid if applicable
+        if self.grid is not None and self.add_grid_features:
+            xbin_idxs, ybin_idxs = self.grid.digitize_points(res['x'], res['y'])
+            grid_features = self.grid.get_grid_features(xbin_idxs, ybin_idxs, [res['locationtime'][0] for x in res['locationtime']])
+            grid_features = apply_grid_normalization(grid_features, self.config)
+            res['grid_features'] = grid_features
         res = apply_normalization(res, self.config)
-        # res = data_utils.map_to_records(res, self.skip_gtfs)[0]
-        # sample = self.pq_dataset.to_table(filter=ds.field("shingle_id")==index).to_pandas()
-        # sample = self.pq_file.read_row_group(index).to_pandas()
-        
-        # # Add grid if applicable
-        # if self.grid is not None and self.add_grid_features:
-        #     xbin_idxs, ybin_idxs = self.grid.digitize_points(sample['x'], sample['y'])
-        #     grid_features = self.grid.get_grid_features(xbin_idxs, ybin_idxs, [sample['locationtime'][0] for x in sample['lon']])
-        #     grid_features = apply_grid_normalization(grid_features, self.config)
-        #     sample['grid_features'] = grid_features
-        # sample = apply_normalization(sample, self.config)
         return res
     def __len__(self):
-        return len(pd.unique(self.t.shingle_id))
+        return len(self.shingle_keys)
+    def get_all_samples(self, indexes, keep_cols):
+        # Read all h5 files in run base directory; get all point obs
+        base_path = "/".join(self.file_path.split("/")[:-1])+"/"
+        train_or_test = self.file_path.split("/")[-1]
+        res = []
+        for filename in os.listdir(base_path):
+            if filename.startswith(train_or_test) and filename.endswith(".h5"):
+                with h5py.File(f"{base_path}{filename}", 'r') as f:
+                    df = f['tabular_data'][:]
+                    df = pd.DataFrame(df, columns=self.col_names)
+                    df['shingle_id'] = df['shingle_id'].astype(int)
+                    df = df[keep_cols]
+                    res.append(df)
+        res = pd.concat(res)
+        # Indexes are in order, but shingle_id's are not; get shingle id for each keep index and filter
+        keep_shingles = [self.shingle_lookup[self.shingle_keys[i]] for i in indexes]
+        df = df[df['shingle_id'].isin(keep_shingles)]
+        return res
 
 def apply_normalization(sample, config):
     for var_name in sample.keys():

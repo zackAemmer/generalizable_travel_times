@@ -14,9 +14,9 @@ class TimeTableModel:
     def train(self, dataloader, config):
         return None
     def evaluate(self, dataloader, config):
-        data = np.array(dataloader.dataset.content)[dataloader.sampler.indices]
-        preds = np.array([sample['scheduled_time_s'][-1] for sample in data])
-        labels = np.array([sample['time'] for sample in data])
+        data = [x for x in dataloader]
+        preds = data_utils.de_normalize(np.concatenate([x[0][1] for x in data])[:,5], config['scheduled_time_s_mean'], config['scheduled_time_s_std'])
+        labels = data_utils.de_normalize(np.concatenate([x[1] for x in data]), config['time_mean'], config['time_std'])
         return labels, preds
     def save_to(self, path):
         data_utils.write_pkl(self, path)

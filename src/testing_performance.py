@@ -61,7 +61,7 @@ def run(run_folder, train_network_folder, **kwargs):
 
     # Data loading and fold setup
     print(f"DATA: '{run_folder}{train_network_folder}deeptte_formatted/'")
-    with open(f"{run_folder}{train_network_folder}deeptte_formatted/train_config.json", "r") as f:
+    with open(f"{run_folder}{train_network_folder}deeptte_formatted/train_summary_config.json", "r") as f:
         config = json.load(f)
 
     # dataset = data_loader.GenericDataset(f"{run_folder}{train_network_folder}deeptte_formatted/train", config, subset=0.5, holdout_routes=kwargs['holdout_routes'])
@@ -70,31 +70,21 @@ def run(run_folder, train_network_folder, **kwargs):
     #     dataset.__getitem__(i)
     # print(time.time()-t0)
 
-    with pa.output_stream('example_mmap.txt') as stream:
-        stream.write(b'Constructing a buffer referencing the mapped memory')
+    # # Assuming your data is stored in a NumPy array called 'data'
+    # data = dataset_new.t.values
+    # with h5py.File('data.h5', 'w') as f:
+    #     f.create_dataset('tabular_data', data=dataset_new.t[['x_cent','y_cent']].values.astype(float))
 
-    with pa.memory_map('example_mmap.txt') as mmap:
-        mmap.read_at(6,45)
-        
-    import h5py
-        
-    import h5py
-    # Assuming your data is stored in a NumPy array called 'data'
-    data = dataset_new.t.values
-    with h5py.File('data.h5', 'w') as f:
-        f.create_dataset('tabular_data', data=dataset_new.t[['x_cent','y_cent']].values.astype(float))
-
-    with h5py.File('data.h5', 'r') as f:
-        dataset = f['tabular_data']
-        specific_lines = dataset[100:1000]
+    # with h5py.File('data.h5', 'r') as f:
+    #     dataset = f['tabular_data']
+    #     specific_lines = dataset[100:1000]
 
     dataset_new = data_loader.BetterGenericDataset(f"{run_folder}{train_network_folder}deeptte_formatted/train", config, subset=0.5, holdout_routes=kwargs['holdout_routes'])
+    dataset_new.get_grid_samples()
     t0 = time.time()
-    with h5py.File('data.h5', 'r') as f:
-        for i in range(0,1000):
-            dataset = f['tabular_data']
-            specific_lines = dataset[100:1000]
-            # dataset_new.__getitem__(i)
+    dataset_new.shingle_lookup.keys()
+    for i in range(0,10000):
+        dataset_new.__getitem__(i)
     print(time.time()-t0)
 
     t = dataset_new.pq_dataset.to_table().to_pandas()
