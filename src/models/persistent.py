@@ -8,7 +8,7 @@ class PersistentTimeSeqModel:
     def __init__(self, model_name):
         self.model_name = model_name
         self.requires_grid = False
-        self.collate_fn = data_loader.sequential_collate
+        self.collate_fn = data_loader.sequential_collate_nosch
         self.train_time = 0.0
         self.hyperparameter_dict = {'BATCH_SIZE': 512}
         self.is_nn = False

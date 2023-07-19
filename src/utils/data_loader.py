@@ -168,7 +168,7 @@ class BetterGenericDataset(Dataset):
         return res
     def __len__(self):
         return len(self.shingle_keys)
-    def get_all_samples(self, indexes, keep_cols):
+    def get_all_samples(self, keep_cols, indexes=None):
         # Read all h5 files in run base directory; get all point obs
         base_path = "/".join(self.file_path.split("/")[:-1])+"/"
         train_or_test = self.file_path.split("/")[-1]
@@ -182,9 +182,10 @@ class BetterGenericDataset(Dataset):
                     df = df[keep_cols]
                     res.append(df)
         res = pd.concat(res)
-        # Indexes are in order, but shingle_id's are not; get shingle id for each keep index and filter
-        keep_shingles = [self.shingle_lookup[self.shingle_keys[i]] for i in indexes]
-        df = df[df['shingle_id'].isin(keep_shingles)]
+        if indexes is not None:
+            # Indexes are in order, but shingle_id's are not; get shingle id for each keep index and filter
+            keep_shingles = [self.shingle_lookup[self.shingle_keys[i]] for i in indexes]
+            res = res[res['shingle_id'].isin(keep_shingles)]
         return res
 
 def apply_normalization(sample, config):
@@ -446,7 +447,7 @@ def deeptte_collate(data):
     info_attrs = ['weekID', 'timeID']
     traj_attrs = ['y_cent','x_cent','time_calc_s','dist_calc_km','bearing','scheduled_time_s','stop_dist_km','stop_x_cent','stop_y_cent','passed_stops_n']
     attr, traj = {}, {}
-    lens = np.asarray([len(item['lon']) for item in data])
+    lens = np.asarray([len(item['x_cent']) for item in data])
     for key in stat_attrs:
         attr[key] = torch.FloatTensor([item[key] for item in data])
     for key in info_attrs:
@@ -467,7 +468,7 @@ def deeptte_collate_nosch(data):
     info_attrs = ['weekID', 'timeID']
     traj_attrs = ['y_cent', 'x_cent', 'time_calc_s', 'dist_calc_km']
     attr, traj = {}, {}
-    lens = np.asarray([len(item['lon']) for item in data])
+    lens = np.asarray([len(item['x_cent']) for item in data])
     for key in stat_attrs:
         attr[key] = torch.FloatTensor([item[key] for item in data])
     for key in info_attrs:

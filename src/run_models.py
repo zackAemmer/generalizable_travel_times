@@ -194,11 +194,11 @@ def run_models(run_folder, network_folder, **kwargs):
         # Build grid using only data from this fold
         print(f"Building grid on fold training data")
         train_ngrid = grids.NGridBetter(config['grid_bounds'][0], kwargs['grid_s_size'])
-        train_ngrid.add_grid_content(dataset.get_all_samples(train_idx, ['shingle_id','locationtime','x','y','speed_m_s','bearing']), trace_format=True)
+        train_ngrid.add_grid_content(dataset.get_all_samples(indexes=train_idx, keep_cols=['shingle_id','locationtime','x','y','speed_m_s','bearing']), trace_format=True)
         train_ngrid.build_cell_lookup()
         print(f"Building grid on fold testing data")
         test_ngrid = grids.NGridBetter(config['grid_bounds'][0], kwargs['grid_s_size'])
-        test_ngrid.add_grid_content(dataset.get_all_samples(test_idx, ['shingle_id','locationtime','x','y','speed_m_s','bearing']), trace_format=True)
+        test_ngrid.add_grid_content(dataset.get_all_samples(indexes=test_idx, keep_cols=['shingle_id','locationtime','x','y','speed_m_s','bearing']), trace_format=True)
         test_ngrid.build_cell_lookup()
 
         # Train all models

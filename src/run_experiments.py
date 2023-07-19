@@ -94,28 +94,28 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
         tune_network_config = json.load(f)
 
     print(f"Building grid on validation data from training network")
-    train_network_dataset = data_loader.GenericDataset(f"{run_folder}{train_network_folder}deeptte_formatted/test", train_network_config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
+    train_network_dataset = data_loader.BetterGenericDataset(f"{run_folder}{train_network_folder}deeptte_formatted/test", train_network_config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
     train_network_ngrid = grids.NGridBetter(train_network_config['grid_bounds'][0],kwargs['grid_s_size'])
-    train_network_ngrid.add_grid_content(train_network_dataset.pq_dataset.to_table().to_pandas(), trace_format=True)
+    train_network_ngrid.add_grid_content(train_network_dataset.get_all_samples(keep_cols=['shingle_id','locationtime','x','y','speed_m_s','bearing']), trace_format=True)
     train_network_ngrid.build_cell_lookup()
     train_network_dataset.grid = train_network_ngrid
     print(f"Building grid on validation data from testing network")
-    test_network_dataset = data_loader.GenericDataset(f"{run_folder}{test_network_folder}deeptte_formatted/test", test_network_config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
+    test_network_dataset = data_loader.BetterGenericDataset(f"{run_folder}{test_network_folder}deeptte_formatted/test", test_network_config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
     test_network_ngrid = grids.NGridBetter(test_network_config['grid_bounds'][0],kwargs['grid_s_size'])
-    test_network_ngrid.add_grid_content(test_network_dataset.pq_dataset.to_table().to_pandas(), trace_format=True)
+    test_network_ngrid.add_grid_content(test_network_dataset.get_all_samples(keep_cols=['shingle_id','locationtime','x','y','speed_m_s','bearing']), trace_format=True)
     test_network_ngrid.build_cell_lookup()
     test_network_dataset.grid = test_network_ngrid
     print(f"Building tune grid on training data from testing network")
-    tune_network_dataset = data_loader.GenericDataset(f"{run_folder}{tune_network_folder}deeptte_formatted/train", tune_network_config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
+    tune_network_dataset = data_loader.BetterGenericDataset(f"{run_folder}{tune_network_folder}deeptte_formatted/train", tune_network_config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
     tune_network_ngrid = grids.NGridBetter(tune_network_config['grid_bounds'][0],kwargs['grid_s_size'])
-    tune_network_ngrid.add_grid_content(tune_network_dataset.pq_dataset.to_table().to_pandas(), trace_format=True)
+    tune_network_ngrid.add_grid_content(tune_network_dataset.get_all_samples(keep_cols=['shingle_id','locationtime','x','y','speed_m_s','bearing']), trace_format=True)
     tune_network_ngrid.build_cell_lookup()
     tune_network_dataset.grid = tune_network_ngrid
     if not kwargs['skip_gtfs']:
         print(f"Building route holdout grid on validation data from training network")
-        holdout_network_dataset = data_loader.GenericDataset(f"{run_folder}{train_network_folder}deeptte_formatted/test", train_network_config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
+        holdout_network_dataset = data_loader.BetterGenericDataset(f"{run_folder}{train_network_folder}deeptte_formatted/test", train_network_config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
         holdout_network_ngrid = grids.NGridBetter(train_network_config['grid_bounds'][0],kwargs['grid_s_size'])
-        holdout_network_ngrid.add_grid_content(holdout_network_dataset.pq_dataset.to_table().to_pandas(), trace_format=True)
+        holdout_network_ngrid.add_grid_content(holdout_network_dataset.get_all_samples(keep_cols=['shingle_id','locationtime','x','y','speed_m_s','bearing']), trace_format=True)
         holdout_network_ngrid.build_cell_lookup()
         holdout_network_dataset.grid = holdout_network_ngrid
 
