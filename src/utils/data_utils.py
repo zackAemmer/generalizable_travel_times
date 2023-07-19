@@ -529,7 +529,6 @@ def get_summary_config(trace_data, **kwargs):
     trace_data: pandas dataframe with unified columns and calculated distances
     Returns: dict of mean and std values, as well as train/test filenames.
     """
-    # config.json
     grouped = trace_data.groupby('shingle_id')
     if not kwargs['skip_gtfs']:
         summary_dict = {
