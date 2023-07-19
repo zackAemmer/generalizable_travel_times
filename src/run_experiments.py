@@ -86,11 +86,11 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
     }
 
     # Data loading and fold setup
-    with open(f"{run_folder}{train_network_folder}deeptte_formatted/train_config.json", "r") as f:
+    with open(f"{run_folder}{train_network_folder}deeptte_formatted/train_summary_config.json", "r") as f:
         train_network_config = json.load(f)
-    with open(f"{run_folder}{test_network_folder}deeptte_formatted/test_config.json", "r") as f:
+    with open(f"{run_folder}{test_network_folder}deeptte_formatted/test_summary_config.json", "r") as f:
         test_network_config = json.load(f)
-    with open(f"{run_folder}{tune_network_folder}deeptte_formatted/train_config.json", "r") as f:
+    with open(f"{run_folder}{tune_network_folder}deeptte_formatted/train_summary_config.json", "r") as f:
         tune_network_config = json.load(f)
 
     print(f"Building grid on validation data from training network")
