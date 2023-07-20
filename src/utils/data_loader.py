@@ -1,6 +1,7 @@
 import json
 import os
 from random import sample
+import time
 
 import h5py
 import numpy as np
@@ -14,57 +15,55 @@ from torch.utils.data import Dataset, DataLoader, IterableDataset
 from models import grids
 from utils import data_utils, shape_utils
 
-
-# class GenericDataset(Dataset):
-#     def __init__(self, file_path, config, grid=None, subset=None, holdout_routes=None, keep_only_holdout=False, add_grid_features=False, skip_gtfs=False):
-#         self.file_path = file_path
-#         self.config = config
-#         self.grid = grid
-#         self.subset = subset
-#         self.holdout_routes = holdout_routes
-#         self.keep_only_holdout = keep_only_holdout
-#         self.add_grid_features = add_grid_features
-#         self.skip_gtfs = skip_gtfs
-#         # Point to a parquet datafile
-#         self.pq_dataset = ds.dataset(self.file_path, format="parquet")
-#         # Read all into memory and reformat
-#         print(f"Dataset is mapping parquet to records...")
-#         self.content = data_utils.map_to_records(self.pq_dataset.to_table().to_pandas(), self.skip_gtfs)
-#         # Filter out (or keep exclusively) any routes that are used for generalization tests
-#         if self.holdout_routes is not None:
-#             is_holdout = [x['route_id'] in holdout_routes for x in self.content]
-#             if self.keep_only_holdout==True:
-#                 self.content = [sample for (sample, is_holdout) in zip(self.content,is_holdout) if is_holdout]
-#             else:
-#                 self.content = [sample for (sample, is_holdout) in zip(self.content,is_holdout) if not is_holdout]
-#         if self.subset is not None:
-#             if self.subset < 1:
-#                 self.content = sample(self.content, int(len(self.content)*self.subset))
-#             else:
-#                 self.content = sample(self.content, self.subset)
-#         # Save length of all shingles
-#         self.lengths = list(map(lambda x: len(x['lon']), self.content))
-
-#     def __getitem__(self, index):
-#         # If precomputing:
-#         sample = self.content[index].copy()
-#         # Add grid if applicable
-#         if self.grid is not None and self.add_grid_features:
-#             xbin_idxs, ybin_idxs = self.grid.digitize_points(sample['x'], sample['y'])
-#             grid_features = self.grid.get_grid_features(xbin_idxs, ybin_idxs, [sample['locationtime'][0] for x in sample['lon']])
-#             grid_features = apply_grid_normalization(grid_features, self.config)
-#             sample['grid_features'] = grid_features
-#         sample = apply_normalization(sample, self.config)
-#         return sample
-#     def __len__(self):
-#         return len(self.content)
+FEATURE_COLS = [
+    "shingle_id",
+    "weekID",
+    "timeID",
+    "timeID_s",
+    "locationtime",
+    "lon",
+    "lat",
+    "x",
+    "y",
+    "x_cent",
+    "y_cent",
+    "dist_calc_km",
+    "time_calc_s",
+    "dist_cumulative_km",
+    "time_cumulative_s",
+    "speed_m_s",
+    "bearing",
+    "stop_x_cent",
+    "stop_y_cent",
+    "scheduled_time_s",
+    "stop_dist_km",
+    "passed_stops_n"
+]
+SKIP_FEATURE_COLS = [
+    "shingle_id",
+    "weekID",
+    "timeID",
+    "timeID_s",
+    "locationtime",
+    "lon",
+    "lat",
+    "x",
+    "y",
+    "x_cent",
+    "y_cent",
+    "dist_calc_km",
+    "time_calc_s",
+    "dist_cumulative_km",
+    "time_cumulative_s",
+    "speed_m_s",
+    "bearing",
+]
 
 class BetterGenericDataset(Dataset):
-    def __init__(self, file_path, config, grid=None, subset=None, holdout_routes=None, keep_only_holdout=False, add_grid_features=False, skip_gtfs=False):
+    def __init__(self, file_path, config, grid=None, holdout_routes=None, keep_only_holdout=False, add_grid_features=False, skip_gtfs=False):
         self.file_path = file_path
         self.config = config
         self.grid = grid
-        self.subset = subset
         self.holdout_routes = holdout_routes
         self.keep_only_holdout = keep_only_holdout
         self.add_grid_features = add_grid_features
@@ -72,50 +71,13 @@ class BetterGenericDataset(Dataset):
         # Defined in run preparation; should be made constant somewhere
         # Necessary to convert from np array tabular format saved in h5 files
         if not self.skip_gtfs:
-            self.col_names = [
-                "shingle_id",
-                "weekID",
-                "timeID",
-                "timeID_s",
-                "locationtime",
-                "lon",
-                "lat",
-                "x",
-                "y",
-                "x_cent",
-                "y_cent",
-                "dist_calc_km",
-                "time_calc_s",
-                "dist_cumulative_km",
-                "time_cumulative_s",
-                "speed_m_s",
-                "bearing",
-                "stop_x_cent",
-                "stop_y_cent",
-                "scheduled_time_s",
-                "stop_dist_km",
-                "passed_stops_n"
-            ]
+            self.col_names = FEATURE_COLS
         else:
-            self.col_names = [
-                "shingle_id",
-                "weekID",
-                "timeID",
-                "timeID_s",
-                "locationtime",
-                "lon",
-                "lat",
-                "x",
-                "y",
-                "x_cent",
-                "y_cent",
-                "dist_calc_km",
-                "time_calc_s",
-                "dist_cumulative_km",
-                "time_cumulative_s",
-                "speed_m_s",
-                "bearing"
-            ]
+            self.col_names = SKIP_FEATURE_COLS
+        # Cache indexes, means and stds for normalization
+        self.col_indices = [i for i, var_name in enumerate(self.col_names) if f"{var_name}_mean" in self.config]
+        self.means = np.array([self.config[f"{self.col_names[i]}_mean"] for i in self.col_indices])
+        self.stds = np.array([self.config[f"{self.col_names[i]}_std"] for i in self.col_indices])
         # Point to a dataset
         with open(f"{self.file_path}_shingle_config.json") as f:
             # This contains all of the shingle information in the data file
@@ -129,35 +91,28 @@ class BetterGenericDataset(Dataset):
                 self.shingle_keys = [i for (i,v) in zip(self.shingle_keys, holdout_idxs) if v]
             else:
                 self.shingle_keys = [i for (i,v) in zip(self.shingle_keys, holdout_idxs) if not v]
+        # It is essential to open the h5 files during initialization; 100x slowdown if done repeatedly in __getitem__
+        self.h5_lookup = {}
+        self.base_path = "/".join(self.file_path.split("/")[:-1])+"/"
+        self.train_or_test = self.file_path.split("/")[-1]
+        for filename in os.listdir(self.base_path):
+            if filename.startswith(self.train_or_test) and filename.endswith(".h5"):
+                self.h5_lookup[filename] = h5py.File(f"{self.base_path}{filename}", 'r')['tabular_data']
     def __getitem__(self, index):
-        stat_attrs = ['dist_cumulative_km', 'time_cumulative_s']
-        stat_names = ['dist', 'time']
-        info_attrs = ['weekID', 'timeID']
-        traj_attrs = ['x','y','locationtime','y_cent', 'x_cent', 'time_calc_s', 'dist_calc_km', 'speed_m_s', 'bearing']
-        traj_attrs_gtfs = [
-            "stop_x_cent",
-            "stop_y_cent",
-            "scheduled_time_s",
-            "stop_dist_km",
-            "passed_stops_n"
-        ]
-        # Get information on shingle file location and lines; read from file
+        # Get information on shingle file location and lines; read specific shingle lines from specific shingle file
         samp_dict = self.shingle_lookup[self.shingle_keys[index]]
-        with h5py.File(f"{self.file_path}_data_{samp_dict['network']}_{samp_dict['file_num']}.h5", 'r') as f:
-            database = f['tabular_data']
-            df = database[samp_dict['start_idx']:samp_dict['end_idx']]
-        # Convert from numpy array to pandas for ease of normalization and interface with past code
-        df = pd.DataFrame(df, columns=self.col_names)
+        df = self.h5_lookup[f"{self.train_or_test}_data_{samp_dict['network']}_{samp_dict['file_num']}.h5"][samp_dict['start_idx']:samp_dict['end_idx']]
+        # df[:,self.col_indices] = (df[:,self.col_indices] - self.means) / self.stds
+        # return df
+        # Convert tabular to dict of keys; inefficient but works with all other code for now
         res = {}
-        for k,n in zip(stat_attrs, stat_names):
-            res[n] = list(df[k])[-1]
-        for k in info_attrs:
-            res[k] = list(df[k])[0]
-        for k in traj_attrs:
-            res[k] = list(df[k])
-        if not self.skip_gtfs:
-            for k in traj_attrs_gtfs:
-                res[k] = list(df[k])
+        for i in range(df.shape[1]):
+            res[self.col_names[i]] = df[:,i]
+        # Some keys should not be repeated across timesteps (use first or last value of sequence)
+        res['time'] = res['time_cumulative_s'][-1]
+        res['dist'] = res['dist_cumulative_km'][-1]
+        res['weekID'] = res['weekID'][0]
+        res['timeID'] = res['timeID'][0]
         # Add grid if applicable
         if self.grid is not None and self.add_grid_features:
             xbin_idxs, ybin_idxs = self.grid.digitize_points(res['x'], res['y'])
@@ -170,35 +125,23 @@ class BetterGenericDataset(Dataset):
         return len(self.shingle_keys)
     def get_all_samples(self, keep_cols, indexes=None):
         # Read all h5 files in run base directory; get all point obs
-        base_path = "/".join(self.file_path.split("/")[:-1])+"/"
-        train_or_test = self.file_path.split("/")[-1]
         res = []
-        for filename in os.listdir(base_path):
-            if filename.startswith(train_or_test) and filename.endswith(".h5"):
-                with h5py.File(f"{base_path}{filename}", 'r') as f:
-                    df = f['tabular_data'][:]
-                    df = pd.DataFrame(df, columns=self.col_names)
-                    df['shingle_id'] = df['shingle_id'].astype(int)
-                    df = df[keep_cols]
-                    res.append(df)
+        for k in list(self.h5_lookup.keys()):
+            df = self.h5_lookup[k][:]
+            df = pd.DataFrame(df, columns=self.col_names)
+            df['shingle_id'] = df['shingle_id'].astype(int)
+            df = df[keep_cols]
+            res.append(df)
         res = pd.concat(res)
         if indexes is not None:
             # Indexes are in order, but shingle_id's are not; get shingle id for each keep index and filter
-            keep_shingles = [self.shingle_lookup[self.shingle_keys[i]] for i in indexes]
+            keep_shingles = [self.shingle_lookup[self.shingle_keys[i]]['shingle_id'] for i in indexes]
             res = res[res['shingle_id'].isin(keep_shingles)]
         return res
 
 def apply_normalization(sample, config):
     for var_name in sample.keys():
-        # DeepTTE is inconsistent with sample and config naming schema.
-        # These variables are in the sample (as cumulatives), but not the config.
-        # The same variable names are in the config, but refer to non-cumulative values.
-        # They have been added here to the config as time/dist cumulative.
-        if var_name == "time_gap":
-            sample[var_name] = data_utils.normalize(np.array(sample[var_name]), config[f"time_cumulative_s_mean"], config[f"time_cumulative_s_std"])
-        elif var_name == "dist_gap":
-            sample[var_name] = data_utils.normalize(np.array(sample[var_name]), config["dist_cumulative_km_mean"], config["dist_cumulative_km_std"])
-        elif f"{var_name}_mean" in config.keys():
+        if f"{var_name}_mean" in config.keys():
             sample[var_name] = data_utils.normalize(np.array(sample[var_name]), config[f"{var_name}_mean"], config[f"{var_name}_std"])
     return sample
 
@@ -224,6 +167,20 @@ def apply_grid_normalization(grid_features, config):
     grid_features = grid_features[:,3:,:,:,:]
     return grid_features
 
+# def basic_collate(batch):
+#     y_col = "time_cumulative_s"
+#     em_cols = ["timeID","weekID"]
+#     first_cols = ["x_cent","y_cent","scheduled_time_s","stop_dist_km","passed_stops_n","speed_m_s","bearing"]
+#     last_cols = ["x_cent","y_cent","scheduled_time_s","stop_dist_km","passed_stops_n","dist_cumulative_km","bearing"]
+#     batch = [torch.tensor(b) for b in batch]
+#     first = torch.cat([b[0,:].unsqueeze(0) for b in batch], axis=0)
+#     last = torch.cat([b[-1,:].unsqueeze(0) for b in batch], axis=0)
+#     X_em = first[:,([FEATURE_COLS.index(z) for z in em_cols])]
+#     X_ct_first = first[:,([FEATURE_COLS.index(z) for z in first_cols])]
+#     X_ct_last = last[:,([FEATURE_COLS.index(z) for z in last_cols])]
+#     X_ct = torch.cat([X_ct_first, X_ct_last], axis=1)
+#     y = last[:,(FEATURE_COLS.index(y_col))]
+#     return [X_em.int(), X_ct.float()], y.float()
 def basic_collate(batch):
     # Last dimension is number of sequence variables below
     seq_lens = torch.tensor([len(x['x_cent']) for x in batch]).int()

@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
+import time
 
 from models import ff, conv, rnn, transformer, avg_speed, schedule, persistent
 from models.deeptte import DeepTTE

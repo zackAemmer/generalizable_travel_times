@@ -538,8 +538,8 @@ def get_summary_config(trace_data, **kwargs):
             "dist_mean": np.mean(grouped.max()[['dist_cumulative_km']].values.flatten()),
             'dist_std': np.std(grouped.max()[['dist_cumulative_km']].values.flatten()),
             # Individual point values (no cumulative)
-            'lons_mean': np.mean(trace_data['lon']),
-            'lons_std': np.std(trace_data['lon']),
+            'lon_mean': np.mean(trace_data['lon']),
+            'lon_std': np.std(trace_data['lon']),
             'lat_mean': np.mean(trace_data['lat']),
             "lat_std": np.std(trace_data['lat']),
             # Other variables:
