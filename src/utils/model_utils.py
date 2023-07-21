@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 import time
+import os
 
 from models import ff, conv, rnn, transformer, avg_speed, schedule, persistent
 from models.deeptte import DeepTTE
@@ -92,7 +93,7 @@ def random_param_search(hyperparameter_sample_dict, model_names):
         set_of_random_dicts.append(all_model_dict)
     return set_of_random_dicts
 
-def make_all_models(hyperparameter_dict, embed_dict, device, config, load_weights=False, weight_folder=None, fold_num=None):
+def make_all_models(hyperparameter_dict, embed_dict, config, load_weights=False, weight_folder=None, fold_num=None):
     # Declare base models
     base_model_list = []
     base_model_list.append(avg_speed.AvgHourlySpeedModel("AVG"))
@@ -100,15 +101,14 @@ def make_all_models(hyperparameter_dict, embed_dict, device, config, load_weight
     base_model_list.append(persistent.PersistentTimeSeqModel("PER_TIM"))
     # Declare neural network models
     nn_model_list = []
-    nn_model_list.append(ff.FF(
+    nn_model_list.append(ff.FF_L(
         "FF",
         n_features=12,
         hyperparameter_dict=hyperparameter_dict['FF'],
         embed_dict=embed_dict,
         collate_fn=data_loader.basic_collate,
-        device=device
-    ).to(device))
-    nn_model_list.append(ff.FF_GRID(
+    ))
+    nn_model_list.append(ff.FF_GRID_L(
         "FF_NGRID_IND",
         n_features=12,
         n_grid_features=3*3*5*5,
@@ -116,17 +116,15 @@ def make_all_models(hyperparameter_dict, embed_dict, device, config, load_weight
         hyperparameter_dict=hyperparameter_dict['FF'],
         embed_dict=embed_dict,
         collate_fn=data_loader.basic_grid_collate,
-        device=device
-    ).to(device))
-    nn_model_list.append(conv.CONV(
+    ))
+    nn_model_list.append(conv.CONV_L(
         "CONV",
         n_features=10,
         hyperparameter_dict=hyperparameter_dict['CONV'],
         embed_dict=embed_dict,
         collate_fn=data_loader.sequential_collate,
-        device=device
-    ).to(device))
-    nn_model_list.append(conv.CONV_GRID(
+    ))
+    nn_model_list.append(conv.CONV_GRID_L(
         "CONV_NGRID_IND",
         n_features=10,
         n_grid_features=3*3*5*5,
@@ -134,17 +132,15 @@ def make_all_models(hyperparameter_dict, embed_dict, device, config, load_weight
         hyperparameter_dict=hyperparameter_dict['CONV'],
         embed_dict=embed_dict,
         collate_fn=data_loader.sequential_grid_collate,
-        device=device
-    ).to(device))
-    nn_model_list.append(rnn.GRU(
+    ))
+    nn_model_list.append(rnn.GRU_L(
         "GRU",
         n_features=10,
         hyperparameter_dict=hyperparameter_dict['GRU'],
         embed_dict=embed_dict,
         collate_fn=data_loader.sequential_collate,
-        device=device
-    ).to(device))
-    nn_model_list.append(rnn.GRU_GRID(
+    ))
+    nn_model_list.append(rnn.GRU_GRID_L(
         "GRU_NGRID_IND",
         n_features=10,
         n_grid_features=3*3*5*5,
@@ -152,17 +148,15 @@ def make_all_models(hyperparameter_dict, embed_dict, device, config, load_weight
         hyperparameter_dict=hyperparameter_dict['GRU'],
         embed_dict=embed_dict,
         collate_fn=data_loader.sequential_grid_collate,
-        device=device
-    ).to(device))
-    nn_model_list.append(transformer.TRSF(
+    ))
+    nn_model_list.append(transformer.TRSF_L(
         "TRSF",
         n_features=10,
         hyperparameter_dict=hyperparameter_dict['TRSF'],
         embed_dict=embed_dict,
         collate_fn=data_loader.sequential_collate,
-        device=device
-    ).to(device))
-    nn_model_list.append(transformer.TRSF_GRID(
+    ))
+    nn_model_list.append(transformer.TRSF_GRID_L(
         "TRSF_NGRID_IND",
         n_features=10,
         n_grid_features=3*3*5*5,
@@ -170,38 +164,26 @@ def make_all_models(hyperparameter_dict, embed_dict, device, config, load_weight
         hyperparameter_dict=hyperparameter_dict['TRSF'],
         embed_dict=embed_dict,
         collate_fn=data_loader.sequential_grid_collate,
-        device=device
-    ).to(device))
-    # nn_model_list.append(transformer.TRSF_GRID_ATTN(
-    #     "TRSF_NGRID_CRS",
-    #     n_features=10,
-    #     n_grid_features=3*3*5*5,
-    #     n_channels=3*3,
-    #     grid_compression_size=8,
-    #     hyperparameter_dict=hyperparameter_dict['TRSF'],
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.sequential_grid_collate,
-    #     device=device
-    # ).to(device))
-    nn_model_list.append(DeepTTE.Net(
-        "DEEP_TTE",
-        hyperparameter_dict=hyperparameter_dict['DEEPTTE'],
-        collate_fn=data_loader.deeptte_collate,
-        device=device,
-        config=config
-    ).to(device))
+    ))
+    # nn_model_list.append(DeepTTE.Net(
+    #     "DEEP_TTE",
+    #     hyperparameter_dict=hyperparameter_dict['DEEPTTE'],
+    #     collate_fn=data_loader.deeptte_collate,
+    #     config=config
+    # )
     # Load weights if applicable
     if load_weights:
         base_model_list = []
         for b in base_model_list:
             b = data_utils.load_pkl(f"{weight_folder}{b.name}_{fold_num}.pkl")
         for m in nn_model_list:
-            m = m.load_state_dict(torch.load(f"{weight_folder}{m.model_name}_{fold_num}.pt"))
-    # Combine all models
+            last_ckpt = os.listdir(f"{weight_folder}/../logs/{m.model_name}/version_{fold_num}/")
+            m = m.load_from_checkpoint(f"{weight_folder}/../logs/{m.model_name}/version_{fold_num}/{last_ckpt}.ckpt").eval()
+            # m = m.load_state_dict(torch.load(f"{weight_folder}{m.model_name}_{fold_num}.pt"))    # Combine all models
     base_model_list.extend(nn_model_list)
     return base_model_list
 
-def make_all_models_nosch(hyperparameter_dict, embed_dict, device, config, load_weights=False, weight_folder=None, fold_num=None):
+def make_all_models_nosch(hyperparameter_dict, embed_dict, config, load_weights=False, weight_folder=None, fold_num=None):
     # Declare base models
     base_model_list = []
     base_model_list.append(avg_speed.AvgHourlySpeedModel("AVG"))
@@ -214,51 +196,48 @@ def make_all_models_nosch(hyperparameter_dict, embed_dict, device, config, load_
         hyperparameter_dict=hyperparameter_dict['FF'],
         embed_dict=embed_dict,
         collate_fn=data_loader.basic_collate_nosch,
-        device=device
-    ).to(device))
+    ))
     nn_model_list.append(conv.CONV(
         "CONV",
         n_features=4,
         hyperparameter_dict=hyperparameter_dict['CONV'],
         embed_dict=embed_dict,
         collate_fn=data_loader.sequential_collate_nosch,
-        device=device
-    ).to(device))
+    ))
     nn_model_list.append(rnn.GRU(
         "GRU",
         n_features=4,
         hyperparameter_dict=hyperparameter_dict['GRU'],
         embed_dict=embed_dict,
         collate_fn=data_loader.sequential_collate_nosch,
-        device=device
-    ).to(device))
+    ))
     nn_model_list.append(transformer.TRSF(
         "TRSF",
         n_features=4,
         hyperparameter_dict=hyperparameter_dict['TRSF'],
         embed_dict=embed_dict,
         collate_fn=data_loader.sequential_collate_nosch,
-        device=device
-    ).to(device))
-    nn_model_list.append(DeepTTE.Net(
-        "DEEP_TTE",
-        hyperparameter_dict=hyperparameter_dict['DEEPTTE'],
-        collate_fn=data_loader.deeptte_collate_nosch,
-        device=device,
-        config=config
-    ).to(device))
+    ))
+    # nn_model_list.append(DeepTTE.Net(
+    #     "DEEP_TTE",
+    #     hyperparameter_dict=hyperparameter_dict['DEEPTTE'],
+    #     collate_fn=data_loader.deeptte_collate_nosch,
+    #     config=config
+    # ))
     # Load weights if applicable
     if load_weights:
         base_model_list = []
         for b in base_model_list:
             b = data_utils.load_pkl(f"{weight_folder}{b.name}_{fold_num}.pkl")
         for m in nn_model_list:
-            m = m.load_state_dict(torch.load(f"{weight_folder}{m.model_name}_{fold_num}.pt"))
+            last_ckpt = os.listdir(f"{weight_folder}/../logs/{m.model_name}/version_{fold_num}/")
+            m = m.load_from_checkpoint(f"{weight_folder}/../logs/{m.model_name}/version_{fold_num}/{last_ckpt}.ckpt").eval()
+            # m = m.load_state_dict(torch.load(f"{weight_folder}{m.model_name}_{fold_num}.pt"))
     # Combine all models
     base_model_list.extend(nn_model_list)
     return base_model_list
 
-def make_param_search_models(hyperparameter_dict, embed_dict, device, config):
+def make_param_search_models(hyperparameter_dict, embed_dict):
     # Declare base models
     base_model_list = []
     # Declare neural network models
@@ -270,32 +249,28 @@ def make_param_search_models(hyperparameter_dict, embed_dict, device, config):
             hyperparameter_dict=sample_dict['FF'],
             embed_dict=embed_dict,
             collate_fn=data_loader.basic_collate,
-            device=device
-        ).to(device))
+        ))
         nn_model_list.append(conv.CONV(
             f"CONV_{sample_num}",
             n_features=10,
             hyperparameter_dict=sample_dict['CONV'],
             embed_dict=embed_dict,
             collate_fn=data_loader.sequential_collate,
-            device=device
-        ).to(device))
+        ))
         nn_model_list.append(rnn.GRU(
             f"GRU_{sample_num}",
             n_features=10,
             hyperparameter_dict=sample_dict['GRU'],
             embed_dict=embed_dict,
             collate_fn=data_loader.sequential_collate,
-            device=device
-        ).to(device))
+        ))
         nn_model_list.append(transformer.TRSF(
             f"TRSF_{sample_num}",
             n_features=10,
             hyperparameter_dict=sample_dict['TRSF'],
             embed_dict=embed_dict,
             collate_fn=data_loader.sequential_collate,
-            device=device
-        ).to(device))
+        ))
     # Combine all models
     base_model_list.extend(nn_model_list)
     return base_model_list

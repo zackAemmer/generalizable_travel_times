@@ -8,9 +8,6 @@ import shutil
 
 import h5py
 import numpy as np
-import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
 import torch
 from joblib import Parallel, delayed
 
@@ -99,10 +96,10 @@ def process_data_parallel(date_list, i, n, **kwargs):
     # Then get shingle config for saved lines
     if not kwargs['skip_gtfs']:
         shingle_list = traces.groupby("shingle_id")[["trip_id","file","route_id"]].agg([lambda x: x.iloc[0], len]).reset_index().values
-        traces = traces.drop(columns=["trip_id","file","route_id"]).values.astype(float)
+        traces = traces.drop(columns=["trip_id","file","route_id"]).values.astype('float32')
     else:
         shingle_list = traces.groupby("shingle_id")[["trip_id","file"]].agg([lambda x: x.iloc[0], len]).reset_index().values
-        traces = traces.drop(columns=["trip_id","file"]).values.astype(float)
+        traces = traces.drop(columns=["trip_id","file"]).values.astype('float32')
     end_idxs = np.cumsum(shingle_list[:,2])
     start_idxs = np.insert(end_idxs, 0, 0)[:-1]
     shingle_config = {}
@@ -279,49 +276,49 @@ if __name__=="__main__":
         skip_gtfs=True
     )
 
-    # PARAM SEARCH
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    prepare_run(
-        overwrite=True,
-        run_name="param_search",
-        network_name=["kcm"],
-        train_dates=data_utils.get_date_list("2023_02_15", 60),
-        test_dates=data_utils.get_date_list("2023_04_01", 7),
-        n_workers=2,
-        n_jobs=8,
-        data_dropout=0.2,
-        gtfs_folder=["./data/kcm_gtfs/"],
-        raw_data_folder=["./data/kcm_all_new/"],
-        timezone=["America/Los_Angeles"],
-        epsg=["32148"],
-        grid_bounds=[[369903,37911,409618,87758]],
-        coord_ref_center=[[386910,69022]],
-        given_names=[['trip_id','file','locationtime','lat','lon','vehicle_id']],
-        skip_gtfs=False
-    )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    prepare_run(
-        overwrite=True,
-        run_name="param_search",
-        network_name=["atb"],
-        train_dates=data_utils.get_date_list("2023_02_15", 60),
-        test_dates=data_utils.get_date_list("2023_04_01", 7),
-        n_workers=2,
-        n_jobs=8,
-        data_dropout=0.2,
-        gtfs_folder=["./data/atb_gtfs/"],
-        raw_data_folder=["./data/atb_all_new/"],
-        timezone=["Europe/Oslo"],
-        epsg=["32632"],
-        grid_bounds=[[550869,7012847,579944,7039521]],
-        coord_ref_center=[[569472,7034350]],
-        given_names=[['trip_id','file','locationtime','lat','lon','vehicle_id']],
-        skip_gtfs=False
-    )
+    # # PARAM SEARCH
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # prepare_run(
+    #     overwrite=True,
+    #     run_name="param_search",
+    #     network_name=["kcm"],
+    #     train_dates=data_utils.get_date_list("2023_02_15", 60),
+    #     test_dates=data_utils.get_date_list("2023_04_01", 7),
+    #     n_workers=2,
+    #     n_jobs=8,
+    #     data_dropout=0.2,
+    #     gtfs_folder=["./data/kcm_gtfs/"],
+    #     raw_data_folder=["./data/kcm_all_new/"],
+    #     timezone=["America/Los_Angeles"],
+    #     epsg=["32148"],
+    #     grid_bounds=[[369903,37911,409618,87758]],
+    #     coord_ref_center=[[386910,69022]],
+    #     given_names=[['trip_id','file','locationtime','lat','lon','vehicle_id']],
+    #     skip_gtfs=False
+    # )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # prepare_run(
+    #     overwrite=True,
+    #     run_name="param_search",
+    #     network_name=["atb"],
+    #     train_dates=data_utils.get_date_list("2023_02_15", 60),
+    #     test_dates=data_utils.get_date_list("2023_04_01", 7),
+    #     n_workers=2,
+    #     n_jobs=8,
+    #     data_dropout=0.2,
+    #     gtfs_folder=["./data/atb_gtfs/"],
+    #     raw_data_folder=["./data/atb_all_new/"],
+    #     timezone=["Europe/Oslo"],
+    #     epsg=["32632"],
+    #     grid_bounds=[[550869,7012847,579944,7039521]],
+    #     coord_ref_center=[[569472,7034350]],
+    #     given_names=[['trip_id','file','locationtime','lat','lon','vehicle_id']],
+    #     skip_gtfs=False
+    # )
 
     # # # # FULL RUN
     

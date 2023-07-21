@@ -2,7 +2,7 @@ import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy import sparse
+# from scipy import sparse
 
 from utils import data_utils
 

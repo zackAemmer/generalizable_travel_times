@@ -82,7 +82,7 @@ def run(run_folder, train_network_folder, **kwargs):
     time_iter = time.time() - t0
     print(f"{time_iter*len(dataset_new)/1000/60} minutes")
 
-    loader = DataLoader(dataset_new, batch_size=512, collate_fn=data_loader.basic_collate, pin_memory=True, num_workers=4, drop_last=True)
+    loader = DataLoader(dataset_new, batch_size=512, collate_fn=data_loader.basic_collate, pin_memory=False, num_workers=0, drop_last=True)
     t0 = time.time()
     i=0
     for x in loader:
