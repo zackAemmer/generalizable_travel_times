@@ -97,9 +97,9 @@ def random_param_search(hyperparameter_sample_dict, model_names):
 def make_all_models(hyperparameter_dict, embed_dict, config, load_weights=False, weight_folder=None, fold_num=None):
     # Declare base models
     base_model_list = []
-    # base_model_list.append(avg_speed.AvgHourlySpeedModel("AVG"))
-    # base_model_list.append(schedule.TimeTableModel("SCH"))
-    # base_model_list.append(persistent.PersistentTimeSeqModel("PER_TIM"))
+    base_model_list.append(avg_speed.AvgHourlySpeedModel("AVG"))
+    base_model_list.append(schedule.TimeTableModel("SCH"))
+    base_model_list.append(persistent.PersistentTimeSeqModel("PER_TIM"))
     # Declare neural network models
     nn_model_list = []
     # nn_model_list.append(ff.FF_L(
@@ -110,16 +110,16 @@ def make_all_models(hyperparameter_dict, embed_dict, config, load_weights=False,
     #     collate_fn=data_loader.basic_collate,
     #     config=config
     # ))
-    nn_model_list.append(ff.FF_GRID_L(
-        "FF_NGRID_IND",
-        n_features=14,
-        n_grid_features=3*3*5*5,
-        grid_compression_size=8,
-        hyperparameter_dict=hyperparameter_dict['FF'],
-        embed_dict=embed_dict,
-        collate_fn=data_loader.basic_grid_collate,
-        config=config
-    ))
+    # nn_model_list.append(ff.FF_GRID_L(
+    #     "FF_NGRID_IND",
+    #     n_features=14,
+    #     n_grid_features=3*3*5*5,
+    #     grid_compression_size=8,
+    #     hyperparameter_dict=hyperparameter_dict['FF'],
+    #     embed_dict=embed_dict,
+    #     collate_fn=data_loader.basic_grid_collate,
+    #     config=config
+    # ))
     # nn_model_list.append(conv.CONV_L(
     #     "CONV",
     #     n_features=10,
@@ -138,42 +138,42 @@ def make_all_models(hyperparameter_dict, embed_dict, config, load_weights=False,
     #     collate_fn=data_loader.sequential_grid_collate,
     #     config=config
     # ))
-    # nn_model_list.append(rnn.GRU_L(
-    #     "GRU",
-    #     n_features=10,
-    #     hyperparameter_dict=hyperparameter_dict['GRU'],
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.sequential_collate,
-    #     config=config
-    # ))
-    # nn_model_list.append(rnn.GRU_GRID_L(
-    #     "GRU_NGRID_IND",
-    #     n_features=10,
-    #     n_grid_features=3*3*5*5,
-    #     grid_compression_size=8,
-    #     hyperparameter_dict=hyperparameter_dict['GRU'],
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.sequential_grid_collate,
-    #     config=config
-    # ))
-    # nn_model_list.append(transformer.TRSF_L(
-    #     "TRSF",
-    #     n_features=10,
-    #     hyperparameter_dict=hyperparameter_dict['TRSF'],
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.sequential_collate,
-    #     config=config
-    # ))
-    # nn_model_list.append(transformer.TRSF_GRID_L(
-    #     "TRSF_NGRID_IND",
-    #     n_features=10,
-    #     n_grid_features=3*3*5*5,
-    #     grid_compression_size=8,
-    #     hyperparameter_dict=hyperparameter_dict['TRSF'],
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.sequential_grid_collate,
-    #     config=config
-    # ))
+    nn_model_list.append(rnn.GRU_L(
+        "GRU",
+        n_features=10,
+        hyperparameter_dict=hyperparameter_dict['GRU'],
+        embed_dict=embed_dict,
+        collate_fn=data_loader.sequential_collate,
+        config=config
+    ))
+    nn_model_list.append(rnn.GRU_GRID_L(
+        "GRU_NGRID_IND",
+        n_features=10,
+        n_grid_features=3*3*5*5,
+        grid_compression_size=8,
+        hyperparameter_dict=hyperparameter_dict['GRU'],
+        embed_dict=embed_dict,
+        collate_fn=data_loader.sequential_grid_collate,
+        config=config
+    ))
+    nn_model_list.append(transformer.TRSF_L(
+        "TRSF",
+        n_features=10,
+        hyperparameter_dict=hyperparameter_dict['TRSF'],
+        embed_dict=embed_dict,
+        collate_fn=data_loader.sequential_collate,
+        config=config
+    ))
+    nn_model_list.append(transformer.TRSF_GRID_L(
+        "TRSF_NGRID_IND",
+        n_features=10,
+        n_grid_features=3*3*5*5,
+        grid_compression_size=8,
+        hyperparameter_dict=hyperparameter_dict['TRSF'],
+        embed_dict=embed_dict,
+        collate_fn=data_loader.sequential_grid_collate,
+        config=config
+    ))
     # nn_model_list.append(DeepTTE.Net(
     #     "DEEP_TTE",
     #     hyperparameter_dict=hyperparameter_dict['DEEPTTE'],
@@ -199,7 +199,7 @@ def make_all_models_nosch(hyperparameter_dict, embed_dict, config, load_weights=
     base_model_list.append(persistent.PersistentTimeSeqModel("PER_TIM"))
     # Declare neural network models
     nn_model_list = []
-    nn_model_list.append(ff.FF(
+    nn_model_list.append(ff.FF_L(
         "FF",
         n_features=8,
         hyperparameter_dict=hyperparameter_dict['FF'],
@@ -207,7 +207,7 @@ def make_all_models_nosch(hyperparameter_dict, embed_dict, config, load_weights=
         collate_fn=data_loader.basic_collate_nosch,
         config=config
     ))
-    nn_model_list.append(conv.CONV(
+    nn_model_list.append(conv.CONV_L(
         "CONV",
         n_features=4,
         hyperparameter_dict=hyperparameter_dict['CONV'],
@@ -215,7 +215,7 @@ def make_all_models_nosch(hyperparameter_dict, embed_dict, config, load_weights=
         collate_fn=data_loader.sequential_collate_nosch,
         config=config
     ))
-    nn_model_list.append(rnn.GRU(
+    nn_model_list.append(rnn.GRU_L(
         "GRU",
         n_features=4,
         hyperparameter_dict=hyperparameter_dict['GRU'],
@@ -223,7 +223,7 @@ def make_all_models_nosch(hyperparameter_dict, embed_dict, config, load_weights=
         collate_fn=data_loader.sequential_collate_nosch,
         config=config
     ))
-    nn_model_list.append(transformer.TRSF(
+    nn_model_list.append(transformer.TRSF_L(
         "TRSF",
         n_features=4,
         hyperparameter_dict=hyperparameter_dict['TRSF'],
@@ -256,15 +256,15 @@ def make_param_search_models(hyperparameter_dict, embed_dict, config):
     # Declare neural network models
     nn_model_list = []
     for sample_num, sample_dict in enumerate(hyperparameter_dict):
-        nn_model_list.append(ff.FF(
+        nn_model_list.append(ff.FF_L(
             f"FF_{sample_num}",
-            n_features=12,
+            n_features=14,
             hyperparameter_dict=sample_dict['FF'],
             embed_dict=embed_dict,
             collate_fn=data_loader.basic_collate,
             config=config
         ))
-        nn_model_list.append(conv.CONV(
+        nn_model_list.append(conv.CONV_L(
             f"CONV_{sample_num}",
             n_features=10,
             hyperparameter_dict=sample_dict['CONV'],
@@ -272,7 +272,7 @@ def make_param_search_models(hyperparameter_dict, embed_dict, config):
             collate_fn=data_loader.sequential_collate,
             config=config
         ))
-        nn_model_list.append(rnn.GRU(
+        nn_model_list.append(rnn.GRU_L(
             f"GRU_{sample_num}",
             n_features=10,
             hyperparameter_dict=sample_dict['GRU'],
@@ -280,7 +280,7 @@ def make_param_search_models(hyperparameter_dict, embed_dict, config):
             collate_fn=data_loader.sequential_collate,
             config=config
         ))
-        nn_model_list.append(transformer.TRSF(
+        nn_model_list.append(transformer.TRSF_L(
             f"TRSF_{sample_num}",
             n_features=10,
             hyperparameter_dict=sample_dict['TRSF'],

@@ -236,110 +236,49 @@ def basic_grid_collate_nosch(batch):
     return [X_em.int(), X_ct.float(), X_gr.float()], y.float()
 
 def sequential_collate(batch):
-    y_col = "time_cumulative_s"
+    y_col = "time_calc_s"
     em_cols = ["timeID","weekID"]
-    return None
-    return [X_em, X_ct, seq_lens], y
-
-# def sequential_collate(batch):
-#     # Last dimension is number of sequence variables below
-#     seq_lens = torch.tensor([len(x['x_cent']) for x in batch]).int()
-#     max_len = max(seq_lens)
-#     # Embedded context features
-#     X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
-#     X_em = torch.from_numpy(X_em)
-#     # Continuous features
-#     X_ct = torch.zeros((len(batch), max_len, 10))
-#     X_ct[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x_cent']) for x in batch], batch_first=True)
-#     X_ct[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y_cent']) for x in batch], batch_first=True)
-#     X_ct[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
-#     X_ct[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
-#     X_ct[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
-#     X_ct[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x_cent']) for x in batch], batch_first=True)
-#     X_ct[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y_cent']) for x in batch], batch_first=True)
-#     X_ct[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
-#     X_ct[:,:,8] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['passed_stops_n']) for x in batch], batch_first=True)
-#     X_ct[:,:,9] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['passed_stops_n']) for x in batch], batch_first=True)
-#     # Target feature
-#     y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
-#     X_em = X_em.int()
-#     X_ct = X_ct.float()
-#     y = y.float()
-#     return [X_em, X_ct, seq_lens], y
-
+    ct_cols = ["x_cent","y_cent","scheduled_time_s","stop_dist_km","stop_x_cent","stop_y_cent","passed_stops_n","bearing","dist_calc_km","dist_calc_km"]
+    batch = [torch.tensor(b['samp']) for b in batch]
+    X_sl = torch.tensor([len(b) for b in batch])
+    first = torch.cat([b[0,:].unsqueeze(0) for b in batch], axis=0)
+    X_em = first[:,([FEATURE_COLS.index(z) for z in em_cols])]
+    batch = torch.nn.utils.rnn.pad_sequence(batch, batch_first=True)
+    X_ct = batch[:,:,([FEATURE_COLS.index(z) for z in ct_cols])]
+    y = batch[:,:,(FEATURE_COLS.index(y_col))]
+    return [X_em.int(), X_ct.float(), X_sl.int()], y.float()
 def sequential_collate_nosch(batch):
-    # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['x_cent']) for x in batch]).int()
-    max_len = max(seq_lens)
-    # Embedded context features
-    X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
-    X_em = torch.from_numpy(X_em)
-    # Continuous features
-    X_ct = torch.zeros((len(batch), max_len, 4))
-    X_ct[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x_cent']) for x in batch], batch_first=True)
-    X_ct[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y_cent']) for x in batch], batch_first=True)
-    X_ct[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
-    X_ct[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
-    # Target feature
-    y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
-    X_em = X_em.int()
-    X_ct = X_ct.float()
-    y = y.float()
-    return [X_em, X_ct, seq_lens], y
-
+    y_col = "time_calc_s"
+    em_cols = ["timeID","weekID"]
+    ct_cols = ["x_cent","y_cent","bearing","dist_calc_km"]
+    batch = [torch.tensor(b['samp']) for b in batch]
+    X_sl = torch.tensor([len(b) for b in batch])
+    first = torch.cat([b[0,:].unsqueeze(0) for b in batch], axis=0)
+    X_em = first[:,([FEATURE_COLS.index(z) for z in em_cols])]
+    batch = torch.nn.utils.rnn.pad_sequence(batch, batch_first=True)
+    X_ct = batch[:,:,([FEATURE_COLS.index(z) for z in ct_cols])]
+    y = batch[:,:,(FEATURE_COLS.index(y_col))]
+    return [X_em.int(), X_ct.float(), X_sl.int()], y.float()
 def sequential_grid_collate(batch):
-    # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['x_cent']) for x in batch]).int()
-    max_len = max(seq_lens)
-    # Embedded context features
-    X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
-    X_em = torch.from_numpy(X_em)
-    # Continuous features
-    X_ct = torch.zeros((len(batch), max_len, 10))
-    X_ct[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x_cent']) for x in batch], batch_first=True)
-    X_ct[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y_cent']) for x in batch], batch_first=True)
-    X_ct[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
-    X_ct[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['scheduled_time_s']) for x in batch], batch_first=True)
-    X_ct[:,:,4] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_dist_km']) for x in batch], batch_first=True)
-    X_ct[:,:,5] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_x_cent']) for x in batch], batch_first=True)
-    X_ct[:,:,6] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['stop_y_cent']) for x in batch], batch_first=True)
-    X_ct[:,:,7] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
-    X_ct[:,:,8] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['passed_stops_n']) for x in batch], batch_first=True)
-    X_ct[:,:,9] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['passed_stops_n']) for x in batch], batch_first=True)
-    # Grid features (NxCxLxHxW)
-    z = [torch.tensor(np.array(x['grid_features'])) for x in batch]
-    X_gr = torch.nn.utils.rnn.pad_sequence(z, batch_first=True)
-    # Target feature
-    y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
-    X_em = X_em.int()
-    X_ct = X_ct.float()
-    X_gr = X_gr.float()
-    y = y.float()
-    return [X_em, X_ct, X_gr, seq_lens], y
-
-def sequential_grid_collate_nosch(batch):
-    # Last dimension is number of sequence variables below
-    seq_lens = torch.tensor([len(x['x_cent']) for x in batch]).int()
-    max_len = max(seq_lens)
-    # Embedded context features
-    X_em = np.array([np.array([x['timeID'], x['weekID']]) for x in batch], dtype='int32')
-    X_em = torch.from_numpy(X_em)
-    # Continuous features
-    X_ct = torch.zeros((len(batch), max_len, 4))
-    X_ct[:,:,0] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['x_cent']) for x in batch], batch_first=True)
-    X_ct[:,:,1] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['y_cent']) for x in batch], batch_first=True)
-    X_ct[:,:,2] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['dist_calc_km']) for x in batch], batch_first=True)
-    X_ct[:,:,3] = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['bearing']) for x in batch], batch_first=True)
-    # Grid features (NxCxLxHxW)
-    z = [torch.tensor(np.array(x['grid_features'])) for x in batch]
-    X_gr = torch.nn.utils.rnn.pad_sequence(z, batch_first=True)
-    # Target feature
-    y = torch.nn.utils.rnn.pad_sequence([torch.tensor(x['time_calc_s']) for x in batch], batch_first=True)
-    X_em = X_em.int()
-    X_ct = X_ct.float()
-    X_gr = X_gr.float()
-    y = y.float()
-    return [X_em, X_ct, X_gr, seq_lens], y
+    y_col = "time_calc_s"
+    em_cols = ["timeID","weekID"]
+    ct_cols = ["x_cent","y_cent","scheduled_time_s","stop_dist_km","stop_x_cent","stop_y_cent","passed_stops_n","bearing","dist_calc_km","dist_calc_km"]
+    batch_ct = [torch.tensor(b['samp']) for b in batch]
+    batch_gr = [torch.tensor(b['grid']) for b in batch]
+    X_sl = torch.tensor([len(b) for b in batch_ct])
+    first = torch.cat([b[0,:].unsqueeze(0) for b in batch_ct], axis=0)
+    X_em = first[:,([FEATURE_COLS.index(z) for z in em_cols])]
+    batch_ct = torch.nn.utils.rnn.pad_sequence(batch_ct, batch_first=True)
+    X_ct = batch_ct[:,:,([FEATURE_COLS.index(z) for z in ct_cols])]
+    y = batch_ct[:,:,(FEATURE_COLS.index(y_col))]
+    # Get speed/bearing/obs age from grid results; average out all values across timesteps; 1 value per cell/obs/variable
+    X_gr = [b[:,3:,:,:,:] for b in batch_gr]
+    X_gr = torch.nn.utils.rnn.pad_sequence(X_gr, batch_first=True)
+    # Replace any nans with the average for that feature
+    means = torch.nanmean(torch.swapaxes(X_gr, 0, 2).flatten(1), dim=1)
+    for i,m in enumerate(means):
+        X_gr[:,:,i,:,:,:] = torch.nan_to_num(X_gr[:,:,i,:,:,:], m)
+    return [X_em.int(), X_ct.float(), X_gr.float(), X_sl.int()], y.float()
 
 def deeptte_collate(data):
     stat_attrs = ['dist', 'time']

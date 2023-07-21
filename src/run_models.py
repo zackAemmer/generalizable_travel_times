@@ -11,6 +11,7 @@ import lightning.pytorch as pl
 import numpy as np
 import torch
 from lightning.pytorch.loggers import CSVLogger
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from sklearn import metrics
 from sklearn.model_selection import KFold
 from torch.utils.data import DataLoader, SubsetRandomSampler
@@ -73,12 +74,9 @@ def run_models(run_folder, network_folder, **kwargs):
     if kwargs['is_param_search']:
         hyperparameter_sample_dict = {
             'N_PARAM_SAMPLES': 5,
-            'EPOCHS': [20, 40, 60],
-            'BATCH_SIZE': [16, 32, 128, 512],
-            'LEARN_RATE': [.1, .01, .001],
-            'HIDDEN_SIZE': [32, 64, 128],
-            'NUM_LAYERS': [2, 3, 4],
-            'DROPOUT_RATE': [.1, .2, .3]
+            'HIDDEN_SIZE': [16, 32, 64, 128],
+            'NUM_LAYERS': [2, 3, 4, 5],
+            'DROPOUT_RATE': [.05, .1, .2, .4]
         }
         hyperparameter_dict = model_utils.random_param_search(hyperparameter_sample_dict, ["FF","CONV","GRU","TRSF"])
         data_utils.write_pkl(hyperparameter_sample_dict, f"{base_folder}param_search_dict.pkl")
@@ -194,15 +192,21 @@ def run_models(run_folder, network_folder, **kwargs):
                 data_utils.write_pkl(model, f"{base_folder}models/{model.model_name}_{fold_num}.pkl")
             else:
                 trainer = pl.Trainer(
-                    max_epochs=2,
-                    limit_train_batches=5,
-                    limit_val_batches=5,
-                    limit_test_batches=5,
-                    logger=CSVLogger(save_dir=f"{run_folder}{network_folder}logs/", name=model.model_name)
+                    limit_train_batches=10,
+                    limit_val_batches=10,
+                    limit_test_batches=10,
+                    check_val_every_n_epoch=1,
+                    max_epochs=50,
+                    logger=CSVLogger(save_dir=f"{run_folder}{network_folder}logs/", name=model.model_name),
+                    callbacks=[EarlyStopping(monitor=f"{model.model_name}_valid_loss", min_delta=5, patience=3, mode="min")]
                 )
                 trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
-                # trainer.test(dataloaders=test_loader)
-                # trainer.predict(model=model, dataloaders=test_loader)
+                trainer.test(model=model, dataloaders=test_loader)
+                preds_and_labels = trainer.predict(model=model, dataloaders=test_loader)
+                preds = np.concatenate([p[0] for p in preds_and_labels])
+                labels = np.concatenate([l[1] for l in preds_and_labels])
+                model_fold_results[model.model_name]["Labels"].extend(list(labels))
+                model_fold_results[model.model_name]["Preds"].extend(list(preds))
 
         # Save fold results
         run_results.append(model_fold_results)
@@ -256,30 +260,30 @@ if __name__=="__main__":
         is_param_search=False
     )
 
-    # # PARAM SEARCH
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
-    # run_models(
-    #     run_folder="./results/param_search/",
-    #     network_folder="kcm/",
-    #     grid_s_size=500,
-    #     n_folds=5,
-    #     holdout_routes=None,
-    #     skip_gtfs=False,
-    #     is_param_search=True
-    # )
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
-    # run_models(
-    #     run_folder="./results/param_search/",
-    #     network_folder="atb/",
-    #     grid_s_size=500,
-    #     n_folds=5,
-    #     holdout_routes=None,
-    #     skip_gtfs=False,
-    #     is_param_search=True
-    # )
+    # PARAM SEARCH
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_models(
+        run_folder="./results/param_search/",
+        network_folder="kcm/",
+        grid_s_size=500,
+        n_folds=5,
+        holdout_routes=None,
+        skip_gtfs=False,
+        is_param_search=True
+    )
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    run_models(
+        run_folder="./results/param_search/",
+        network_folder="atb/",
+        grid_s_size=500,
+        n_folds=5,
+        holdout_routes=None,
+        skip_gtfs=False,
+        is_param_search=True
+    )
 
     # FULL RUN

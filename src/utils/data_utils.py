@@ -816,7 +816,7 @@ def extract_gen_results(city, gen_results):
         res.append(gen_df)
     return pd.concat(res, axis=0)
 
-def create_tensor_mask(seq_lens):
+def create_tensor_mask(seq_lens, drop_first=True):
     """
     Create a mask based on a tensor of sequence lengths.
     """
@@ -824,6 +824,7 @@ def create_tensor_mask(seq_lens):
     mask = torch.zeros(len(seq_lens), max_len, dtype=torch.bool)
     for i, seq_len in enumerate(seq_lens):
         mask[i, :seq_len] = 1
+    mask[:,0] = 0
     return mask
 
 def pad_tensors(tensor_list, pad_dim):
