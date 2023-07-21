@@ -15,6 +15,7 @@ class FF_L(pl.LightningModule):
         self.model_name = model_name
         self.n_features = n_features
         self.hyperparameter_dict = hyperparameter_dict
+        self.batch_size = int(self.hyperparameter_dict['batch_size'])
         self.embed_dict = embed_dict
         self.collate_fn = collate_fn
         self.config = config
@@ -29,13 +30,13 @@ class FF_L(pl.LightningModule):
         # Feedforward
         self.linear_relu_stack = nn.Sequential()
         self.linear_relu_stack.append(nn.BatchNorm1d(self.n_features + self.embed_total_dims))
-        self.linear_relu_stack.append(nn.Linear(self.n_features + self.embed_total_dims, self.hyperparameter_dict['HIDDEN_SIZE']))
+        self.linear_relu_stack.append(nn.Linear(self.n_features + self.embed_total_dims, self.hyperparameter_dict['hidden_size']))
         self.linear_relu_stack.append(nn.ReLU())
-        for i in range(self.hyperparameter_dict['NUM_LAYERS']):
-            self.linear_relu_stack.append(nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], self.hyperparameter_dict['HIDDEN_SIZE']))
+        for i in range(self.hyperparameter_dict['num_layers']):
+            self.linear_relu_stack.append(nn.Linear(self.hyperparameter_dict['hidden_size'], self.hyperparameter_dict['hidden_size']))
             self.linear_relu_stack.append(nn.ReLU())
-        self.linear_relu_stack.append(nn.Dropout(p=self.hyperparameter_dict['DROPOUT_RATE']))
-        self.feature_extract = nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], 1)
+        self.linear_relu_stack.append(nn.Dropout(p=self.hyperparameter_dict['dropout_rate']))
+        self.feature_extract = nn.Linear(self.hyperparameter_dict['hidden_size'], 1)
         self.feature_extract_activation = nn.ReLU()
     def training_step(self, batch, batch_idx):
         x,y = batch
@@ -96,6 +97,7 @@ class FF_GRID_L(pl.LightningModule):
         self.n_grid_features = n_grid_features
         self.grid_compression_size = grid_compression_size
         self.hyperparameter_dict = hyperparameter_dict
+        self.batch_size = int(self.hyperparameter_dict['batch_size'])
         self.embed_dict = embed_dict
         self.collate_fn = collate_fn
         self.config = config
@@ -110,21 +112,21 @@ class FF_GRID_L(pl.LightningModule):
         # Grid Feedforward
         self.linear_relu_stack_grid = nn.Sequential(
             nn.BatchNorm1d(self.n_grid_features),
-            nn.Linear(self.n_grid_features, self.hyperparameter_dict['HIDDEN_SIZE']),
+            nn.Linear(self.n_grid_features, self.hyperparameter_dict['hidden_size']),
             nn.ReLU(),
-            nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], self.grid_compression_size),
+            nn.Linear(self.hyperparameter_dict['hidden_size'], self.grid_compression_size),
             nn.ReLU()
         )
         # Feedforward
         self.linear_relu_stack = nn.Sequential()
         self.linear_relu_stack.append(nn.BatchNorm1d(self.n_features + self.embed_total_dims + self.grid_compression_size))
-        self.linear_relu_stack.append(nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, self.hyperparameter_dict['HIDDEN_SIZE']))
+        self.linear_relu_stack.append(nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, self.hyperparameter_dict['hidden_size']))
         self.linear_relu_stack.append(nn.ReLU())
-        for i in range(self.hyperparameter_dict['NUM_LAYERS']):
-            self.linear_relu_stack.append(nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], self.hyperparameter_dict['HIDDEN_SIZE']))
+        for i in range(self.hyperparameter_dict['num_layers']):
+            self.linear_relu_stack.append(nn.Linear(self.hyperparameter_dict['hidden_size'], self.hyperparameter_dict['hidden_size']))
             self.linear_relu_stack.append(nn.ReLU())
-        self.linear_relu_stack.append(nn.Dropout(p=self.hyperparameter_dict['DROPOUT_RATE']))
-        self.feature_extract = nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], 1)
+        self.linear_relu_stack.append(nn.Dropout(p=self.hyperparameter_dict['dropout_rate']))
+        self.feature_extract = nn.Linear(self.hyperparameter_dict['hidden_size'], 1)
         self.feature_extract_activation = nn.ReLU()
     def training_step(self, batch, batch_idx):
         x,y = batch
@@ -226,24 +228,24 @@ class FF_GRID_L(pl.LightningModule):
 #         # 2d positional encoding
 #         self.pos_enc = pos_encodings.PositionalEncodingPermute2D(self.n_channels)
 #         # Grid attention
-#         encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_grid_features, nhead=4, dim_feedforward=self.hyperparameter_dict['HIDDEN_SIZE'], batch_first=True)
+#         encoder_layer = nn.TransformerEncoderLayer(d_model=self.n_grid_features, nhead=4, dim_feedforward=self.hyperparameter_dict['hidden_size'], batch_first=True)
 #         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=2)
 #         # Grid Feedforward
 #         self.linear_relu_stack_grid = nn.Sequential(
-#             nn.Linear(self.n_grid_features, self.hyperparameter_dict['HIDDEN_SIZE']),
+#             nn.Linear(self.n_grid_features, self.hyperparameter_dict['hidden_size']),
 #             nn.ReLU(),
-#             nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], self.grid_compression_size),
+#             nn.Linear(self.hyperparameter_dict['hidden_size'], self.grid_compression_size),
 #             nn.ReLU()
 #         )
 #         # Feedforward
 #         self.linear_relu_stack = nn.Sequential()
-#         self.linear_relu_stack.append(nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, self.hyperparameter_dict['HIDDEN_SIZE']))
+#         self.linear_relu_stack.append(nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, self.hyperparameter_dict['hidden_size']))
 #         self.linear_relu_stack.append(nn.ReLU())
-#         for i in range(self.hyperparameter_dict['NUM_LAYERS']):
-#             self.linear_relu_stack.append(nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], self.hyperparameter_dict['HIDDEN_SIZE']))
+#         for i in range(self.hyperparameter_dict['num_layers']):
+#             self.linear_relu_stack.append(nn.Linear(self.hyperparameter_dict['hidden_size'], self.hyperparameter_dict['hidden_size']))
 #             self.linear_relu_stack.append(nn.ReLU())
-#         self.linear_relu_stack.append(nn.Dropout(p=self.hyperparameter_dict['DROPOUT_RATE']))
-#         self.feature_extract = nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], 1)
+#         self.linear_relu_stack.append(nn.Dropout(p=self.hyperparameter_dict['dropout_rate']))
+#         self.feature_extract = nn.Linear(self.hyperparameter_dict['hidden_size'], 1)
 #         self.feature_extract_activation = nn.ReLU()
 #     def forward(self, x):
 #         x_em = x[0]

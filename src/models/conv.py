@@ -14,6 +14,7 @@ class CONV_L(pl.LightningModule):
         self.model_name = model_name
         self.n_features = n_features
         self.hyperparameter_dict = hyperparameter_dict
+        self.batch_size = int(self.hyperparameter_dict['batch_size'])
         self.embed_dict = embed_dict
         self.collate_fn = collate_fn
         self.config = config
@@ -28,14 +29,14 @@ class CONV_L(pl.LightningModule):
         # Conv1d layer
         self.conv1d = nn.Sequential()
         self.conv1d.append(nn.BatchNorm1d(self.n_features))
-        self.conv1d.append(nn.Conv1d(in_channels=self.n_features, out_channels=self.hyperparameter_dict['HIDDEN_SIZE'], kernel_size=3, padding=1))
+        self.conv1d.append(nn.Conv1d(in_channels=self.n_features, out_channels=self.hyperparameter_dict['hidden_size'], kernel_size=3, padding=1))
         self.conv1d.append(nn.ReLU())
-        for i in range(self.hyperparameter_dict['NUM_LAYERS']):
-            self.conv1d.append(nn.Conv1d(in_channels=self.hyperparameter_dict['HIDDEN_SIZE'], out_channels=self.hyperparameter_dict['HIDDEN_SIZE'], kernel_size=3, padding=1))
+        for i in range(self.hyperparameter_dict['num_layers']):
+            self.conv1d.append(nn.Conv1d(in_channels=self.hyperparameter_dict['hidden_size'], out_channels=self.hyperparameter_dict['hidden_size'], kernel_size=3, padding=1))
             self.conv1d.append(nn.ReLU())
-        self.conv1d.append(nn.Dropout(p=self.hyperparameter_dict['DROPOUT_RATE']))
+        self.conv1d.append(nn.Dropout(p=self.hyperparameter_dict['dropout_rate']))
         # Linear compression layer
-        self.feature_extract = nn.Linear(in_features=self.hyperparameter_dict['HIDDEN_SIZE'] + self.embed_total_dims, out_features=1)
+        self.feature_extract = nn.Linear(in_features=self.hyperparameter_dict['hidden_size'] + self.embed_total_dims, out_features=1)
         self.feature_extract_activation = nn.ReLU()
     def training_step(self, batch, batch_idx):
         x,y = batch
@@ -141,6 +142,7 @@ class CONV_GRID_L(pl.LightningModule):
         self.n_grid_features = n_grid_features
         self.grid_compression_size = grid_compression_size
         self.hyperparameter_dict = hyperparameter_dict
+        self.batch_size = int(self.hyperparameter_dict['batch_size'])
         self.embed_dict = embed_dict
         self.collate_fn = collate_fn
         self.config = config
@@ -155,22 +157,22 @@ class CONV_GRID_L(pl.LightningModule):
         # Grid Feedforward
         self.grid_norm = nn.BatchNorm1d(self.n_grid_features)
         self.linear_relu_stack_grid = nn.Sequential(
-            nn.Linear(self.n_grid_features, self.hyperparameter_dict['HIDDEN_SIZE']),
+            nn.Linear(self.n_grid_features, self.hyperparameter_dict['hidden_size']),
             nn.ReLU(),
-            nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], self.grid_compression_size),
+            nn.Linear(self.hyperparameter_dict['hidden_size'], self.grid_compression_size),
             nn.ReLU()
         )
         # Conv1d layer
         self.conv1d = nn.Sequential()
         self.conv1d.append(nn.BatchNorm1d(self.n_features + self.grid_compression_size))
-        self.conv1d.append(nn.Conv1d(in_channels=self.n_features + self.grid_compression_size, out_channels=self.hyperparameter_dict['HIDDEN_SIZE'], kernel_size=3, padding=1))
+        self.conv1d.append(nn.Conv1d(in_channels=self.n_features + self.grid_compression_size, out_channels=self.hyperparameter_dict['hidden_size'], kernel_size=3, padding=1))
         self.conv1d.append(nn.ReLU())
-        for i in range(self.hyperparameter_dict['NUM_LAYERS']):
-            self.conv1d.append(nn.Conv1d(in_channels=self.hyperparameter_dict['HIDDEN_SIZE'], out_channels=self.hyperparameter_dict['HIDDEN_SIZE'], kernel_size=3, padding=1))
+        for i in range(self.hyperparameter_dict['num_layers']):
+            self.conv1d.append(nn.Conv1d(in_channels=self.hyperparameter_dict['hidden_size'], out_channels=self.hyperparameter_dict['hidden_size'], kernel_size=3, padding=1))
             self.conv1d.append(nn.ReLU())
-        self.conv1d.append(nn.Dropout(p=self.hyperparameter_dict['DROPOUT_RATE']))
+        self.conv1d.append(nn.Dropout(p=self.hyperparameter_dict['dropout_rate']))
         # Linear compression layer
-        self.feature_extract = nn.Linear(in_features=self.hyperparameter_dict['HIDDEN_SIZE'] + self.embed_total_dims, out_features=1)
+        self.feature_extract = nn.Linear(in_features=self.hyperparameter_dict['hidden_size'] + self.embed_total_dims, out_features=1)
         self.feature_extract_activation = nn.ReLU()
     def training_step(self, batch, batch_idx):
         x,y = batch

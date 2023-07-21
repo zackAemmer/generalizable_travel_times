@@ -35,7 +35,9 @@ def run_models(run_folder, network_folder, **kwargs):
     print("="*30)
     print(f"RUN MODELS: '{run_folder}'")
     print(f"NETWORK: '{network_folder}'")
-    NUM_WORKERS=0
+
+    NUM_WORKERS=4
+    PIN_MEMORY=True
 
     # Create folder structure; delete older results
     base_folder = f"{run_folder}{network_folder}"
@@ -74,10 +76,11 @@ def run_models(run_folder, network_folder, **kwargs):
     # Sample parameter values for random search
     if kwargs['is_param_search']:
         hyperparameter_sample_dict = {
-            'N_PARAM_SAMPLES': 5,
-            'HIDDEN_SIZE': [16, 32, 64, 128],
-            'NUM_LAYERS': [2, 3, 4, 5],
-            'DROPOUT_RATE': [.05, .1, .2, .4]
+            'n_param_samples': 2,
+            'batch_size': [512],
+            'hidden_size': [16, 32, 64, 128],
+            'num_layers': [2, 3, 4, 5],
+            'dropout_rate': [.05, .1, .2, .4]
         }
         hyperparameter_dict = model_utils.random_param_search(hyperparameter_sample_dict, ["FF","CONV","GRU","TRSF"])
         data_utils.write_pkl(hyperparameter_sample_dict, f"{base_folder}param_search_dict.pkl")
@@ -86,41 +89,31 @@ def run_models(run_folder, network_folder, **kwargs):
     else:
         hyperparameter_dict = {
             'FF': {
-                'EPOCHS': 2,
-                'BATCH_SIZE': 512,
-                'LEARN_RATE': .001,
-                'HIDDEN_SIZE': 32,
-                'NUM_LAYERS': 2,
-                'DROPOUT_RATE': .1
+                'batch_size': 64,
+                'hidden_size': 32,
+                'num_layers': 2,
+                'dropout_rate': .1
             },
             'CONV': {
-                'EPOCHS': 2,
-                'BATCH_SIZE': 512,
-                'LEARN_RATE': .001,
-                'HIDDEN_SIZE': 32,
-                'NUM_LAYERS': 2,
-                'DROPOUT_RATE': .1
+                'batch_size': 64,
+                'hidden_size': 32,
+                'num_layers': 2,
+                'dropout_rate': .1
             },
             'GRU': {
-                'EPOCHS': 2,
-                'BATCH_SIZE': 512,
-                'LEARN_RATE': .001,
-                'HIDDEN_SIZE': 32,
-                'NUM_LAYERS': 2,
-                'DROPOUT_RATE': .1
+                'batch_size': 64,
+                'hidden_size': 32,
+                'num_layers': 2,
+                'dropout_rate': .1
             },
             'TRSF': {
-                'EPOCHS': 2,
-                'BATCH_SIZE': 512,
-                'LEARN_RATE': .001,
-                'HIDDEN_SIZE': 32,
-                'NUM_LAYERS': 2,
-                'DROPOUT_RATE': .1
+                'batch_size': 64,
+                'hidden_size': 32,
+                'num_layers': 2,
+                'dropout_rate': .1
             },
             'DEEPTTE': {
-                'EPOCHS': 2,
-                'BATCH_SIZE': 512,
-                'LEARN_RATE': .001
+                'batch_size': 64
             }
         }
 
@@ -155,7 +148,7 @@ def run_models(run_folder, network_folder, **kwargs):
 
         # Declare models
         if kwargs['is_param_search']:
-            model_list = model_utils.make_param_search_models(hyperparameter_dict, embed_dict)
+            model_list = model_utils.make_param_search_models(hyperparameter_dict, embed_dict, config)
         elif not kwargs['skip_gtfs']:
             model_list = model_utils.make_all_models(hyperparameter_dict, embed_dict, config)
         else:
@@ -180,9 +173,9 @@ def run_models(run_folder, network_folder, **kwargs):
             print(f"Network {network_folder} Fold {fold_num} Model {model.model_name}")
             train_dataset.add_grid_features = model.requires_grid
             test_dataset.add_grid_features = model.requires_grid
-            train_loader = DataLoader(train_dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True, num_workers=NUM_WORKERS, pin_memory=True)
-            val_loader = DataLoader(train_dataset, sampler=val_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True, num_workers=NUM_WORKERS, pin_memory=True)
-            test_loader = DataLoader(test_dataset, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True, num_workers=NUM_WORKERS, pin_memory=True)
+            train_loader = DataLoader(train_dataset, batch_size=model.batch_size, sampler=train_sampler, collate_fn=model.collate_fn, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+            val_loader = DataLoader(train_dataset, batch_size=model.batch_size, sampler=val_sampler, collate_fn=model.collate_fn, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+            test_loader = DataLoader(test_dataset, batch_size=model.batch_size, collate_fn=model.collate_fn, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
             if not model.is_nn:
                 # Train base model on all fold data
                 model.train(train_loader, config)
@@ -195,12 +188,12 @@ def run_models(run_folder, network_folder, **kwargs):
                 trainer = pl.Trainer(
                     limit_val_batches=.50,
                     limit_test_batches=.50,
-                    check_val_every_n_epoch=5,
+                    check_val_every_n_epoch=2,
                     max_epochs=50,
                     min_epochs=10,
-                    accelerator="cpu",
                     logger=CSVLogger(save_dir=f"{run_folder}{network_folder}logs/", name=model.model_name),
-                    callbacks=[EarlyStopping(monitor=f"{model.model_name}_valid_loss", min_delta=1, patience=1)]
+                    callbacks=[EarlyStopping(monitor=f"{model.model_name}_valid_loss", min_delta=1, patience=3)]
+                    # profiler="simple"
                 )
                 trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
                 trainer.test(model=model, dataloaders=test_loader)
@@ -223,69 +216,54 @@ if __name__=="__main__":
     torch.set_float32_matmul_precision('medium')
     pl.seed_everything(42, workers=True)
 
-    # DEBUG
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/debug/",
-        network_folder="kcm/",
-        grid_s_size=500,
-        n_folds=2,
-        holdout_routes=[100252,100139,102581,100341,102720],
-        skip_gtfs=False,
-        is_param_search=False
-    )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/debug/",
-        network_folder="atb/",
-        grid_s_size=500,
-        n_folds=2,
-        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
-        skip_gtfs=False,
-        is_param_search=False
-    )
-    # DEBUG MIXED
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/debug_nosch/",
-        network_folder="kcm_atb/",
-        grid_s_size=500,
-        n_folds=2,
-        holdout_routes=None,
-        skip_gtfs=True,
-        is_param_search=False
-    )
-
-    # # PARAM SEARCH
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
+    # # DEBUG
     # run_models(
-    #     run_folder="./results/param_search/",
+    #     run_folder="./results/debug/",
     #     network_folder="kcm/",
     #     grid_s_size=500,
-    #     n_folds=5,
-    #     holdout_routes=None,
+    #     n_folds=2,
+    #     holdout_routes=[100252,100139,102581,100341,102720],
     #     skip_gtfs=False,
-    #     is_param_search=True
+    #     is_param_search=False
     # )
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
     # run_models(
-    #     run_folder="./results/param_search/",
+    #     run_folder="./results/debug/",
     #     network_folder="atb/",
     #     grid_s_size=500,
-    #     n_folds=5,
-    #     holdout_routes=None,
+    #     n_folds=2,
+    #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
     #     skip_gtfs=False,
-    #     is_param_search=True
+    #     is_param_search=False
     # )
+    # # DEBUG MIXED
+    # run_models(
+    #     run_folder="./results/debug_nosch/",
+    #     network_folder="kcm_atb/",
+    #     grid_s_size=500,
+    #     n_folds=2,
+    #     holdout_routes=None,
+    #     skip_gtfs=True,
+    #     is_param_search=False
+    # )
+
+    # PARAM SEARCH
+    run_models(
+        run_folder="./results/param_search/",
+        network_folder="kcm/",
+        grid_s_size=500,
+        n_folds=5,
+        holdout_routes=None,
+        skip_gtfs=False,
+        is_param_search=True
+    )
+    run_models(
+        run_folder="./results/param_search/",
+        network_folder="atb/",
+        grid_s_size=500,
+        n_folds=5,
+        holdout_routes=None,
+        skip_gtfs=False,
+        is_param_search=True
+    )
 
     # FULL RUN

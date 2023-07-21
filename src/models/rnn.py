@@ -14,6 +14,7 @@ class GRU_L(pl.LightningModule):
         self.model_name = model_name
         self.n_features = n_features
         self.hyperparameter_dict = hyperparameter_dict
+        self.batch_size = int(self.hyperparameter_dict['batch_size'])
         self.embed_dict = embed_dict
         self.collate_fn = collate_fn
         self.config = config
@@ -27,9 +28,9 @@ class GRU_L(pl.LightningModule):
         self.weekID_em = nn.Embedding(self.embed_dict['weekID']['vocab_size'], self.embed_dict['weekID']['embed_dims'])
         # Recurrent layer
         self.norm = nn.BatchNorm1d(self.n_features)
-        self.rnn = nn.GRU(input_size=self.n_features, hidden_size=self.hyperparameter_dict['HIDDEN_SIZE'], num_layers=self.hyperparameter_dict['NUM_LAYERS'], batch_first=True, dropout=self.hyperparameter_dict['DROPOUT_RATE'])
+        self.rnn = nn.GRU(input_size=self.n_features, hidden_size=self.hyperparameter_dict['hidden_size'], num_layers=self.hyperparameter_dict['num_layers'], batch_first=True, dropout=self.hyperparameter_dict['dropout_rate'])
         # Linear compression layer
-        self.feature_extract = nn.Linear(in_features=self.hyperparameter_dict['HIDDEN_SIZE'] + self.embed_total_dims, out_features=1)
+        self.feature_extract = nn.Linear(in_features=self.hyperparameter_dict['hidden_size'] + self.embed_total_dims, out_features=1)
         self.feature_extract_activation = nn.ReLU()
     def training_step(self, batch, batch_idx):
         x,y = batch
@@ -135,6 +136,7 @@ class GRU_GRID_L(pl.LightningModule):
         self.n_grid_features = n_grid_features
         self.grid_compression_size = grid_compression_size
         self.hyperparameter_dict = hyperparameter_dict
+        self.batch_size = int(self.hyperparameter_dict['batch_size'])
         self.embed_dict = embed_dict
         self.collate_fn = collate_fn
         self.config = config
@@ -149,16 +151,16 @@ class GRU_GRID_L(pl.LightningModule):
         # Grid Feedforward
         self.grid_norm = nn.BatchNorm1d(self.n_grid_features)
         self.linear_relu_stack_grid = nn.Sequential(
-            nn.Linear(self.n_grid_features, self.hyperparameter_dict['HIDDEN_SIZE']),
+            nn.Linear(self.n_grid_features, self.hyperparameter_dict['hidden_size']),
             nn.ReLU(),
-            nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], self.grid_compression_size),
+            nn.Linear(self.hyperparameter_dict['hidden_size'], self.grid_compression_size),
             nn.ReLU()
         )
         # Recurrent layer
         self.norm = nn.BatchNorm1d(self.n_features + self.grid_compression_size)
-        self.rnn = nn.GRU(input_size=self.n_features + self.grid_compression_size, hidden_size=self.hyperparameter_dict['HIDDEN_SIZE'], num_layers=self.hyperparameter_dict['NUM_LAYERS'], batch_first=True, dropout=self.hyperparameter_dict['DROPOUT_RATE'])
+        self.rnn = nn.GRU(input_size=self.n_features + self.grid_compression_size, hidden_size=self.hyperparameter_dict['hidden_size'], num_layers=self.hyperparameter_dict['num_layers'], batch_first=True, dropout=self.hyperparameter_dict['dropout_rate'])
         # Linear compression layer
-        self.feature_extract = nn.Linear(in_features=self.hyperparameter_dict['HIDDEN_SIZE'] + self.embed_total_dims, out_features=1)
+        self.feature_extract = nn.Linear(in_features=self.hyperparameter_dict['hidden_size'] + self.embed_total_dims, out_features=1)
         self.feature_extract_activation = nn.ReLU()
     def training_step(self, batch, batch_idx):
         x,y = batch

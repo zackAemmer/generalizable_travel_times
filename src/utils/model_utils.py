@@ -84,7 +84,7 @@ def set_feature_extraction(model, feature_extraction=True):
 def random_param_search(hyperparameter_sample_dict, model_names):
     # Keep list of hyperparam dicts; each is randomly sampled from the given; repeat dict for each model
     set_of_random_dicts = []
-    for i in range(hyperparameter_sample_dict['N_PARAM_SAMPLES']):
+    for i in range(hyperparameter_sample_dict['n_param_samples']):
         all_model_dict = {}
         random_dict = {}
         for key in list(hyperparameter_sample_dict.keys()):

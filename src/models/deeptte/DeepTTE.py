@@ -94,6 +94,7 @@ class Net(pl.LightningModule):
         # Training configurations
         self.model_name = model_name
         self.hyperparameter_dict = hyperparameter_dict
+        self.batch_size = int(self.hyperparameter_dict['batch_size'])
         self.collate_fn = collate_fn
         self.config = config
         self.is_nn = True
