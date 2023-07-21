@@ -281,40 +281,45 @@ def sequential_grid_collate(batch):
     return [X_em.int(), X_ct.float(), X_gr.float(), X_sl.int()], y.float()
 
 def deeptte_collate(data):
-    stat_attrs = ['dist', 'time']
+    stat_attrs = ['dist_cumulative_km', 'time_cumulative_s']
+    stat_names = ['dist','time']
     info_attrs = ['weekID', 'timeID']
     traj_attrs = ['y_cent','x_cent','time_calc_s','dist_calc_km','bearing','scheduled_time_s','stop_dist_km','stop_x_cent','stop_y_cent','passed_stops_n']
     attr, traj = {}, {}
-    lens = np.asarray([len(item['x_cent']) for item in data])
-    for key in stat_attrs:
-        attr[key] = torch.FloatTensor([item[key] for item in data])
+    batch_ct = [torch.tensor(b['samp']) for b in data]
+    lens = np.array([len(b) for b in batch_ct])
+    for n,key in zip(stat_names, stat_attrs):
+        attr[n] = torch.FloatTensor([d['samp'][-1,FEATURE_COLS.index(key)] for d in data])
     for key in info_attrs:
-        attr[key] = torch.LongTensor([item[key] for item in data])
+        attr[key] = torch.LongTensor([int(d['samp'][0,FEATURE_COLS.index(key)]) for d in data])
     for key in traj_attrs:
-        seqs = np.asarray([item[key] for item in data], dtype=object)
+        seqs = [d['samp'][:,FEATURE_COLS.index(key)] for d in data]
+        seqs = np.asarray(seqs, dtype=object)
         mask = np.arange(lens.max()) < lens[:, None]
-        padded = np.zeros(mask.shape, dtype = np.float32)
+        padded = np.zeros(mask.shape, dtype=np.float32)
         padded[mask] = np.concatenate(seqs)
         padded = torch.from_numpy(padded).float()
         traj[key] = padded
     lens = lens.tolist()
     traj['lens'] = lens
     return [attr, traj]
-
 def deeptte_collate_nosch(data):
-    stat_attrs = ['dist', 'time']
+    stat_attrs = ['dist_cumulative_km', 'time_cumulative_s']
+    stat_names = ['dist','time']
     info_attrs = ['weekID', 'timeID']
     traj_attrs = ['y_cent', 'x_cent', 'time_calc_s', 'dist_calc_km']
     attr, traj = {}, {}
-    lens = np.asarray([len(item['x_cent']) for item in data])
-    for key in stat_attrs:
-        attr[key] = torch.FloatTensor([item[key] for item in data])
+    batch_ct = [torch.tensor(b['samp']) for b in data]
+    lens = np.array([len(b) for b in batch_ct])
+    for n,key in zip(stat_names, stat_attrs):
+        attr[n] = torch.FloatTensor([d['samp'][-1,FEATURE_COLS.index(key)] for d in data])
     for key in info_attrs:
-        attr[key] = torch.LongTensor([item[key] for item in data])
+        attr[key] = torch.LongTensor([int(d['samp'][0,FEATURE_COLS.index(key)]) for d in data])
     for key in traj_attrs:
-        seqs = np.asarray([item[key] for item in data], dtype=object)
+        seqs = [d['samp'][:,FEATURE_COLS.index(key)] for d in data]
+        seqs = np.asarray(seqs, dtype=object)
         mask = np.arange(lens.max()) < lens[:, None]
-        padded = np.zeros(mask.shape, dtype = np.float32)
+        padded = np.zeros(mask.shape, dtype=np.float32)
         padded[mask] = np.concatenate(seqs)
         padded = torch.from_numpy(padded).float()
         traj[key] = padded

@@ -174,12 +174,12 @@ def make_all_models(hyperparameter_dict, embed_dict, config, load_weights=False,
         collate_fn=data_loader.sequential_grid_collate,
         config=config
     ))
-    # nn_model_list.append(DeepTTE.Net(
-    #     "DEEP_TTE",
-    #     hyperparameter_dict=hyperparameter_dict['DEEPTTE'],
-    #     collate_fn=data_loader.deeptte_collate,
-    #     config=config
-    # ))
+    nn_model_list.append(DeepTTE.Net(
+        "DEEP_TTE",
+        hyperparameter_dict=hyperparameter_dict['DEEPTTE'],
+        collate_fn=data_loader.deeptte_collate,
+        config=config
+    ))
     # Load weights if applicable
     if load_weights:
         base_model_list = []

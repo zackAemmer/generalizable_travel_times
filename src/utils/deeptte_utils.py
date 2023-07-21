@@ -38,10 +38,10 @@ def pad_sequence(sequences, lengths):
 
 def to_var(var):
     if torch.is_tensor(var):
-        var = Variable(var)
-        if torch.cuda.is_available():
-            var = var.cuda()
-        return var
+        z = Variable(var).to(var)
+        # if torch.cuda.is_available():
+        #     var = var.cuda()
+        return z
     if isinstance(var, int) or isinstance(var, float):
         return var
     if isinstance(var, dict):
@@ -55,10 +55,11 @@ def to_var(var):
 def get_local_seq(full_seq, kernel_size, mean, std):
     seq_len = full_seq.size()[1]
 
-    if torch.cuda.is_available():
-        indices = torch.cuda.LongTensor(seq_len)
-    else:
-        indices = torch.LongTensor(seq_len)
+    indices = torch.LongTensor(seq_len).to(full_seq).int()
+    # if torch.cuda.is_available():
+    #     indices = torch.cuda.LongTensor(seq_len)
+    # else:
+    #     indices = torch.LongTensor(seq_len)
 
     torch.arange(0, seq_len, out = indices)
     indices = Variable(indices, requires_grad = False)   ### size [max len of trip in batch, ]

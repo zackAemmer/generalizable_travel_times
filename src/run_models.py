@@ -35,6 +35,7 @@ def run_models(run_folder, network_folder, **kwargs):
     print("="*30)
     print(f"RUN MODELS: '{run_folder}'")
     print(f"NETWORK: '{network_folder}'")
+    NUM_WORKERS=0
 
     # Create folder structure; delete older results
     base_folder = f"{run_folder}{network_folder}"
@@ -179,9 +180,9 @@ def run_models(run_folder, network_folder, **kwargs):
             print(f"Network {network_folder} Fold {fold_num} Model {model.model_name}")
             train_dataset.add_grid_features = model.requires_grid
             test_dataset.add_grid_features = model.requires_grid
-            train_loader = DataLoader(train_dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True, num_workers=4, pin_memory=True)
-            val_loader = DataLoader(train_dataset, sampler=val_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True, num_workers=4, pin_memory=True)
-            test_loader = DataLoader(test_dataset, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True, num_workers=4, pin_memory=True)
+            train_loader = DataLoader(train_dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True, num_workers=NUM_WORKERS, pin_memory=True)
+            val_loader = DataLoader(train_dataset, sampler=val_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True, num_workers=NUM_WORKERS, pin_memory=True)
+            test_loader = DataLoader(test_dataset, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True, num_workers=NUM_WORKERS, pin_memory=True)
             if not model.is_nn:
                 # Train base model on all fold data
                 model.train(train_loader, config)
@@ -197,6 +198,7 @@ def run_models(run_folder, network_folder, **kwargs):
                     check_val_every_n_epoch=5,
                     max_epochs=50,
                     min_epochs=10,
+                    accelerator="cpu",
                     logger=CSVLogger(save_dir=f"{run_folder}{network_folder}logs/", name=model.model_name),
                     callbacks=[EarlyStopping(monitor=f"{model.model_name}_valid_loss", min_delta=1, patience=1)]
                 )
