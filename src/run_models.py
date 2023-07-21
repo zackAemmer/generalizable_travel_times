@@ -176,7 +176,7 @@ def run_models(run_folder, network_folder, **kwargs):
 
         # Train all models
         for model in model_list:
-            print(f"Fold training for: {model.model_name}")
+            print(f"Network {network_folder} Fold {fold_num} Model {model.model_name}")
             train_dataset.add_grid_features = model.requires_grid
             test_dataset.add_grid_features = model.requires_grid
             train_loader = DataLoader(train_dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True, num_workers=4, pin_memory=True)
@@ -192,13 +192,13 @@ def run_models(run_folder, network_folder, **kwargs):
                 data_utils.write_pkl(model, f"{base_folder}models/{model.model_name}_{fold_num}.pkl")
             else:
                 trainer = pl.Trainer(
-                    limit_train_batches=10,
-                    limit_val_batches=10,
-                    limit_test_batches=10,
-                    check_val_every_n_epoch=1,
+                    limit_val_batches=.50,
+                    limit_test_batches=.50,
+                    check_val_every_n_epoch=5,
                     max_epochs=50,
+                    min_epochs=10,
                     logger=CSVLogger(save_dir=f"{run_folder}{network_folder}logs/", name=model.model_name),
-                    callbacks=[EarlyStopping(monitor=f"{model.model_name}_valid_loss", min_delta=5, patience=3, mode="min")]
+                    callbacks=[EarlyStopping(monitor=f"{model.model_name}_valid_loss", min_delta=1, patience=1)]
                 )
                 trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
                 trainer.test(model=model, dataloaders=test_loader)
@@ -260,30 +260,30 @@ if __name__=="__main__":
         is_param_search=False
     )
 
-    # PARAM SEARCH
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/param_search/",
-        network_folder="kcm/",
-        grid_s_size=500,
-        n_folds=5,
-        holdout_routes=None,
-        skip_gtfs=False,
-        is_param_search=True
-    )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/param_search/",
-        network_folder="atb/",
-        grid_s_size=500,
-        n_folds=5,
-        holdout_routes=None,
-        skip_gtfs=False,
-        is_param_search=True
-    )
+    # # PARAM SEARCH
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/param_search/",
+    #     network_folder="kcm/",
+    #     grid_s_size=500,
+    #     n_folds=5,
+    #     holdout_routes=None,
+    #     skip_gtfs=False,
+    #     is_param_search=True
+    # )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/param_search/",
+    #     network_folder="atb/",
+    #     grid_s_size=500,
+    #     n_folds=5,
+    #     holdout_routes=None,
+    #     skip_gtfs=False,
+    #     is_param_search=True
+    # )
 
     # FULL RUN

@@ -102,42 +102,42 @@ def make_all_models(hyperparameter_dict, embed_dict, config, load_weights=False,
     base_model_list.append(persistent.PersistentTimeSeqModel("PER_TIM"))
     # Declare neural network models
     nn_model_list = []
-    # nn_model_list.append(ff.FF_L(
-    #     "FF",
-    #     n_features=14,
-    #     hyperparameter_dict=hyperparameter_dict['FF'],
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.basic_collate,
-    #     config=config
-    # ))
-    # nn_model_list.append(ff.FF_GRID_L(
-    #     "FF_NGRID_IND",
-    #     n_features=14,
-    #     n_grid_features=3*3*5*5,
-    #     grid_compression_size=8,
-    #     hyperparameter_dict=hyperparameter_dict['FF'],
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.basic_grid_collate,
-    #     config=config
-    # ))
-    # nn_model_list.append(conv.CONV_L(
-    #     "CONV",
-    #     n_features=10,
-    #     hyperparameter_dict=hyperparameter_dict['CONV'],
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.sequential_collate,
-    #     config=config
-    # ))
-    # nn_model_list.append(conv.CONV_GRID_L(
-    #     "CONV_NGRID_IND",
-    #     n_features=10,
-    #     n_grid_features=3*3*5*5,
-    #     grid_compression_size=8,
-    #     hyperparameter_dict=hyperparameter_dict['CONV'],
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.sequential_grid_collate,
-    #     config=config
-    # ))
+    nn_model_list.append(ff.FF_L(
+        "FF",
+        n_features=14,
+        hyperparameter_dict=hyperparameter_dict['FF'],
+        embed_dict=embed_dict,
+        collate_fn=data_loader.basic_collate,
+        config=config
+    ))
+    nn_model_list.append(ff.FF_GRID_L(
+        "FF_NGRID_IND",
+        n_features=14,
+        n_grid_features=3*3*5*5,
+        grid_compression_size=8,
+        hyperparameter_dict=hyperparameter_dict['FF'],
+        embed_dict=embed_dict,
+        collate_fn=data_loader.basic_grid_collate,
+        config=config
+    ))
+    nn_model_list.append(conv.CONV_L(
+        "CONV",
+        n_features=10,
+        hyperparameter_dict=hyperparameter_dict['CONV'],
+        embed_dict=embed_dict,
+        collate_fn=data_loader.sequential_collate,
+        config=config
+    ))
+    nn_model_list.append(conv.CONV_GRID_L(
+        "CONV_NGRID_IND",
+        n_features=10,
+        n_grid_features=3*3*5*5,
+        grid_compression_size=8,
+        hyperparameter_dict=hyperparameter_dict['CONV'],
+        embed_dict=embed_dict,
+        collate_fn=data_loader.sequential_grid_collate,
+        config=config
+    ))
     nn_model_list.append(rnn.GRU_L(
         "GRU",
         n_features=10,
@@ -231,12 +231,12 @@ def make_all_models_nosch(hyperparameter_dict, embed_dict, config, load_weights=
         collate_fn=data_loader.sequential_collate_nosch,
         config=config
     ))
-    nn_model_list.append(DeepTTE.Net(
-        "DEEP_TTE",
-        hyperparameter_dict=hyperparameter_dict['DEEPTTE'],
-        collate_fn=data_loader.deeptte_collate_nosch,
-        config=config
-    ))
+    # nn_model_list.append(DeepTTE.Net(
+    #     "DEEP_TTE",
+    #     hyperparameter_dict=hyperparameter_dict['DEEPTTE'],
+    #     collate_fn=data_loader.deeptte_collate_nosch,
+    #     config=config
+    # ))
     # Load weights if applicable
     if load_weights:
         base_model_list = []
