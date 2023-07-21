@@ -25,8 +25,8 @@ class TRSF(nn.Module):
         self.loss_fn = masked_loss.MaskedHuberLoss()
         # Embeddings
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
-        self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
-        self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
+        self.timeID_em = nn.Embedding(self.embed_dict['timeID']['vocab_size'], self.embed_dict['timeID']['embed_dims'])
+        self.weekID_em = nn.Embedding(self.embed_dict['weekID']['vocab_size'], self.embed_dict['weekID']['embed_dims'])
         # Positional encoding layer
         self.pos_encoder = pos_encodings.PositionalEncoding1D(self.n_features)
         # Encoder layer
@@ -67,7 +67,7 @@ class TRSF(nn.Module):
         labels = data_utils.aggregate_tts(labels, mask)
         return labels, preds
 class TRSF_L(pl.LightningModule):
-    def __init__(self, model_name, n_features, hyperparameter_dict, embed_dict, collate_fn):
+    def __init__(self, model_name, n_features, hyperparameter_dict, embed_dict, collate_fn, config):
         super(TRSF_L, self).__init__()
         self.save_hyperparameters()
         self.model_name = model_name
@@ -75,14 +75,15 @@ class TRSF_L(pl.LightningModule):
         self.hyperparameter_dict = hyperparameter_dict
         self.embed_dict = embed_dict
         self.collate_fn = collate_fn
+        self.config = config
         self.is_nn = True
         self.requires_grid = False
         self.train_time = 0.0
         self.loss_fn = masked_loss.MaskedHuberLoss()
         # Embeddings
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
-        self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
-        self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
+        self.timeID_em = nn.Embedding(self.embed_dict['timeID']['vocab_size'], self.embed_dict['timeID']['embed_dims'])
+        self.weekID_em = nn.Embedding(self.embed_dict['weekID']['vocab_size'], self.embed_dict['weekID']['embed_dims'])
         # Activation layer
         self.activation = nn.ReLU()
         # Positional encoding layer
@@ -153,6 +154,28 @@ class TRSF_L(pl.LightningModule):
         loss = self.loss_fn(out, y, mask)
         self.log(f"{self.model_name}_test_loss", loss, on_epoch=True, prog_bar=True, logger=True)
         return loss
+    def predict_step(self, batch, batch_idx):
+        x,y = batch
+        x_em = x[0]
+        x_ct = x[1]
+        x_sl = x[2]
+        # Embed categorical variables
+        timeID_embedded = self.timeID_em(x_em[:,0])
+        weekID_embedded = self.weekID_em(x_em[:,1])
+        x_em = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
+        x_em = x_em.expand(-1, x_ct.shape[1], -1)
+        # Get transformer prediction
+        x_ct = self.pos_encoder(x_ct)
+        x_ct = self.transformer_encoder(x_ct)
+        # Combine all variables
+        out = torch.cat([x_em, x_ct], dim=2)
+        out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
+        mask = data_utils.create_tensor_mask(x_sl).to(x_sl)
+        out = data_utils.de_normalize(out, self.config['time_calc_s_mean'], self.config['time_calc_s_std'])
+        y = data_utils.de_normalize(y, self.config['time_calc_s_mean'], self.config['time_calc_s_std'])
+        out = data_utils.aggregate_tts(out, mask.numpy())
+        y = data_utils.aggregate_tts(y, mask.numpy())
+        return (out, y)
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
@@ -174,8 +197,8 @@ class TRSF_GRID(nn.Module):
         self.loss_fn = masked_loss.MaskedHuberLoss()
         # Embeddings
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
-        self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
-        self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
+        self.timeID_em = nn.Embedding(self.embed_dict['timeID']['vocab_size'], self.embed_dict['timeID']['embed_dims'])
+        self.weekID_em = nn.Embedding(self.embed_dict['weekID']['vocab_size'], self.embed_dict['weekID']['embed_dims'])
         # Grid Feedforward
         self.linear_relu_stack_grid = nn.Sequential(
             nn.Linear(self.n_grid_features, self.hyperparameter_dict['HIDDEN_SIZE']),
@@ -228,7 +251,7 @@ class TRSF_GRID(nn.Module):
         labels = data_utils.aggregate_tts(labels, mask)
         return labels, preds
 class TRSF_GRID_L(pl.LightningModule):
-    def __init__(self, model_name, n_features, n_grid_features, grid_compression_size, hyperparameter_dict, embed_dict, collate_fn):
+    def __init__(self, model_name, n_features, n_grid_features, grid_compression_size, hyperparameter_dict, embed_dict, collate_fn, config):
         super(TRSF_GRID_L, self).__init__()
         self.save_hyperparameters()
         self.model_name = model_name
@@ -238,14 +261,15 @@ class TRSF_GRID_L(pl.LightningModule):
         self.hyperparameter_dict = hyperparameter_dict
         self.embed_dict = embed_dict
         self.collate_fn = collate_fn
+        self.config = config
         self.is_nn = True
         self.requires_grid = True
         self.train_time = 0.0
         self.loss_fn = masked_loss.MaskedHuberLoss()
         # Embeddings
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
-        self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
-        self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
+        self.timeID_em = nn.Embedding(self.embed_dict['timeID']['vocab_size'], self.embed_dict['timeID']['embed_dims'])
+        self.weekID_em = nn.Embedding(self.embed_dict['weekID']['vocab_size'], self.embed_dict['weekID']['embed_dims'])
         # Grid Feedforward
         self.linear_relu_stack_grid = nn.Sequential(
             nn.Linear(self.n_grid_features, self.hyperparameter_dict['HIDDEN_SIZE']),
@@ -336,6 +360,33 @@ class TRSF_GRID_L(pl.LightningModule):
         loss = self.loss_fn(out, y, mask)
         self.log(f"{self.model_name}_test_loss", loss, on_epoch=True, prog_bar=True, logger=True)
         return loss
+    def predict_step(self, batch, batch_idx):
+        x,y = batch
+        x_em = x[0]
+        x_ct = x[1]
+        x_gr = x[2]
+        x_sl = x[3]
+        # Embed categorical variables
+        timeID_embedded = self.timeID_em(x_em[:,0])
+        weekID_embedded = self.weekID_em(x_em[:,1])
+        x_em = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
+        x_em = x_em.expand(-1, x_ct.shape[1], -1)
+        # Feed grid data through model
+        x_gr = torch.flatten(x_gr, 2)
+        x_gr = self.linear_relu_stack_grid(x_gr)
+        # Get transformer prediction
+        x_ct = torch.cat((x_ct, x_gr), dim=2)
+        x_ct = self.pos_encoder(x_ct)
+        x_ct = self.transformer_encoder(x_ct)
+        # Combine all variables
+        out = torch.cat((x_em, x_ct), dim=2)
+        out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
+        mask = data_utils.create_tensor_mask(x_sl).to(x_sl)
+        out = data_utils.de_normalize(out, self.config['time_calc_s_mean'], self.config['time_calc_s_std'])
+        y = data_utils.de_normalize(y, self.config['time_calc_s_mean'], self.config['time_calc_s_std'])
+        out = data_utils.aggregate_tts(out, mask.numpy())
+        y = data_utils.aggregate_tts(y, mask.numpy())
+        return (out, y)
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer

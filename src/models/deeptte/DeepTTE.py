@@ -1,6 +1,8 @@
+from typing import Any
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import lightning.pytorch as pl
 
 from utils import data_utils, deeptte_utils, model_utils
 from models.deeptte import Attr, SpatioTemporal
@@ -84,18 +86,18 @@ class LocalEstimator(nn.Module):
         return loss.mean()
 
 
-class Net(nn.Module):
-    def __init__(self, model_name, hyperparameter_dict, collate_fn, device, config, kernel_size = 3, num_filter = 32, pooling_method = 'attention', num_final_fcs = 3, final_fc_size = 128, alpha = 0.3, cfg=None):
+class Net(pl.LightningModule):
+    def __init__(self, model_name, hyperparameter_dict, collate_fn, config, kernel_size = 3, num_filter = 32, pooling_method = 'attention', num_final_fcs = 3, final_fc_size = 128, alpha = 0.3):
         super(Net, self).__init__()
+        self.save_hyperparameters()
 
         # Training configurations
         self.model_name = model_name
         self.hyperparameter_dict = hyperparameter_dict
         self.collate_fn = collate_fn
-        self.device = device
+        self.config = config
         self.is_nn = True
         self.requires_grid = False
-        self.config = config
         self.train_time = 0.0
 
         # parameter of attribute / spatio-temporal component
@@ -107,9 +109,6 @@ class Net(nn.Module):
         self.num_final_fcs = num_final_fcs
         self.final_fc_size = final_fc_size
         self.alpha = alpha
-
-        # Number of embeddings for vehID
-        self.cfg = cfg
 
         self.build()
         self.init_weight()
@@ -123,7 +122,7 @@ class Net(nn.Module):
 
     def build(self):
         # attribute component
-        self.attr_net = Attr.Net(cfg=self.cfg)
+        self.attr_net = Attr.Net()
 
         # spatio-temporal component
         self.spatio_temporal = SpatioTemporal.Net(attr_size = self.attr_net.out_size(), \
@@ -132,10 +131,52 @@ class Net(nn.Module):
                                                        pooling_method = self.pooling_method
         )
 
-        self.entire_estimate = EntireEstimator(input_size =  self.spatio_temporal.out_size() + self.attr_net.out_size(), num_final_fcs = self.num_final_fcs, hidden_size = self.final_fc_size)
+        self.entire_estimate = EntireEstimator(input_size = self.spatio_temporal.out_size() + self.attr_net.out_size(), num_final_fcs = self.num_final_fcs, hidden_size = self.final_fc_size)
 
         self.local_estimate = LocalEstimator(input_size = self.spatio_temporal.out_size())
 
+    def training_step(self, batch, batch_idx):
+        attr = batch[0]
+        traj = batch[1]
+        config = self.config
+        entire_out, (local_out, local_length) = self(attr, traj, config)
+        pred_dict, entire_loss = self.entire_estimate.eval_on_batch(entire_out, attr['time'], config['time_mean'], config['time_std'])
+        # get the mean/std of each local path
+        mean, std = (self.kernel_size - 1) * config['time_calc_s_mean'], (self.kernel_size - 1) * config['time_calc_s_std']
+        # get ground truth of each local path
+        local_label = deeptte_utils.get_local_seq(traj['time_calc_s'], self.kernel_size, mean, std)
+        local_loss = self.local_estimate.eval_on_batch(local_out, local_length, local_label, mean, std)
+        loss = (1 - self.alpha) * entire_loss + self.alpha * local_loss ### According to eqn 8 of paper
+        self.log(f"{self.model_name}_train_loss", loss, on_epoch=True, prog_bar=True, logger=True)
+        return loss
+    def validation_step(self, batch, batch_idx):
+        attr = batch[0]
+        traj = batch[1]
+        config = self.config
+        entire_out = self(attr, traj, config)
+        pred_dict, entire_loss = self.entire_estimate.eval_on_batch(entire_out, attr['time'], config['time_mean'], config['time_std'])
+        loss = entire_loss
+        self.log(f"{self.model_name}_valid_loss", loss, on_epoch=True, prog_bar=True, logger=True)
+        return entire_loss
+    def test_step(self, batch, batch_idx):
+        attr = batch[0]
+        traj = batch[1]
+        config = self.config
+        entire_out = self(attr, traj, config)
+        pred_dict, entire_loss = self.entire_estimate.eval_on_batch(entire_out, attr['time'], config['time_mean'], config['time_std'])
+        loss = entire_loss
+        self.log(f"{self.model_name}_test_loss", loss, on_epoch=True, prog_bar=True, logger=True)
+        return entire_loss
+    def predict_step(self, batch, batch_idx):
+        attr = batch[0]
+        traj = batch[1]
+        config = self.config
+        entire_out = self(attr, traj, config)
+        pred_dict, entire_loss = self.entire_estimate.eval_on_batch(entire_out, attr['time'], config['time_mean'], config['time_std'])
+        return (pred_dict['pred'], pred_dict['label'])
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        return optimizer
 
     def forward(self, attr, traj, config):
         attr_t = self.attr_net(attr)   ### shape [batch, 28] (explained in Attr.py)
@@ -154,34 +195,34 @@ class Net(nn.Module):
         else:
             return entire_out
 
-    def batch_step(self, data):
-        attr = data[0]
-        traj = data[1]
-        for key in attr.keys():
-            attr[key] = attr[key].to(self.device)
-        for key in traj.keys():
-            if key != 'lens':
-                traj[key] = traj[key].to(self.device)
-        config = self.config
+    # def batch_step(self, data):
+    #     attr = data[0]
+    #     traj = data[1]
+    #     for key in attr.keys():
+    #         attr[key] = attr[key].to(self.device)
+    #     for key in traj.keys():
+    #         if key != 'lens':
+    #             traj[key] = traj[key].to(self.device)
+    #     config = self.config
 
-        if self.training:
-            entire_out, (local_out, local_length) = self(attr, traj, config)
-        else:
-            entire_out = self(attr, traj, config)
+    #     if self.training:
+    #         entire_out, (local_out, local_length) = self(attr, traj, config)
+    #     else:
+    #         entire_out = self(attr, traj, config)
 
-        pred_dict, entire_loss = self.entire_estimate.eval_on_batch(entire_out, attr['time'], config['time_mean'], config['time_std'])
+    #     pred_dict, entire_loss = self.entire_estimate.eval_on_batch(entire_out, attr['time'], config['time_mean'], config['time_std'])
 
-        if self.training:
-            # get the mean/std of each local path
-            mean, std = (self.kernel_size - 1) * config['time_calc_s_mean'], (self.kernel_size - 1) * config['time_calc_s_std']
-            # get ground truth of each local path
-            local_label = deeptte_utils.get_local_seq(traj['time_calc_s'], self.kernel_size, mean, std)
-            local_loss = self.local_estimate.eval_on_batch(local_out, local_length, local_label, mean, std)
+    #     if self.training:
+    #         # get the mean/std of each local path
+    #         mean, std = (self.kernel_size - 1) * config['time_calc_s_mean'], (self.kernel_size - 1) * config['time_calc_s_std']
+    #         # get ground truth of each local path
+    #         local_label = deeptte_utils.get_local_seq(traj['time_calc_s'], self.kernel_size, mean, std)
+    #         local_loss = self.local_estimate.eval_on_batch(local_out, local_length, local_label, mean, std)
 
-            return pred_dict['label'], pred_dict['pred'], (1 - self.alpha) * entire_loss + self.alpha * local_loss   ### According to eqn 8 of paper
-        else:
-            return pred_dict['label'], pred_dict['pred'], entire_loss
+    #         return pred_dict['label'], pred_dict['pred'], (1 - self.alpha) * entire_loss + self.alpha * local_loss   ### According to eqn 8 of paper
+    #     else:
+    #         return pred_dict['label'], pred_dict['pred'], entire_loss
 
-    def evaluate(self, test_dataloader, config):
-        labels, preds, avg_batch_loss = model_utils.predict(self, test_dataloader)
-        return labels, preds
+    # def evaluate(self, test_dataloader, config):
+    #     labels, preds, avg_batch_loss = model_utils.predict(self, test_dataloader)
+    #     return labels, preds

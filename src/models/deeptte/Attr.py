@@ -12,7 +12,7 @@ class Net(nn.Module):
     ### dateID isnt embedded?
     # embed_dims = [('driverID', 1152, 16), ('weekID', 7, 3), ('timeID', 1440, 8)]
 
-    def __init__(self, cfg):
+    def __init__(self):
         super(Net, self).__init__()
         # self.embed_dims_cfg = [('vehicleID', cfg['n_unique_veh'], 16), ('weekID', 7, 3), ('timeID', 1440, 8)]
         self.embed_dims_cfg = [('weekID', 7, 3), ('timeID', 1440, 8)]

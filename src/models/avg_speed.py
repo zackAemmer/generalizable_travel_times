@@ -1,7 +1,9 @@
 import numpy as np
 import pandas as pd
+import lightning.pytorch as pl
+from utils import data_loader
 
-from utils import data_utils, data_loader
+from utils import data_utils
 
 
 class AvgHourlySpeedModel:
@@ -9,26 +11,35 @@ class AvgHourlySpeedModel:
         self.model_name = model_name
         self.speed_lookup = {}
         self.requires_grid = False
-        self.collate_fn = data_loader.basic_collate_nosch
+        self.collate_fn = data_loader.avg_collate
         self.train_time = 0.0
         self.hyperparameter_dict = {'BATCH_SIZE': 512}
         self.is_nn = False
         return None
     def train(self, dataloader, config):
-        data = [x for x in dataloader]
-        speeds = data_utils.de_normalize(np.concatenate([x[0][1] for x in data])[:,4], config['speed_m_s_mean'], config['speed_m_s_std'])
-        hours = np.concatenate([x[0][0] for x in data])[:,0] // 60
+        speeds = []
+        dists = []
+        hours = []
+        for i in dataloader:
+            speeds.extend(i[0])
+            dists.extend(i[1])
+            hours.extend(i[2])
         # Calculate average speed grouped by time of day
         self.speed_lookup = pd.DataFrame({"hour":hours, "speed":speeds}).groupby("hour").mean().to_dict()
         return None
     def evaluate(self, dataloader, config):
-        data = [x for x in dataloader]
-        hours = np.concatenate([x[0][0] for x in data])[:,0] // 60
-        dists = data_utils.de_normalize(np.concatenate([x[0][1] for x in data])[:,6], config['dist_mean'], config['dist_std'])
-        speeds = np.array([self.get_speed_if_available(x) for x in hours])
-        preds = dists*1000.0 / speeds
-        labels = data_utils.de_normalize(np.concatenate([x[1] for x in data]), config['time_mean'], config['time_std'])
-        return labels, preds
+        speeds = []
+        dists = []
+        hours = []
+        labels = []
+        for i in dataloader:
+            speeds.extend(i[0])
+            dists.extend(i[1])
+            hours.extend(i[2])
+            labels.extend(i[3])
+        pred_speeds = np.array([self.get_speed_if_available(x) for x in hours])
+        preds = list(dists / pred_speeds)
+        return np.array(labels), np.array(preds)
     def get_speed_if_available(self, hour):
         # If no data was available for the requested hour, return the mean of all available hours
         if hour in self.speed_lookup['speed'].keys():

@@ -6,6 +6,9 @@ import time
 import h5py
 import numpy as np
 import pandas as pd
+# import pyarrow as pa
+# import pyarrow.parquet as pq
+# import pyarrow.dataset as ds
 import torch
 from torch.utils.data import Dataset, DataLoader, IterableDataset
 
@@ -56,7 +59,7 @@ SKIP_FEATURE_COLS = [
     "bearing",
 ]
 
-class LoadAllDataset(Dataset):
+class BetterGenericDataset(Dataset):
     def __init__(self, file_path, config, grid=None, holdout_routes=None, keep_only_holdout=False, add_grid_features=False, skip_gtfs=False):
         self.file_path = file_path
         self.config = config
@@ -75,14 +78,6 @@ class LoadAllDataset(Dataset):
         self.col_indices = [i for i, var_name in enumerate(self.col_names) if f"{var_name}_mean" in self.config]
         self.means = np.array([self.config[f"{self.col_names[i]}_mean"] for i in self.col_indices])
         self.stds = np.array([self.config[f"{self.col_names[i]}_std"] for i in self.col_indices])
-        # Load data
-        self.h5_lookup = {}
-        self.base_path = "/".join(self.file_path.split("/")[:-1])+"/"
-        self.train_or_test = self.file_path.split("/")[-1]
-        for filename in os.listdir(self.base_path):
-            if filename.startswith(self.train_or_test) and filename.endswith(".h5"):
-                self.h5_lookup[filename] = h5py.File(f"{self.base_path}{filename}", 'r')['tabular_data']
-        self.data = self.get_all_samples(keep_cols=self.col_names)
         # Point to a dataset
         with open(f"{self.file_path}_shingle_config.json") as f:
             # This contains all of the shingle information in the data file
@@ -96,11 +91,18 @@ class LoadAllDataset(Dataset):
                 self.shingle_keys = [i for (i,v) in zip(self.shingle_keys, holdout_idxs) if v]
             else:
                 self.shingle_keys = [i for (i,v) in zip(self.shingle_keys, holdout_idxs) if not v]
+        # It is essential to open the h5 files during initialization; 100x slowdown if done repeatedly in __getitem__
+        self.h5_lookup = {}
+        self.base_path = "/".join(self.file_path.split("/")[:-1])+"/"
+        self.train_or_test = self.file_path.split("/")[-1]
+        for filename in os.listdir(self.base_path):
+            if filename.startswith(self.train_or_test) and filename.endswith(".h5"):
+                self.h5_lookup[filename] = h5py.File(f"{self.base_path}{filename}", 'r')['tabular_data']
     def __getitem__(self, index):
         # Get information on shingle file location and lines; read specific shingle lines from specific shingle file
         samp_dict = self.shingle_lookup[self.shingle_keys[index]]
-        df = self.data[self.data['shingle_id']==samp_dict['shingle_id']].values
-        # df = self.h5_lookup[f"{self.train_or_test}_data_{samp_dict['network']}_{samp_dict['file_num']}.h5"][samp_dict['start_idx']:samp_dict['end_idx']]
+        df = self.h5_lookup[f"{self.train_or_test}_data_{samp_dict['network']}_{samp_dict['file_num']}.h5"][samp_dict['start_idx']:samp_dict['end_idx']]
+        df = df.astype('float32')
         # df[:,self.col_indices] = (df[:,self.col_indices] - self.means) / self.stds
         # return df
         # Convert tabular to dict of keys; inefficient but works with all other code for now
@@ -108,7 +110,6 @@ class LoadAllDataset(Dataset):
         for i in range(df.shape[1]):
             res[self.col_names[i]] = df[:,i]
         # Some keys should not be repeated across timesteps (use first or last value of sequence)
-        res['shingle_id'] = res['shingle_id'][0]
         res['time'] = res['time_cumulative_s'][-1]
         res['dist'] = res['dist_cumulative_km'][-1]
         res['weekID'] = res['weekID'][0]
@@ -120,84 +121,6 @@ class LoadAllDataset(Dataset):
             grid_features = apply_grid_normalization(grid_features, self.config)
             res['grid_features'] = grid_features
         res = apply_normalization(res, self.config)
-        return res
-    def __len__(self):
-        return len(self.shingle_keys)
-    def get_all_samples(self, keep_cols, indexes=None):
-        # Read all h5 files in run base directory; get all point obs
-        res = []
-        for k in list(self.h5_lookup.keys()):
-            df = self.h5_lookup[k][:]
-            df = pd.DataFrame(df, columns=self.col_names)
-            df['shingle_id'] = df['shingle_id'].astype(int)
-            df = df[keep_cols]
-            res.append(df)
-        res = pd.concat(res)
-        if indexes is not None:
-            # Indexes are in order, but shingle_id's are not; get shingle id for each keep index and filter
-            keep_shingles = [self.shingle_lookup[self.shingle_keys[i]]['shingle_id'] for i in indexes]
-            res = res[res['shingle_id'].isin(keep_shingles)]
-        return res
-
-class LoadSliceDataset(Dataset):
-    def __init__(self, file_path, config, holdout_routes=None, keep_only_holdout=False, add_grid_features=False, skip_gtfs=False):
-        self.file_path = file_path
-        self.config = config
-        self.holdout_routes = holdout_routes
-        self.keep_only_holdout = keep_only_holdout
-        self.add_grid_features = add_grid_features
-        self.skip_gtfs = skip_gtfs
-        if not self.skip_gtfs:
-            self.col_names = FEATURE_COLS
-        else:
-            self.col_names = SKIP_FEATURE_COLS
-        # Cache indexes, means and stds for normalization
-        self.col_indices = [i for i, var_name in enumerate(self.col_names) if f"{var_name}_mean" in self.config]
-        self.means = np.array([self.config[f"{self.col_names[i]}_mean"] for i in self.col_indices])
-        self.stds = np.array([self.config[f"{self.col_names[i]}_std"] for i in self.col_indices])
-        # Load data
-        self.h5_lookup = {}
-        self.base_path = "/".join(self.file_path.split("/")[:-1])+"/"
-        self.train_or_test = self.file_path.split("/")[-1]
-        for filename in os.listdir(self.base_path):
-            if filename.startswith(self.train_or_test) and filename.endswith(".h5"):
-                self.h5_lookup[filename] = h5py.File(f"{self.base_path}{filename}", 'r')['tabular_data']
-        # Point to a dataset
-        with open(f"{self.file_path}_shingle_config.json") as f:
-            # This contains all of the shingle information in the data file
-            self.shingle_lookup = json.load(f)
-            # This is a list of keys that will be filtered and each point to a sample
-            self.shingle_keys = list(self.shingle_lookup.keys())
-        # Filter out (or keep exclusively) any routes that are used for generalization tests
-        if self.holdout_routes is not None:
-            holdout_idxs = [self.shingle_lookup[x]['route_id'] in self.holdout_routes for x in self.shingle_lookup]
-            if self.keep_only_holdout==True:
-                self.shingle_keys = [i for (i,v) in zip(self.shingle_keys, holdout_idxs) if v]
-            else:
-                self.shingle_keys = [i for (i,v) in zip(self.shingle_keys, holdout_idxs) if not v]
-    def __getitem__(self, index):
-        # Get information on shingle file location and lines; read specific shingle lines from specific shingle file
-        samp_dict = self.shingle_lookup[self.shingle_keys[index]]
-        # df = self.data[self.data['shingle_id']==samp_dict['shingle_id']].values
-        df = self.h5_lookup[f"{self.train_or_test}_data_{samp_dict['network']}_{samp_dict['file_num']}.h5"][samp_dict['start_idx']:samp_dict['end_idx']]
-        df[:,self.col_indices] = (df[:,self.col_indices] - self.means) / self.stds
-        # Convert tabular to dict of keys; inefficient but works with all other code for now
-        res = {}
-        for i in range(df.shape[1]):
-            res[self.col_names[i]] = df[:,i]
-        # Some keys should not be repeated across timesteps (use first or last value of sequence)
-        res['shingle_id'] = res['shingle_id'][0]
-        res['time'] = res['time_cumulative_s'][-1]
-        res['dist'] = res['dist_cumulative_km'][-1]
-        res['weekID'] = res['weekID'][0]
-        res['timeID'] = res['timeID'][0]
-        # Add grid if applicable
-        if self.add_grid_features:
-            xbin_idxs, ybin_idxs = self.grid.digitize_points(res['x'], res['y'])
-            grid_features = self.grid.get_grid_features(xbin_idxs, ybin_idxs, [res['locationtime'][0] for x in res['locationtime']])
-            grid_features = apply_grid_normalization(grid_features, self.config)
-            res['grid_features'] = grid_features
-        # res = apply_normalization(res, self.config)
         return res
     def __len__(self):
         return len(self.shingle_keys)

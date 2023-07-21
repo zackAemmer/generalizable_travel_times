@@ -3,6 +3,8 @@
 
 import json
 import random
+import lightning.pytorch as pl
+
 
 import numpy as np
 import torch
@@ -10,7 +12,7 @@ from torch.utils.data import DataLoader, SubsetRandomSampler
 from sklearn import metrics
 
 from models import grids
-from utils import data_utils, data_loader, model_utils
+from utils import data_utils, model_utils, data_loader
 
 
 def run_experiments(run_folder, train_network_folder, test_network_folder, tune_network_folder, **kwargs):
@@ -154,7 +156,14 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             print(f"Evaluating: {model.model_name}")
             train_network_dataset.add_grid_features = model.requires_grid
             loader = DataLoader(train_network_dataset, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True)
-            labels, preds = model.evaluate(loader, train_network_config)
+            trainer = pl.Trainer(
+                max_epochs=2,
+                limit_train_batches=5,
+                limit_val_batches=5,
+                limit_test_batches=5,
+            )
+            labels, preds = trainer.predict(model=model, dataloaders=loader)
+            # labels, preds = model.evaluate(loader, train_network_config)
             model_fold_results[model.model_name]["Train_Labels"].extend(list(labels))
             model_fold_results[model.model_name]["Train_Preds"].extend(list(preds))
 
@@ -164,7 +173,14 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
             print(f"Evaluating: {model.model_name}")
             test_network_dataset.add_grid_features = model.requires_grid
             loader = DataLoader(test_network_dataset, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True)
-            labels, preds = model.evaluate(loader, test_network_config)
+            trainer = pl.Trainer(
+                max_epochs=2,
+                limit_train_batches=5,
+                limit_val_batches=5,
+                limit_test_batches=5,
+            )
+            labels, preds = trainer.predict(model=model, dataloaders=loader)
+            # labels, preds = model.evaluate(loader, test_network_config)
             model_fold_results[model.model_name]["Test_Labels"].extend(list(labels))
             model_fold_results[model.model_name]["Test_Preds"].extend(list(preds))
 
@@ -175,7 +191,14 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 print(f"Evaluating: {model.model_name}")
                 holdout_network_dataset.add_grid_features = model.requires_grid
                 loader = DataLoader(holdout_network_dataset, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True)
-                labels, preds = model.evaluate(loader, train_network_config)
+                trainer = pl.Trainer(
+                    max_epochs=2,
+                    limit_train_batches=5,
+                    limit_val_batches=5,
+                    limit_test_batches=5,
+                )
+                labels, preds = trainer.predict(model=model, dataloaders=loader)
+                # labels, preds = model.evaluate(loader, train_network_config)
                 model_fold_results[model.model_name]["Holdout_Labels"].extend(list(labels))
                 model_fold_results[model.model_name]["Holdout_Preds"].extend(list(preds))
 

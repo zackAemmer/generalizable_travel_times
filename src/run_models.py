@@ -7,19 +7,16 @@ import random
 import shutil
 import time
 
-import numpy as np
 import lightning.pytorch as pl
-from lightning.pytorch.loggers import CSVLogger
+import numpy as np
 import torch
-from torch.utils.data import DataLoader, SubsetRandomSampler
+from lightning.pytorch.loggers import CSVLogger
 from sklearn import metrics
 from sklearn.model_selection import KFold
-# from tabulate import tabulate
+from torch.utils.data import DataLoader, SubsetRandomSampler
 
 from models import grids
-from utils import new_data_loader, data_utils, model_utils
-
-from torch.profiler import profile, record_function, ProfilerActivity
+from utils import data_loader, data_utils, model_utils
 
 
 def run_models(run_folder, network_folder, **kwargs):
@@ -131,8 +128,8 @@ def run_models(run_folder, network_folder, **kwargs):
     # Data loading and fold setup
     with open(f"{run_folder}{network_folder}deeptte_formatted/train_summary_config.json", "r") as f:
         config = json.load(f)
-    train_dataset = new_data_loader.LoadSliceDataset(f"{run_folder}{network_folder}deeptte_formatted/train", config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
-    test_dataset = new_data_loader.LoadSliceDataset(f"{run_folder}{network_folder}deeptte_formatted/test", config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
+    train_dataset = data_loader.LoadSliceDataset(f"{run_folder}{network_folder}deeptte_formatted/train", config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
+    test_dataset = data_loader.LoadSliceDataset(f"{run_folder}{network_folder}deeptte_formatted/test", config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
     splits = KFold(kwargs['n_folds'], shuffle=True, random_state=0)
     run_results = []
 
@@ -175,14 +172,6 @@ def run_models(run_folder, network_folder, **kwargs):
                 "Labels":[],
                 "Preds":[]
             }
-        # Keep track of train/test curves during training for network models
-        model_fold_curves = {}
-        for x in model_list:
-            if x.is_nn:
-                model_fold_curves[x.model_name] = {
-                    "Train":[],
-                    "Test":[]
-                }
 
         # Total run samples
         print(f"Training on {len(train_dataset)} samples, testing on {len(test_dataset)} samples")
@@ -192,9 +181,9 @@ def run_models(run_folder, network_folder, **kwargs):
             print(f"Fold training for: {model.model_name}")
             train_dataset.add_grid_features = model.requires_grid
             test_dataset.add_grid_features = model.requires_grid
-            train_loader = DataLoader(train_dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True)
-            val_loader = DataLoader(train_dataset, sampler=val_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True)
-            test_loader = DataLoader(test_dataset, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True)
+            train_loader = DataLoader(train_dataset, sampler=train_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True, num_workers=4, pin_memory=True)
+            val_loader = DataLoader(train_dataset, sampler=val_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True, num_workers=4, pin_memory=True)
+            test_loader = DataLoader(test_dataset, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True, num_workers=4, pin_memory=True)
             if not model.is_nn:
                 # Train base model on all fold data
                 model.train(train_loader, config)
@@ -205,14 +194,18 @@ def run_models(run_folder, network_folder, **kwargs):
                 data_utils.write_pkl(model, f"{base_folder}models/{model.model_name}_{fold_num}.pkl")
             else:
                 trainer = pl.Trainer(
-                    max_time={"seconds":30},
-                    limit_train_batches=0.10,
-                    limit_val_batches=0.10,
-                    limit_test_batches=0.10,
+                    max_epochs=2,
+                    limit_train_batches=5,
+                    limit_val_batches=5,
+                    limit_test_batches=5,
                     logger=CSVLogger(save_dir=f"{run_folder}{network_folder}logs/", name=model.model_name)
                 )
                 trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
-                trainer.test(dataloaders=test_loader)
+                # trainer.test(dataloaders=test_loader)
+                # trainer.predict(model=model, dataloaders=test_loader)
+
+        # Save fold results
+        run_results.append(model_fold_results)
 
     # Save full run results
     data_utils.write_pkl(run_results, f"{base_folder}model_results.pkl")
@@ -221,6 +214,7 @@ def run_models(run_folder, network_folder, **kwargs):
 
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
+    torch.set_float32_matmul_precision('medium')
     pl.seed_everything(42, workers=True)
 
     # DEBUG
@@ -230,7 +224,6 @@ if __name__=="__main__":
     run_models(
         run_folder="./results/debug/",
         network_folder="kcm/",
-        EPOCH_EVAL_FREQ=10,
         grid_s_size=500,
         n_folds=2,
         holdout_routes=[100252,100139,102581,100341,102720],
@@ -243,7 +236,6 @@ if __name__=="__main__":
     run_models(
         run_folder="./results/debug/",
         network_folder="atb/",
-        EPOCH_EVAL_FREQ=10,
         grid_s_size=500,
         n_folds=2,
         holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
@@ -257,7 +249,6 @@ if __name__=="__main__":
     run_models(
         run_folder="./results/debug_nosch/",
         network_folder="kcm_atb/",
-        EPOCH_EVAL_FREQ=10,
         grid_s_size=500,
         n_folds=2,
         holdout_routes=None,
@@ -265,32 +256,30 @@ if __name__=="__main__":
         is_param_search=False
     )
 
-    # PARAM SEARCH
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/param_search/",
-        network_folder="kcm/",
-        EPOCH_EVAL_FREQ=10,
-        grid_s_size=500,
-        n_folds=5,
-        holdout_routes=None,
-        skip_gtfs=False,
-        is_param_search=True
-    )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-    run_models(
-        run_folder="./results/param_search/",
-        network_folder="atb/",
-        EPOCH_EVAL_FREQ=10,
-        grid_s_size=500,
-        n_folds=5,
-        holdout_routes=None,
-        skip_gtfs=False,
-        is_param_search=True
-    )
+    # # PARAM SEARCH
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/param_search/",
+    #     network_folder="kcm/",
+    #     grid_s_size=500,
+    #     n_folds=5,
+    #     holdout_routes=None,
+    #     skip_gtfs=False,
+    #     is_param_search=True
+    # )
+    # random.seed(0)
+    # np.random.seed(0)
+    # torch.manual_seed(0)
+    # run_models(
+    #     run_folder="./results/param_search/",
+    #     network_folder="atb/",
+    #     grid_s_size=500,
+    #     n_folds=5,
+    #     holdout_routes=None,
+    #     skip_gtfs=False,
+    #     is_param_search=True
+    # )
 
     # FULL RUN

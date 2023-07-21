@@ -19,7 +19,8 @@ from tabulate import tabulate
 import pyarrow.dataset as ds
 
 from models import avg_speed, conv, ff, grids, persistent, rnn, schedule, transformer
-from utils import data_loader, data_utils, model_utils
+from src.utils import old_data_loader
+from utils import data_utils, model_utils
 
 import torch
 import torchvision.models as models
@@ -68,7 +69,7 @@ def run(run_folder, train_network_folder, **kwargs):
 
 
 
-    dataset_new = data_loader.BetterGenericDataset(f"{run_folder}{train_network_folder}deeptte_formatted/train", config, holdout_routes=kwargs['holdout_routes'])
+    dataset_new = old_data_loader.BetterGenericDataset(f"{run_folder}{train_network_folder}deeptte_formatted/train", config, holdout_routes=kwargs['holdout_routes'])
     print(len(dataset_new))
 
     t0 = time.time()
@@ -82,7 +83,7 @@ def run(run_folder, train_network_folder, **kwargs):
     time_iter = time.time() - t0
     print(f"{time_iter*len(dataset_new)/1000/60} minutes")
 
-    loader = DataLoader(dataset_new, batch_size=512, collate_fn=data_loader.basic_collate, pin_memory=False, num_workers=0, drop_last=True)
+    loader = DataLoader(dataset_new, batch_size=512, collate_fn=old_data_loader.basic_collate, pin_memory=False, num_workers=0, drop_last=True)
     t0 = time.time()
     i=0
     for x in loader:

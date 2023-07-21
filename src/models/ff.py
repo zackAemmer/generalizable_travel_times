@@ -23,8 +23,8 @@ class FF(nn.Module):
         self.loss_fn = torch.nn.HuberLoss()
         # Embeddings
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
-        self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
-        self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
+        self.timeID_em = nn.Embedding(self.embed_dict['timeID']['vocab_size'], self.embed_dict['timeID']['embed_dims'])
+        self.weekID_em = nn.Embedding(self.embed_dict['weekID']['vocab_size'], self.embed_dict['weekID']['embed_dims'])
         # Feedforward
         self.linear_relu_stack = nn.Sequential()
         self.linear_relu_stack.append(nn.Linear(self.n_features + self.embed_total_dims, self.hyperparameter_dict['HIDDEN_SIZE']))
@@ -60,24 +60,26 @@ class FF(nn.Module):
         preds = data_utils.de_normalize(preds, config['time_mean'], config['time_std'])
         return labels, preds
 class FF_L(pl.LightningModule):
-    def __init__(self, model_name, n_features, hyperparameter_dict, embed_dict, collate_fn):
+    def __init__(self, model_name, n_features, hyperparameter_dict, embed_dict, collate_fn, config):
         super(FF_L, self).__init__()
         self.save_hyperparameters()
         self.model_name = model_name
         self.n_features = n_features
         self.hyperparameter_dict = hyperparameter_dict
-        self.collate_fn = collate_fn
         self.embed_dict = embed_dict
+        self.collate_fn = collate_fn
+        self.config = config
         self.is_nn = True
         self.requires_grid = False
         self.train_time = 0.0
         self.loss_fn = nn.HuberLoss()
         # Embeddings
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
-        self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
-        self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
+        self.timeID_em = nn.Embedding(self.embed_dict['timeID']['vocab_size'], self.embed_dict['timeID']['embed_dims'])
+        self.weekID_em = nn.Embedding(self.embed_dict['weekID']['vocab_size'], self.embed_dict['weekID']['embed_dims'])
         # Feedforward
         self.linear_relu_stack = nn.Sequential()
+        self.linear_relu_stack.append(nn.BatchNorm1d(self.n_features + self.embed_total_dims))
         self.linear_relu_stack.append(nn.Linear(self.n_features + self.embed_total_dims, self.hyperparameter_dict['HIDDEN_SIZE']))
         self.linear_relu_stack.append(nn.ReLU())
         for i in range(self.hyperparameter_dict['NUM_LAYERS']):
@@ -122,6 +124,18 @@ class FF_L(pl.LightningModule):
         loss = self.loss_fn(out, y)
         self.log(f"{self.model_name}_test_loss", loss, on_epoch=True, prog_bar=True, logger=True)
         return loss
+    def predict_step(self, batch, batch_idx):
+        x,y = batch
+        x_em = x[0]
+        x_ct = x[1]
+        timeID_embedded = self.timeID_em(x_em[:,0])
+        weekID_embedded = self.weekID_em(x_em[:,1])
+        out = torch.cat([x_ct, timeID_embedded, weekID_embedded], dim=1)
+        out = self.linear_relu_stack(out)
+        out = self.feature_extract(self.feature_extract_activation(out)).squeeze()
+        out = data_utils.de_normalize(out, self.config['time_mean'], self.config['time_std'])
+        y = data_utils.de_normalize(y, self.config['time_mean'], self.config['time_std'])
+        return (out, y)
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
@@ -142,8 +156,8 @@ class FF_GRID(nn.Module):
         self.loss_fn = torch.nn.HuberLoss()
         # Embeddings
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
-        self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
-        self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
+        self.timeID_em = nn.Embedding(self.embed_dict['timeID']['vocab_size'], self.embed_dict['timeID']['embed_dims'])
+        self.weekID_em = nn.Embedding(self.embed_dict['weekID']['vocab_size'], self.embed_dict['weekID']['embed_dims'])
         # Grid Feedforward
         self.linear_relu_stack_grid = nn.Sequential(
             nn.Linear(self.n_grid_features, self.hyperparameter_dict['HIDDEN_SIZE']),
@@ -189,7 +203,7 @@ class FF_GRID(nn.Module):
         preds = data_utils.de_normalize(preds, config['time_mean'], config['time_std'])
         return labels, preds
 class FF_GRID_L(pl.LightningModule):
-    def __init__(self, model_name, n_features, n_grid_features, grid_compression_size, hyperparameter_dict, embed_dict, collate_fn):
+    def __init__(self, model_name, n_features, n_grid_features, grid_compression_size, hyperparameter_dict, embed_dict, collate_fn, config):
         super(FF_GRID_L, self).__init__()
         self.save_hyperparameters()
         self.model_name = model_name
@@ -199,16 +213,18 @@ class FF_GRID_L(pl.LightningModule):
         self.hyperparameter_dict = hyperparameter_dict
         self.embed_dict = embed_dict
         self.collate_fn = collate_fn
+        self.config = config
         self.is_nn = True
         self.requires_grid = True
         self.train_time = 0.0
         self.loss_fn = nn.HuberLoss()
         # Embeddings
         self.embed_total_dims = np.sum([self.embed_dict[key]['embed_dims'] for key in self.embed_dict.keys()]).astype('int32')
-        self.timeID_em = nn.Embedding(embed_dict['timeID']['vocab_size'], embed_dict['timeID']['embed_dims'])
-        self.weekID_em = nn.Embedding(embed_dict['weekID']['vocab_size'], embed_dict['weekID']['embed_dims'])
+        self.timeID_em = nn.Embedding(self.embed_dict['timeID']['vocab_size'], self.embed_dict['timeID']['embed_dims'])
+        self.weekID_em = nn.Embedding(self.embed_dict['weekID']['vocab_size'], self.embed_dict['weekID']['embed_dims'])
         # Grid Feedforward
         self.linear_relu_stack_grid = nn.Sequential(
+            nn.BatchNorm1d(self.n_grid_features),
             nn.Linear(self.n_grid_features, self.hyperparameter_dict['HIDDEN_SIZE']),
             nn.ReLU(),
             nn.Linear(self.hyperparameter_dict['HIDDEN_SIZE'], self.grid_compression_size),
@@ -216,6 +232,7 @@ class FF_GRID_L(pl.LightningModule):
         )
         # Feedforward
         self.linear_relu_stack = nn.Sequential()
+        self.linear_relu_stack.append(nn.BatchNorm1d(self.n_features + self.embed_total_dims + self.grid_compression_size))
         self.linear_relu_stack.append(nn.Linear(self.n_features + self.embed_total_dims + self.grid_compression_size, self.hyperparameter_dict['HIDDEN_SIZE']))
         self.linear_relu_stack.append(nn.ReLU())
         for i in range(self.hyperparameter_dict['NUM_LAYERS']):
@@ -281,6 +298,24 @@ class FF_GRID_L(pl.LightningModule):
         loss = self.loss_fn(out, y)
         self.log(f"{self.model_name}_test_loss", loss, on_epoch=True, prog_bar=True, logger=True)
         return loss
+    def predict_step(self, batch, batch_idx):
+        x,y = batch
+        x_em = x[0]
+        x_ct = x[1]
+        x_gr = x[2]
+        # Embed categorical variables
+        timeID_embedded = self.timeID_em(x_em[:,0])
+        weekID_embedded = self.weekID_em(x_em[:,1])
+        # Feed grid data through model
+        x_gr = self.linear_relu_stack_grid(torch.flatten(x_gr, 1))
+        # Feed data through the model
+        out = torch.cat([x_gr, x_ct, timeID_embedded, weekID_embedded], dim=1)
+        # Make prediction
+        out = self.linear_relu_stack(out)
+        out = self.feature_extract(self.feature_extract_activation(out)).squeeze()
+        out = data_utils.de_normalize(out, self.config['time_mean'], self.config['time_std'])
+        y = data_utils.de_normalize(y, self.config['time_mean'], self.config['time_std'])
+        return (out, y)
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer

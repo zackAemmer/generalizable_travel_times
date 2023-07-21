@@ -1,25 +1,23 @@
-name: valle
+name: valle_ltn
 channels:
   - conda-forge
   - defaults
 dependencies:
   - python=3.10
-  - geopandas
-  - numpy
-  - pandas
-  - pyarrow
-  - h5py
-  - scikit-learn
-  - tabulate
-  - pyproj
-  - python-dotenv
-  - plotly
-  - seaborn
-  - shapely
-  - boto3
+  - lightning
   - pytorch
   - pytorch-cuda
   - torchaudio
   - torchvision
+  - geopandas
+  - pandas
+  - h5py
+  - pyproj
+  - scikit-learn
+  - boto3
   - ipykernel
-prefix: /home/zack/miniconda3/envs/valle
+  - plotly
+  - python-dotenv
+  - seaborn
+  - shapely
+prefix: /home/zack/miniconda3/envs/valle_ltn
