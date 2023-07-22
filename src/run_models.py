@@ -12,6 +12,7 @@ import numpy as np
 import torch
 from lightning.pytorch.loggers import CSVLogger
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
+from lightning.pytorch.tuner import Tuner
 from sklearn import metrics
 from sklearn.model_selection import KFold
 from torch.utils.data import DataLoader, SubsetRandomSampler
@@ -76,8 +77,9 @@ def run_models(run_folder, network_folder, **kwargs):
     # Sample parameter values for random search
     if kwargs['is_param_search']:
         hyperparameter_sample_dict = {
-            'n_param_samples': 4,
-            'batch_size': [64, 128, 256, 512, 1024, 2048],
+            'n_param_samples': 1,
+            # 'batch_size': [64, 128, 256, 512, 1024, 2048],
+            'batch_size': [512],
             'hidden_size': [16, 32, 64, 128],
             'num_layers': [2, 3, 4, 5],
             'dropout_rate': [.05, .1, .2, .4]
@@ -191,6 +193,7 @@ def run_models(run_folder, network_folder, **kwargs):
                     check_val_every_n_epoch=2,
                     max_epochs=50,
                     min_epochs=10,
+                    accelerator="cpu",
                     logger=CSVLogger(save_dir=f"{run_folder}{network_folder}logs/", name=model.model_name),
                     callbacks=[EarlyStopping(monitor=f"{model.model_name}_valid_loss", min_delta=1, patience=3)]
                     # profiler="simple"
@@ -214,7 +217,7 @@ def run_models(run_folder, network_folder, **kwargs):
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
     torch.set_float32_matmul_precision('medium')
-    pl.seed_everything(42, workers=True)
+    pl.seed_everything(43, workers=True)
 
     # # DEBUG
     # run_models(
@@ -251,7 +254,7 @@ if __name__=="__main__":
         run_folder="./results/param_search/",
         network_folder="kcm/",
         grid_s_size=500,
-        n_folds=5,
+        n_folds=3,
         holdout_routes=None,
         skip_gtfs=False,
         is_param_search=True
@@ -260,7 +263,7 @@ if __name__=="__main__":
         run_folder="./results/param_search/",
         network_folder="atb/",
         grid_s_size=500,
-        n_folds=5,
+        n_folds=3,
         holdout_routes=None,
         skip_gtfs=False,
         is_param_search=True

@@ -231,12 +231,12 @@ def make_all_models_nosch(hyperparameter_dict, embed_dict, config, load_weights=
         collate_fn=data_loader.sequential_collate_nosch,
         config=config
     ))
-    # nn_model_list.append(DeepTTE.Net(
-    #     "DEEP_TTE",
-    #     hyperparameter_dict=hyperparameter_dict['DEEPTTE'],
-    #     collate_fn=data_loader.deeptte_collate_nosch,
-    #     config=config
-    # ))
+    nn_model_list.append(DeepTTE.Net(
+        "DEEP_TTE",
+        hyperparameter_dict=hyperparameter_dict['DEEPTTE'],
+        collate_fn=data_loader.deeptte_collate_nosch,
+        config=config
+    ))
     # Load weights if applicable
     if load_weights:
         base_model_list = []
