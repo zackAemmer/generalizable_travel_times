@@ -76,8 +76,8 @@ def run_models(run_folder, network_folder, **kwargs):
     # Sample parameter values for random search
     if kwargs['is_param_search']:
         hyperparameter_sample_dict = {
-            'n_param_samples': 2,
-            'batch_size': [512],
+            'n_param_samples': 4,
+            'batch_size': [64, 128, 256, 512, 1024, 2048],
             'hidden_size': [16, 32, 64, 128],
             'num_layers': [2, 3, 4, 5],
             'dropout_rate': [.05, .1, .2, .4]
@@ -89,31 +89,31 @@ def run_models(run_folder, network_folder, **kwargs):
     else:
         hyperparameter_dict = {
             'FF': {
-                'batch_size': 64,
+                'batch_size': 128,
                 'hidden_size': 32,
                 'num_layers': 2,
                 'dropout_rate': .1
             },
             'CONV': {
-                'batch_size': 64,
+                'batch_size': 128,
                 'hidden_size': 32,
                 'num_layers': 2,
                 'dropout_rate': .1
             },
             'GRU': {
-                'batch_size': 64,
+                'batch_size': 128,
                 'hidden_size': 32,
                 'num_layers': 2,
                 'dropout_rate': .1
             },
             'TRSF': {
-                'batch_size': 64,
+                'batch_size': 128,
                 'hidden_size': 32,
                 'num_layers': 2,
                 'dropout_rate': .1
             },
             'DEEPTTE': {
-                'batch_size': 64
+                'batch_size': 128
             }
         }
 
