@@ -11,7 +11,7 @@ class PersistentTimeSeqModel:
         self.requires_grid = False
         self.collate_fn = data_loader.persistent_collate
         self.train_time = 0.0
-        self.hyperparameter_dict = {'BATCH_SIZE': 512}
+        self.batch_size = 512
         self.is_nn = False
         return None
     def train(self, dataloader, config):

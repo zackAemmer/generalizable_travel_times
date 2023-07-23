@@ -93,12 +93,16 @@ class LoadSliceDataset(Dataset):
         # Get information on shingle file location and lines; read specific shingle lines from specific shingle file
         samp_dict = self.shingle_lookup[self.shingle_keys[index]]
         samp = self.h5_lookup[f"{self.train_or_test}_data_{samp_dict['network']}_{samp_dict['file_num']}.h5"][samp_dict['start_idx']:samp_dict['end_idx']]
+        label = samp[-1,self.col_names.index("time_cumulative_s")]
+        norm_label = (label - self.config['time_mean']) / self.config['time_std']
+        label_seq = samp[:,self.col_names.index("time_calc_s")]
+        norm_label_seq = (label_seq - self.config['time_calc_s_mean']) / self.config['time_calc_s_std']
         if not self.add_grid_features:
-            return {"samp": samp}
+            return {"samp": samp, "norm_label": norm_label, "norm_label_seq": norm_label_seq}
         else:
             xbin_idxs, ybin_idxs = self.grid.digitize_points(samp[:,self.col_names.index("x")], samp[:,self.col_names.index("y")])
             grid_features = self.grid.get_grid_features(xbin_idxs, ybin_idxs, samp[:,self.col_names.index("locationtime")])
-            return {"samp": samp, "grid": grid_features}
+            return {"samp": samp, "grid": grid_features, "norm_label": norm_label, "norm_label_seq": norm_label_seq}
     def __len__(self):
         return len(self.shingle_keys)
     def get_all_samples(self, keep_cols, indexes=None):
@@ -171,106 +175,106 @@ def basic_collate(batch):
     em_cols = ["timeID","weekID"]
     first_cols = ["x_cent","y_cent","scheduled_time_s","stop_dist_km","passed_stops_n","speed_m_s","bearing"]
     last_cols = ["x_cent","y_cent","scheduled_time_s","stop_dist_km","passed_stops_n","dist_cumulative_km","bearing"]
-    batch = [torch.tensor(b['samp']) for b in batch]
+    y = torch.tensor([b['norm_label'] for b in batch], dtype=torch.float)
+    batch = [torch.tensor(b['samp'], dtype=torch.float) for b in batch]
     first = torch.cat([b[0,:].unsqueeze(0) for b in batch], axis=0)
     last = torch.cat([b[-1,:].unsqueeze(0) for b in batch], axis=0)
-    X_em = first[:,([FEATURE_COLS.index(z) for z in em_cols])]
+    X_em = first[:,([FEATURE_COLS.index(z) for z in em_cols])].int()
     X_ct_first = first[:,([FEATURE_COLS.index(z) for z in first_cols])]
     X_ct_last = last[:,([FEATURE_COLS.index(z) for z in last_cols])]
     X_ct = torch.cat([X_ct_first, X_ct_last], axis=1)
-    y = last[:,(FEATURE_COLS.index(y_col))]
-    return [X_em.int(), X_ct.float()], y.float()
+    return [X_em, X_ct], y
 def basic_collate_nosch(batch):
     y_col = "time_cumulative_s"
     em_cols = ["timeID","weekID"]
     first_cols = ["x_cent","y_cent","speed_m_s","bearing"]
     last_cols = ["x_cent","y_cent","dist_cumulative_km","bearing"]
-    batch = [torch.tensor(b['samp']) for b in batch]
+    y = torch.tensor([b['norm_label'] for b in batch], dtype=torch.float)
+    batch = [torch.tensor(b['samp'], dtype=torch.float) for b in batch]
     first = torch.cat([b[0,:].unsqueeze(0) for b in batch], axis=0)
     last = torch.cat([b[-1,:].unsqueeze(0) for b in batch], axis=0)
-    X_em = first[:,([FEATURE_COLS.index(z) for z in em_cols])]
+    X_em = first[:,([FEATURE_COLS.index(z) for z in em_cols])].int()
     X_ct_first = first[:,([FEATURE_COLS.index(z) for z in first_cols])]
     X_ct_last = last[:,([FEATURE_COLS.index(z) for z in last_cols])]
     X_ct = torch.cat([X_ct_first, X_ct_last], axis=1)
-    y = last[:,(FEATURE_COLS.index(y_col))]
-    return [X_em.int(), X_ct.float()], y.float()
+    return [X_em, X_ct], y
 def basic_grid_collate(batch):
     y_col = "time_cumulative_s"
     em_cols = ["timeID","weekID"]
     first_cols = ["x_cent","y_cent","scheduled_time_s","stop_dist_km","passed_stops_n","speed_m_s","bearing"]
     last_cols = ["x_cent","y_cent","scheduled_time_s","stop_dist_km","passed_stops_n","dist_cumulative_km","bearing"]
-    batch_ct = [torch.tensor(b['samp']) for b in batch]
+    y = torch.tensor([b['norm_label'] for b in batch], dtype=torch.float)
+    batch_ct = [torch.tensor(b['samp'], dtype=torch.float) for b in batch]
     first = torch.cat([b[0,:].unsqueeze(0) for b in batch_ct], axis=0)
     last = torch.cat([b[-1,:].unsqueeze(0) for b in batch_ct], axis=0)
-    X_em = first[:,([FEATURE_COLS.index(z) for z in em_cols])]
+    X_em = first[:,([FEATURE_COLS.index(z) for z in em_cols])].int()
     X_ct_first = first[:,([FEATURE_COLS.index(z) for z in first_cols])]
     X_ct_last = last[:,([FEATURE_COLS.index(z) for z in last_cols])]
     X_ct = torch.cat([X_ct_first, X_ct_last], axis=1)
-    y = last[:,(FEATURE_COLS.index(y_col))]
     # Get speed/bearing/obs age from grid results; average out all values across timesteps; 1 value per cell/obs/variable
-    X_gr = torch.cat([torch.nanmean(torch.tensor(z['grid'])[:,3:,:,:,:], dim=0).unsqueeze(0) for z in batch])
+    X_gr = torch.cat([torch.nanmean(torch.tensor(z['grid'], dtype=torch.float)[:,3:,:,:,:], dim=0).unsqueeze(0) for z in batch])
     # Replace any nans with the average for that feature
     means = torch.nanmean(torch.swapaxes(X_gr, 0, 1).flatten(1), dim=1)
     for i,m in enumerate(means):
         X_gr[:,i,:,:,:] = torch.nan_to_num(X_gr[:,i,:,:,:], m)
-    return [X_em.int(), X_ct.float(), X_gr.float()], y.float()
+    return [X_em, X_ct, X_gr], y
 def basic_grid_collate_nosch(batch):
     y_col = "time_cumulative_s"
     em_cols = ["timeID","weekID"]
     first_cols = ["x_cent","y_cent","speed_m_s","bearing"]
     last_cols = ["x_cent","y_cent","dist_cumulative_km","bearing"]
-    batch_ct = [torch.tensor(b['samp']) for b in batch]
+    y = torch.tensor([b['norm_label'] for b in batch], dtype=torch.float)
+    batch_ct = [torch.tensor(b['samp'], dtype=torch.float) for b in batch]
     first = torch.cat([b[0,:].unsqueeze(0) for b in batch_ct], axis=0)
     last = torch.cat([b[-1,:].unsqueeze(0) for b in batch_ct], axis=0)
-    X_em = first[:,([FEATURE_COLS.index(z) for z in em_cols])]
+    X_em = first[:,([FEATURE_COLS.index(z) for z in em_cols])].int()
     X_ct_first = first[:,([FEATURE_COLS.index(z) for z in first_cols])]
     X_ct_last = last[:,([FEATURE_COLS.index(z) for z in last_cols])]
     X_ct = torch.cat([X_ct_first, X_ct_last], axis=1)
-    y = last[:,(FEATURE_COLS.index(y_col))]
     # Get speed/bearing/obs age from grid results; average out all values across timesteps; 1 value per cell/obs/variable
-    X_gr = torch.cat([torch.nanmean(torch.tensor(z['grid'])[:,3:,:,:,:], dim=0).unsqueeze(0) for z in batch])
+    X_gr = torch.cat([torch.nanmean(torch.tensor(z['grid'], dtype=torch.float)[:,3:,:,:,:], dim=0).unsqueeze(0) for z in batch])
     # Replace any nans with the average for that feature
     means = torch.nanmean(torch.swapaxes(X_gr, 0, 1).flatten(1), dim=1)
     for i,m in enumerate(means):
         X_gr[:,i,:,:,:] = torch.nan_to_num(X_gr[:,i,:,:,:], m)
-    return [X_em.int(), X_ct.float(), X_gr.float()], y.float()
+    return [X_em, X_ct, X_gr], y
 
 def sequential_collate(batch):
     y_col = "time_calc_s"
     em_cols = ["timeID","weekID"]
     ct_cols = ["x_cent","y_cent","scheduled_time_s","stop_dist_km","stop_x_cent","stop_y_cent","passed_stops_n","bearing","dist_calc_km","dist_calc_km"]
-    batch = [torch.tensor(b['samp']) for b in batch]
-    X_sl = torch.tensor([len(b) for b in batch])
+    y = torch.tensor([b['norm_label_seq'] for b in batch], dtype=torch.float)
+    batch = [torch.tensor(b['samp'], dtype=torch.float) for b in batch]
+    X_sl = torch.tensor([len(b) for b in batch], dtype=torch.int)
     first = torch.cat([b[0,:].unsqueeze(0) for b in batch], axis=0)
-    X_em = first[:,([FEATURE_COLS.index(z) for z in em_cols])]
+    X_em = first[:,([FEATURE_COLS.index(z) for z in em_cols])].int()
     batch = torch.nn.utils.rnn.pad_sequence(batch, batch_first=True)
     X_ct = batch[:,:,([FEATURE_COLS.index(z) for z in ct_cols])]
-    y = batch[:,:,(FEATURE_COLS.index(y_col))]
-    return [X_em.int(), X_ct.float(), X_sl.int()], y.float()
+    return [X_em, X_ct, X_sl], y
 def sequential_collate_nosch(batch):
     y_col = "time_calc_s"
     em_cols = ["timeID","weekID"]
     ct_cols = ["x_cent","y_cent","bearing","dist_calc_km"]
-    batch = [torch.tensor(b['samp']) for b in batch]
-    X_sl = torch.tensor([len(b) for b in batch])
+    y = torch.tensor([b['norm_label_seq'] for b in batch], dtype=torch.float)
+    batch = [torch.tensor(b['samp'], dtype=torch.float) for b in batch]
+    X_sl = torch.tensor([len(b) for b in batch], dtype=torch.int)
     first = torch.cat([b[0,:].unsqueeze(0) for b in batch], axis=0)
-    X_em = first[:,([FEATURE_COLS.index(z) for z in em_cols])]
+    X_em = first[:,([FEATURE_COLS.index(z) for z in em_cols])].int()
     batch = torch.nn.utils.rnn.pad_sequence(batch, batch_first=True)
     X_ct = batch[:,:,([FEATURE_COLS.index(z) for z in ct_cols])]
-    y = batch[:,:,(FEATURE_COLS.index(y_col))]
-    return [X_em.int(), X_ct.float(), X_sl.int()], y.float()
+    return [X_em, X_ct, X_sl], y
 def sequential_grid_collate(batch):
     y_col = "time_calc_s"
     em_cols = ["timeID","weekID"]
     ct_cols = ["x_cent","y_cent","scheduled_time_s","stop_dist_km","stop_x_cent","stop_y_cent","passed_stops_n","bearing","dist_calc_km","dist_calc_km"]
-    batch_ct = [torch.tensor(b['samp']) for b in batch]
-    batch_gr = [torch.tensor(b['grid']) for b in batch]
-    X_sl = torch.tensor([len(b) for b in batch_ct])
+    y = torch.tensor([b['norm_label_seq'] for b in batch], dtype=torch.float)
+    batch_ct = [torch.tensor(b['samp'], dtype=torch.float) for b in batch]
+    batch_gr = [torch.tensor(b['grid'], dtype=torch.float) for b in batch]
+    X_sl = torch.tensor([len(b) for b in batch_ct], dtype=torch.int)
     first = torch.cat([b[0,:].unsqueeze(0) for b in batch_ct], axis=0)
-    X_em = first[:,([FEATURE_COLS.index(z) for z in em_cols])]
+    X_em = first[:,([FEATURE_COLS.index(z) for z in em_cols])].int()
     batch_ct = torch.nn.utils.rnn.pad_sequence(batch_ct, batch_first=True)
     X_ct = batch_ct[:,:,([FEATURE_COLS.index(z) for z in ct_cols])]
-    y = batch_ct[:,:,(FEATURE_COLS.index(y_col))]
     # Get speed/bearing/obs age from grid results; average out all values across timesteps; 1 value per cell/obs/variable
     X_gr = [b[:,3:,:,:,:] for b in batch_gr]
     X_gr = torch.nn.utils.rnn.pad_sequence(X_gr, batch_first=True)
@@ -278,7 +282,7 @@ def sequential_grid_collate(batch):
     means = torch.nanmean(torch.swapaxes(X_gr, 0, 2).flatten(1), dim=1)
     for i,m in enumerate(means):
         X_gr[:,:,i,:,:,:] = torch.nan_to_num(X_gr[:,:,i,:,:,:], m)
-    return [X_em.int(), X_ct.float(), X_gr.float(), X_sl.int()], y.float()
+    return [X_em, X_ct, X_gr, X_sl], y
 
 def deeptte_collate(data):
     stat_attrs = ['dist_cumulative_km', 'time_cumulative_s']

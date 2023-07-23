@@ -127,9 +127,9 @@ class TRSF_L(pl.LightningModule):
         out = torch.cat([x_em, x_ct], dim=2)
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
         mask = data_utils.create_tensor_mask(x_sl).to(x_sl)
-        out = out.cpu().numpy()
         mask = mask.cpu().numpy()
-        y = y.cpu().numpy()
+        out  = (out.cpu().numpy() * self.config['time_calc_s_std']) + self.config['time_calc_s_mean']
+        y = (y.cpu().numpy() * self.config['time_calc_s_std']) + self.config['time_calc_s_mean']
         out = data_utils.aggregate_tts(out, mask)
         y = data_utils.aggregate_tts(y, mask)
         return (out, y)
@@ -296,9 +296,9 @@ class TRSF_GRID_L(pl.LightningModule):
         out = torch.cat((x_em, x_ct), dim=2)
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
         mask = data_utils.create_tensor_mask(x_sl).to(x_sl)
-        out = out.cpu().numpy()
         mask = mask.cpu().numpy()
-        y = y.cpu().numpy()
+        out  = (out.cpu().numpy() * self.config['time_calc_s_std']) + self.config['time_calc_s_mean']
+        y = (y.cpu().numpy() * self.config['time_calc_s_std']) + self.config['time_calc_s_mean']
         out = data_utils.aggregate_tts(out, mask)
         y = data_utils.aggregate_tts(y, mask)
         return (out, y)

@@ -49,9 +49,12 @@ class EntireEstimator(nn.Module):
         pred = pred * std + mean
 
         ### MAPE loss
-        loss = torch.abs(pred - label) / label   ### size [batch, 1]
+        loss_fn = nn.HuberLoss()
+        loss = loss_fn(pred, label)
+        # loss = torch.abs(pred - label) / label   ### size [batch, 1]
 
-        return {'label': label, 'pred': pred}, loss.mean()
+        return {'label': label, 'pred': pred}, loss
+        # return {'label': label, 'pred': pred}, loss.mean()
 
 
 class LocalEstimator(nn.Module):
@@ -81,9 +84,12 @@ class LocalEstimator(nn.Module):
         pred = pred * std + mean
 
         ### MAPE loss
-        loss = torch.abs(pred - label) / (label + EPS)   ### size [variable, 1]
-        
-        return loss.mean()
+        loss_fn = nn.HuberLoss()
+        loss = loss_fn(pred, label)
+        # loss = torch.abs(pred - label) / (label + EPS)   ### size [variable, 1]
+
+        return loss
+        # return loss.mean()
 
 
 class Net(pl.LightningModule):
@@ -140,6 +146,17 @@ class Net(pl.LightningModule):
         attr = batch[0]
         traj = batch[1]
         config = self.config
+        # Norm
+        for k in list(attr.keys()):
+            try:
+                attr[k] = (attr[k] - self.config[f"{k}_mean"]) / self.config[f"{k}_std"]
+            except:
+                continue
+        for k in list(traj.keys()):
+            try:
+                traj[k] = (traj[k] - self.config[f"{k}_mean"]) / self.config[f"{k}_std"]
+            except:
+                continue
         entire_out, (local_out, local_length) = self(attr, traj, config)
         pred_dict, entire_loss = self.entire_estimate.eval_on_batch(entire_out, attr['time'], config['time_mean'], config['time_std'])
         # get the mean/std of each local path
