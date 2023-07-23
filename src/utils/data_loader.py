@@ -243,7 +243,7 @@ def sequential_collate(batch):
     y_col = "time_calc_s"
     em_cols = ["timeID","weekID"]
     ct_cols = ["x_cent","y_cent","scheduled_time_s","stop_dist_km","stop_x_cent","stop_y_cent","passed_stops_n","bearing","dist_calc_km","dist_calc_km"]
-    y = torch.tensor([b['norm_label_seq'] for b in batch], dtype=torch.float)
+    y = torch.nn.utils.rnn.pad_sequence([torch.tensor(b['norm_label_seq'], dtype=torch.float) for b in batch], batch_first=True)
     batch = [torch.tensor(b['samp'], dtype=torch.float) for b in batch]
     X_sl = torch.tensor([len(b) for b in batch], dtype=torch.int)
     first = torch.cat([b[0,:].unsqueeze(0) for b in batch], axis=0)
@@ -255,7 +255,7 @@ def sequential_collate_nosch(batch):
     y_col = "time_calc_s"
     em_cols = ["timeID","weekID"]
     ct_cols = ["x_cent","y_cent","bearing","dist_calc_km"]
-    y = torch.tensor([b['norm_label_seq'] for b in batch], dtype=torch.float)
+    y = torch.nn.utils.rnn.pad_sequence([torch.tensor(b['norm_label_seq'], dtype=torch.float) for b in batch], batch_first=True)
     batch = [torch.tensor(b['samp'], dtype=torch.float) for b in batch]
     X_sl = torch.tensor([len(b) for b in batch], dtype=torch.int)
     first = torch.cat([b[0,:].unsqueeze(0) for b in batch], axis=0)
@@ -267,7 +267,7 @@ def sequential_grid_collate(batch):
     y_col = "time_calc_s"
     em_cols = ["timeID","weekID"]
     ct_cols = ["x_cent","y_cent","scheduled_time_s","stop_dist_km","stop_x_cent","stop_y_cent","passed_stops_n","bearing","dist_calc_km","dist_calc_km"]
-    y = torch.tensor([b['norm_label_seq'] for b in batch], dtype=torch.float)
+    y = torch.nn.utils.rnn.pad_sequence([torch.tensor(b['norm_label_seq'], dtype=torch.float) for b in batch], batch_first=True)
     batch_ct = [torch.tensor(b['samp'], dtype=torch.float) for b in batch]
     batch_gr = [torch.tensor(b['grid'], dtype=torch.float) for b in batch]
     X_sl = torch.tensor([len(b) for b in batch_ct], dtype=torch.int)
