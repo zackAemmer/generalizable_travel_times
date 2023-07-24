@@ -39,7 +39,9 @@ class Net(nn.Module):
             embed = getattr(self, name + '_em')
             attr_t = attr[name].view(-1, 1)   ### Original is 1D, reshape to 2D
             attr_t = torch.squeeze(embed(attr_t))   ### embed(attr_t) is size [batch, 1, dim_out]
-
+            # The model breaks here if batch size is 1
+            if len(attr_t.shape)==1:
+                attr_t = attr_t.view(1,-1)
             em_list.append(attr_t)
 
         # dist = utils.normalize(attr['dist'], 'dist')   ### Not sure why this is normalised again, alr done in dataloader

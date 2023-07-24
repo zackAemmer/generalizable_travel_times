@@ -67,11 +67,11 @@ def run_models(run_folder, network_folder, **kwargs):
     embed_dict = {
         'timeID': {
             'vocab_size': 1440,
-            'embed_dims': 27
+            'embed_dims': 8
         },
         'weekID': {
             'vocab_size': 7,
-            'embed_dims': 4
+            'embed_dims': 3
         }
     }
     # Sample parameter values for random search
@@ -190,11 +190,11 @@ def run_models(run_folder, network_folder, **kwargs):
                     limit_val_batches=.50,
                     limit_test_batches=.50,
                     check_val_every_n_epoch=2,
-                    max_epochs=50,
-                    min_epochs=10,
+                    max_epochs=2,
+                    min_epochs=1,
                     accelerator="cpu",
                     logger=CSVLogger(save_dir=f"{run_folder}{network_folder}logs/", name=model.model_name),
-                    callbacks=[EarlyStopping(monitor=f"{model.model_name}_valid_loss", min_delta=.01, patience=3)]
+                    callbacks=[EarlyStopping(monitor=f"{model.model_name}_valid_loss", min_delta=.001, patience=3)]
                     # profiler="simple"
                 )
                 trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)

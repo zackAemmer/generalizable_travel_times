@@ -27,6 +27,9 @@ class EntireEstimator(nn.Module):
         self.feature_extract = nn.Linear(hidden_size, 1)
 
     def forward(self, attr_t, sptm_t):
+        # Breaks on batch with 1
+        if len(sptm_t.shape)==1:
+            sptm_t = sptm_t.view(1,-1)
         inputs = torch.cat((attr_t, sptm_t), dim = 1)   ### size [batch, 128 + 28 = 156]
 
         hidden = F.leaky_relu(self.input2hid(inputs))   
@@ -171,6 +174,17 @@ class Net(pl.LightningModule):
         attr = batch[0]
         traj = batch[1]
         config = self.config
+        # Norm
+        for k in list(attr.keys()):
+            try:
+                attr[k] = (attr[k] - self.config[f"{k}_mean"]) / self.config[f"{k}_std"]
+            except:
+                continue
+        for k in list(traj.keys()):
+            try:
+                traj[k] = (traj[k] - self.config[f"{k}_mean"]) / self.config[f"{k}_std"]
+            except:
+                continue
         entire_out = self(attr, traj, config)
         pred_dict, entire_loss = self.entire_estimate.eval_on_batch(entire_out, attr['time'], config['time_mean'], config['time_std'])
         loss = entire_loss
@@ -180,6 +194,17 @@ class Net(pl.LightningModule):
         attr = batch[0]
         traj = batch[1]
         config = self.config
+        # Norm
+        for k in list(attr.keys()):
+            try:
+                attr[k] = (attr[k] - self.config[f"{k}_mean"]) / self.config[f"{k}_std"]
+            except:
+                continue
+        for k in list(traj.keys()):
+            try:
+                traj[k] = (traj[k] - self.config[f"{k}_mean"]) / self.config[f"{k}_std"]
+            except:
+                continue
         entire_out = self(attr, traj, config)
         pred_dict, entire_loss = self.entire_estimate.eval_on_batch(entire_out, attr['time'], config['time_mean'], config['time_std'])
         loss = entire_loss
@@ -188,6 +213,17 @@ class Net(pl.LightningModule):
     def predict_step(self, batch, batch_idx):
         attr = batch[0]
         traj = batch[1]
+        # Norm
+        for k in list(attr.keys()):
+            try:
+                attr[k] = (attr[k] - self.config[f"{k}_mean"]) / self.config[f"{k}_std"]
+            except:
+                continue
+        for k in list(traj.keys()):
+            try:
+                traj[k] = (traj[k] - self.config[f"{k}_mean"]) / self.config[f"{k}_std"]
+            except:
+                continue
         config = self.config
         entire_out = self(attr, traj, config)
         pred_dict, entire_loss = self.entire_estimate.eval_on_batch(entire_out, attr['time'], config['time_mean'], config['time_std'])
