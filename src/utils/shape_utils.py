@@ -153,7 +153,7 @@ def fill_trajectories(df, min_timeID, max_timeID, group_id):
     fill['timeID_s'] = fill['timeID_s'].astype(int)
     return fill
 
-def plot_gtfsrt_trip(ax, trace_df, epsg, gtfs_folder):
+def plot_gtfsrt_trip(ax, trace_df, epsg, gtfs_folder, coord_ref_center):
     """
     Plot a single real-time bus trajectory on a map.
     ax: where to plot
@@ -171,7 +171,7 @@ def plot_gtfsrt_trip(ax, trace_df, epsg, gtfs_folder):
     # Plot observations
     to_plot = trace_df.copy()
     to_plot = geopandas.GeoDataFrame(to_plot, geometry=geopandas.points_from_xy(to_plot.x, to_plot.y), crs=f"EPSG:{epsg}")
-    to_plot_stop = trace_df.iloc[-1:,:]
+    to_plot_stop = trace_df.iloc[-1:,:].copy()
     to_plot_stop = geopandas.GeoDataFrame(to_plot_stop, geometry=geopandas.points_from_xy(to_plot_stop.stop_x, to_plot_stop.stop_y), crs=f"EPSG:{epsg}")
     to_plot.plot(ax=ax, marker='.', color='purple', markersize=20)
     # Plot first/last observations

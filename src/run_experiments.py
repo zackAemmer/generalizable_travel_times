@@ -2,9 +2,11 @@
 
 
 import json
+import shutil
 import random
 import lightning.pytorch as pl
-
+from lightning.pytorch.loggers import CSVLogger
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 
 import numpy as np
 import torch
@@ -22,54 +24,52 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
     print(f"TUNE ON NETWORK: '{tune_network_folder}'")
     print(f"TEST ON NETWORK: '{test_network_folder}'")
 
+    NUM_WORKERS=4
+    PIN_MEMORY=True
+
+    try:
+        shutil.rmtree(f"{run_folder}{train_network_folder}gen_logs/")
+    except:
+        print("Logs folder not found to remove")
+
     # Define embedded variables for network models
     embed_dict = {
         'timeID': {
             'vocab_size': 1440,
-            'embed_dims': 27
+            'embed_dims': 8
         },
         'weekID': {
             'vocab_size': 7,
-            'embed_dims': 4
+            'embed_dims': 3
         }
     }
     hyperparameter_dict = {
         'FF': {
-            'EPOCHS': 2,
-            'BATCH_SIZE': 512,
-            'LEARN_RATE': .001,
-            'HIDDEN_SIZE': 32,
-            'NUM_LAYERS': 2,
-            'DROPOUT_RATE': .1
+            'batch_size': 128,
+            'hidden_size': 128,
+            'num_layers': 2,
+            'dropout_rate': .2
         },
         'CONV': {
-            'EPOCHS': 2,
-            'BATCH_SIZE': 512,
-            'LEARN_RATE': .001,
-            'HIDDEN_SIZE': 32,
-            'NUM_LAYERS': 2,
-            'DROPOUT_RATE': .1
+            'batch_size': 128,
+            'hidden_size': 64,
+            'num_layers': 3,
+            'dropout_rate': .1
         },
         'GRU': {
-            'EPOCHS': 2,
-            'BATCH_SIZE': 512,
-            'LEARN_RATE': .001,
-            'HIDDEN_SIZE': 32,
-            'NUM_LAYERS': 2,
-            'DROPOUT_RATE': .1
+            'batch_size': 128,
+            'hidden_size': 64,
+            'num_layers': 2,
+            'dropout_rate': .05
         },
         'TRSF': {
-            'EPOCHS': 2,
-            'BATCH_SIZE': 512,
-            'LEARN_RATE': .001,
-            'HIDDEN_SIZE': 32,
-            'NUM_LAYERS': 2,
-            'DROPOUT_RATE': .1
+            'batch_size': 128,
+            'hidden_size': 64,
+            'num_layers': 3,
+            'dropout_rate': .1
         },
         'DEEPTTE': {
-            'EPOCHS': 2,
-            'BATCH_SIZE': 512,
-            'LEARN_RATE': .001
+            'batch_size': 10
         }
     }
 
@@ -82,28 +82,28 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
         tune_network_config = json.load(f)
 
     print(f"Building grid on validation data from training network")
-    train_network_dataset = data_loader.BetterGenericDataset(f"{run_folder}{train_network_folder}deeptte_formatted/test", train_network_config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
+    train_network_dataset = data_loader.LoadSliceDataset(f"{run_folder}{train_network_folder}deeptte_formatted/test", train_network_config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
     train_network_ngrid = grids.NGridBetter(train_network_config['grid_bounds'][0],kwargs['grid_s_size'])
     train_network_ngrid.add_grid_content(train_network_dataset.get_all_samples(keep_cols=['shingle_id','locationtime','x','y','speed_m_s','bearing']), trace_format=True)
     train_network_ngrid.build_cell_lookup()
     train_network_dataset.grid = train_network_ngrid
     print(f"Building grid on validation data from testing network")
-    test_network_dataset = data_loader.BetterGenericDataset(f"{run_folder}{test_network_folder}deeptte_formatted/test", test_network_config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
+    test_network_dataset = data_loader.LoadSliceDataset(f"{run_folder}{test_network_folder}deeptte_formatted/test", test_network_config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
     test_network_ngrid = grids.NGridBetter(test_network_config['grid_bounds'][0],kwargs['grid_s_size'])
     test_network_ngrid.add_grid_content(test_network_dataset.get_all_samples(keep_cols=['shingle_id','locationtime','x','y','speed_m_s','bearing']), trace_format=True)
     test_network_ngrid.build_cell_lookup()
     test_network_dataset.grid = test_network_ngrid
     print(f"Building tune grid on training data from testing network")
-    tune_network_dataset = data_loader.BetterGenericDataset(f"{run_folder}{tune_network_folder}deeptte_formatted/train", tune_network_config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
+    tune_network_dataset = data_loader.LoadSliceDataset(f"{run_folder}{tune_network_folder}deeptte_formatted/train", tune_network_config, holdout_routes=kwargs['holdout_routes'], skip_gtfs=kwargs['skip_gtfs'])
     tune_network_ngrid = grids.NGridBetter(tune_network_config['grid_bounds'][0],kwargs['grid_s_size'])
     tune_network_ngrid.add_grid_content(tune_network_dataset.get_all_samples(keep_cols=['shingle_id','locationtime','x','y','speed_m_s','bearing']), trace_format=True)
     tune_network_ngrid.build_cell_lookup()
     tune_network_dataset.grid = tune_network_ngrid
     if not kwargs['skip_gtfs']:
         print(f"Building route holdout grid on validation data from training network")
-        holdout_network_dataset = data_loader.BetterGenericDataset(f"{run_folder}{train_network_folder}deeptte_formatted/test", train_network_config, holdout_routes=kwargs['holdout_routes'], keep_only_holdout=True, skip_gtfs=kwargs['skip_gtfs'])
+        holdout_network_dataset = data_loader.LoadSliceDataset(f"{run_folder}{train_network_folder}deeptte_formatted/test", train_network_config, holdout_routes=kwargs['holdout_routes'], keep_only_holdout=True, skip_gtfs=kwargs['skip_gtfs'])
         holdout_network_ngrid = grids.NGridBetter(train_network_config['grid_bounds'][0],kwargs['grid_s_size'])
-        holdout_network_ngrid.add_grid_content(holdout_network_dataset.get_all_samples(keep_cols=['shingle_id','locationtime','x','y','speed_m_s','bearing']), trace_format=True)
+        holdout_network_ngrid.add_grid_content(train_network_dataset.get_all_samples(keep_cols=['shingle_id','locationtime','x','y','speed_m_s','bearing']), trace_format=True)
         holdout_network_ngrid.build_cell_lookup()
         holdout_network_dataset.grid = holdout_network_ngrid
 
@@ -113,13 +113,6 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
     for fold_num in range(kwargs['n_folds']):
         print("="*30)
         print(f"BEGIN FOLD: {fold_num}")
-
-        # # Random samplers for indices from this fold
-        # train_network_sampler = SubsetRandomSampler(np.arange(len(train_network_dataset)))
-        # test_network_sampler = SubsetRandomSampler(np.arange(len(test_network_dataset)))
-        # tune_network_sampler = SubsetRandomSampler(np.arange(len(tune_network_dataset)))
-        # if not kwargs['skip_gtfs']:
-        #     holdout_network_sampler = SubsetRandomSampler(np.arange(len(holdout_network_dataset)))
 
         # Declare models
         if not kwargs['skip_gtfs']:
@@ -143,133 +136,134 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 "Tune_Train_Labels":[],
                 "Tune_Train_Preds":[],
                 "Tune_Test_Labels":[],
-                "Tune_Test_Preds":[],
-                "Extract_Train_Labels":[],
-                "Extract_Train_Preds":[],
-                "Extract_Test_Labels":[],
-                "Extract_Test_Preds":[]
+                "Tune_Test_Preds":[]
             }
 
         print(f"EXPERIMENT: SAME NETWORK")
         print(f"Evaluating {run_folder}{train_network_folder} on {train_network_folder}")
         for model in model_list:
-            print(f"Evaluating: {model.model_name}")
-            train_network_dataset.add_grid_features = model.requires_grid
-            loader = DataLoader(train_network_dataset, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True)
-            trainer = pl.Trainer(
-                max_epochs=2,
-                limit_train_batches=5,
-                limit_val_batches=5,
-                limit_test_batches=5,
-            )
-            labels, preds = trainer.predict(model=model, dataloaders=loader)
-            # labels, preds = model.evaluate(loader, train_network_config)
-            model_fold_results[model.model_name]["Train_Labels"].extend(list(labels))
-            model_fold_results[model.model_name]["Train_Preds"].extend(list(preds))
+            print(f"Network {train_network_folder} Fold {fold_num} Model {model.model_name}")
+            if not model.is_nn:
+                train_network_dataset.add_grid_features = model.requires_grid
+                loader = DataLoader(train_network_dataset, collate_fn=model.collate_fn, batch_size=model.batch_size, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
+                labels, preds = model.evaluate(loader, train_network_config)
+                model_fold_results[model.model_name]["Train_Labels"].extend(list(labels))
+                model_fold_results[model.model_name]["Train_Preds"].extend(list(preds))
+            else:
+                train_network_dataset.add_grid_features = model.requires_grid
+                loader = DataLoader(train_network_dataset, collate_fn=model.collate_fn, batch_size=model.batch_size, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
+                trainer = pl.Trainer(
+                    limit_predict_batches=.20,
+                    logger=CSVLogger(save_dir=f"{run_folder}{train_network_folder}gen_logs/", name=f"{model.model_name}_SAME"),
+                )
+                preds_and_labels = trainer.predict(model=model, dataloaders=loader)
+                preds = np.concatenate([p[0] for p in preds_and_labels])
+                labels = np.concatenate([l[1] for l in preds_and_labels])
+                model_fold_results[model.model_name]["Train_Labels"].extend(list(labels))
+                model_fold_results[model.model_name]["Train_Preds"].extend(list(preds))
 
         print(f"EXPERIMENT: DIFFERENT NETWORK")
         print(f"Evaluating {run_folder}{train_network_folder} on {test_network_folder}")
         for model in model_list:
-            print(f"Evaluating: {model.model_name}")
-            test_network_dataset.add_grid_features = model.requires_grid
-            loader = DataLoader(test_network_dataset, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True)
-            trainer = pl.Trainer(
-                max_epochs=2,
-                limit_train_batches=5,
-                limit_val_batches=5,
-                limit_test_batches=5,
-            )
-            labels, preds = trainer.predict(model=model, dataloaders=loader)
-            # labels, preds = model.evaluate(loader, test_network_config)
-            model_fold_results[model.model_name]["Test_Labels"].extend(list(labels))
-            model_fold_results[model.model_name]["Test_Preds"].extend(list(preds))
+            print(f"Network {train_network_folder} Fold {fold_num} Model {model.model_name}")
+            if not model.is_nn:
+                test_network_dataset.add_grid_features = model.requires_grid
+                loader = DataLoader(test_network_dataset, collate_fn=model.collate_fn, batch_size=model.batch_size, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
+                labels, preds = model.evaluate(loader, train_network_config)
+                model_fold_results[model.model_name]["Test_Labels"].extend(list(labels))
+                model_fold_results[model.model_name]["Test_Preds"].extend(list(preds))
+            else:
+                test_network_dataset.add_grid_features = model.requires_grid
+                loader = DataLoader(test_network_dataset, collate_fn=model.collate_fn, batch_size=model.batch_size, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
+                trainer = pl.Trainer(
+                    limit_predict_batches=.20,
+                    logger=CSVLogger(save_dir=f"{run_folder}{train_network_folder}gen_logs/", name=f"{model.model_name}_DIFF"),
+                )
+                preds_and_labels = trainer.predict(model=model, dataloaders=loader)
+                preds = np.concatenate([p[0] for p in preds_and_labels])
+                labels = np.concatenate([l[1] for l in preds_and_labels])
+                model_fold_results[model.model_name]["Test_Labels"].extend(list(labels))
+                model_fold_results[model.model_name]["Test_Preds"].extend(list(preds))
 
         if not kwargs['skip_gtfs']:
             print(f"EXPERIMENT: HOLDOUT ROUTES")
             print(f"Evaluating {run_folder}{train_network_folder} on holdout routes from {train_network_folder}")
             for model in model_list:
-                print(f"Evaluating: {model.model_name}")
-                holdout_network_dataset.add_grid_features = model.requires_grid
-                loader = DataLoader(holdout_network_dataset, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True)
-                trainer = pl.Trainer(
-                    max_epochs=2,
-                    limit_train_batches=5,
-                    limit_val_batches=5,
-                    limit_test_batches=5,
-                )
-                labels, preds = trainer.predict(model=model, dataloaders=loader)
-                # labels, preds = model.evaluate(loader, train_network_config)
-                model_fold_results[model.model_name]["Holdout_Labels"].extend(list(labels))
-                model_fold_results[model.model_name]["Holdout_Preds"].extend(list(preds))
+                print(f"Network {train_network_folder} Fold {fold_num} Model {model.model_name}")
+                if not model.is_nn:
+                    holdout_network_dataset.add_grid_features = model.requires_grid
+                    loader = DataLoader(holdout_network_dataset, collate_fn=model.collate_fn, batch_size=model.batch_size, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
+                    labels, preds = model.evaluate(loader, train_network_config)
+                    model_fold_results[model.model_name]["Holdout_Labels"].extend(list(labels))
+                    model_fold_results[model.model_name]["Holdout_Preds"].extend(list(preds))
+                else:
+                    holdout_network_dataset.add_grid_features = model.requires_grid
+                    loader = DataLoader(holdout_network_dataset, collate_fn=model.collate_fn, batch_size=model.batch_size, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
+                    trainer = pl.Trainer(
+                        limit_predict_batches=.20,
+                        logger=CSVLogger(save_dir=f"{run_folder}{train_network_folder}gen_logs/", name=f"{model.model_name}_HOLD"),
+                    )
+                    preds_and_labels = trainer.predict(model=model, dataloaders=loader)
+                    preds = np.concatenate([p[0] for p in preds_and_labels])
+                    labels = np.concatenate([l[1] for l in preds_and_labels])
+                    model_fold_results[model.model_name]["Holdout_Labels"].extend(list(labels))
+                    model_fold_results[model.model_name]["Holdout_Preds"].extend(list(preds))
 
             print(f"EXPERIMENT: FINE TUNING")
             # Re-declare models with original weights
-            model_list = model_utils.make_all_models(hyperparameter_dict, embed_dict, device, train_network_config, load_weights=True, weight_folder=f"{run_folder}{train_network_folder}models/", fold_num=fold_num)
+            model_list = model_utils.make_all_models(hyperparameter_dict, embed_dict, train_network_config, load_weights=True, weight_folder=f"{run_folder}{train_network_folder}models/", fold_num=fold_num)
             # Tune model on tuning network
             for model in model_list:
-                print(f"Tuning model {model.model_name} on {tune_network_folder}")
-                tune_network_dataset.add_grid_features = model.requires_grid
-                loader = DataLoader(tune_network_dataset, sampler=tune_network_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True)
+                print(f"Network {train_network_folder} Fold {fold_num} Model {model.model_name}")
                 if not model.is_nn:
+                    tune_network_dataset.add_grid_features = model.requires_grid
+                    loader = DataLoader(tune_network_dataset, collate_fn=model.collate_fn, batch_size=model.batch_size, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
                     model.train(loader, train_network_config)
+                    print(f"Evaluating model {model.model_name} on {train_network_folder}")
+                    train_network_dataset.add_grid_features = model.requires_grid
+                    loader = DataLoader(train_network_dataset, collate_fn=model.collate_fn, batch_size=model.batch_size, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
+                    labels, preds = model.evaluate(loader, train_network_config)
+                    model_fold_results[model.model_name]["Tune_Train_Labels"].extend(list(labels))
+                    model_fold_results[model.model_name]["Tune_Train_Preds"].extend(list(preds))
+                    print(f"Evaluating model {model.model_name} on {test_network_folder}")
+                    test_network_dataset.add_grid_features = model.requires_grid
+                    loader = DataLoader(test_network_dataset, collate_fn=model.collate_fn, batch_size=model.batch_size, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
+                    labels, preds = model.evaluate(loader, test_network_config)
+                    model_fold_results[model.model_name]["Tune_Test_Labels"].extend(list(labels))
+                    model_fold_results[model.model_name]["Tune_Test_Preds"].extend(list(preds))
                 else:
-                    optimizer = torch.optim.Adam(model.parameters(), lr=model.hyperparameter_dict['LEARN_RATE'])
-                    for epoch in range(kwargs['TUNE_EPOCHS']):
-                        avg_batch_loss = model_utils.train(model, loader, optimizer)
-            # Evaluate models on train/test networks
-            for model in model_list:
-                train_network_dataset.add_grid_features = model.requires_grid
-                loader = DataLoader(train_network_dataset, sampler=train_network_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True)
-                labels, preds = model.evaluate(loader, train_network_config)
-                model_fold_results[model.model_name]["Tune_Train_Labels"].extend(list(labels))
-                model_fold_results[model.model_name]["Tune_Train_Preds"].extend(list(preds))
-            for model in model_list:
-                test_network_dataset.add_grid_features = model.requires_grid
-                loader = DataLoader(test_network_dataset, sampler=test_network_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True)
-                labels, preds = model.evaluate(loader, test_network_config)
-                model_fold_results[model.model_name]["Tune_Test_Labels"].extend(list(labels))
-                model_fold_results[model.model_name]["Tune_Test_Preds"].extend(list(preds))
+                    tune_network_dataset.add_grid_features = model.requires_grid
+                    loader = DataLoader(tune_network_dataset, collate_fn=model.collate_fn, batch_size=model.batch_size, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
+                    trainer = pl.Trainer(
+                        limit_predict_batches=.20,
+                        check_val_every_n_epoch=2,
+                        max_epochs=kwargs['TUNE_EPOCHS'],
+                        min_epochs=1,
+                        logger=CSVLogger(save_dir=f"{run_folder}{train_network_folder}gen_logs/", name=f"{model.model_name}_TUNE"),
+                        callbacks=[EarlyStopping(monitor=f"{model.model_name}_valid_loss", min_delta=.001, patience=3)]
+                    )
+                    trainer.fit(model=model, train_dataloaders=loader)
+                    print(f"Evaluating model {model.model_name} on {train_network_folder}")
+                    train_network_dataset.add_grid_features = model.requires_grid
+                    loader = DataLoader(train_network_dataset, collate_fn=model.collate_fn, batch_size=model.batch_size, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
+                    preds_and_labels = trainer.predict(model=model, dataloaders=loader)
+                    preds = np.concatenate([p[0] for p in preds_and_labels])
+                    labels = np.concatenate([l[1] for l in preds_and_labels])
+                    model_fold_results[model.model_name]["Tune_Train_Labels"].extend(list(labels))
+                    model_fold_results[model.model_name]["Tune_Train_Preds"].extend(list(preds))
+                    print(f"Evaluating model {model.model_name} on {test_network_folder}")
+                    test_network_dataset.add_grid_features = model.requires_grid
+                    loader = DataLoader(test_network_dataset, collate_fn=model.collate_fn, batch_size=model.batch_size, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
+                    preds_and_labels = trainer.predict(model=model, dataloaders=loader)
+                    preds = np.concatenate([p[0] for p in preds_and_labels])
+                    labels = np.concatenate([l[1] for l in preds_and_labels])
+                    model_fold_results[model.model_name]["Tune_Test_Labels"].extend(list(labels))
+                    model_fold_results[model.model_name]["Tune_Test_Preds"].extend(list(preds))
             # Save tuned models
             print(f"Fold {fold_num} fine tuning complete, saving model states and metrics...")
             for model in model_list:
                 if model.is_nn:
-                    torch.save(model.state_dict(), f"{run_folder}{train_network_folder}models/{model.model_name}_tuned_{fold_num}.pt")
-                else:
-                    model.save_to(f"{run_folder}{train_network_folder}models/{model.model_name}_tuned_{fold_num}.pkl")
-
-            print(f"EXPERIMENT: FEATURE EXTRACTION")
-            # Re-declare models with original weights
-            model_list = model_utils.make_all_models(hyperparameter_dict, embed_dict, device, train_network_config, load_weights=True, weight_folder=f"{run_folder}{train_network_folder}models/", fold_num=fold_num)
-            # Tune model on tuning network
-            for model in model_list:
-                print(f"Tuning model {model.model_name} on {tune_network_folder}")
-                tune_network_dataset.add_grid_features = model.requires_grid
-                loader = DataLoader(tune_network_dataset, sampler=tune_network_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True)
-                if not model.is_nn:
-                    model.train(loader, train_network_config)
-                else:
-                    # Set only the final layer to train
-                    model_utils.set_feature_extraction(model)
-                    optimizer = torch.optim.Adam(model.parameters(), lr=model.hyperparameter_dict['LEARN_RATE'])
-                    for epoch in range(kwargs['TUNE_EPOCHS']):
-                        avg_batch_loss = model_utils.train(model, loader, optimizer)
-            # Evaluate models on train/test networks
-            for model in model_list:
-                train_network_dataset.add_grid_features = model.requires_grid
-                loader = DataLoader(train_network_dataset, sampler=train_network_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True)
-                labels, preds = model.evaluate(loader, train_network_config)
-                model_fold_results[model.model_name]["Extract_Train_Labels"].extend(list(labels))
-                model_fold_results[model.model_name]["Extract_Train_Preds"].extend(list(preds))
-            for model in model_list:
-                test_network_dataset.add_grid_features = model.requires_grid
-                loader = DataLoader(test_network_dataset, sampler=test_network_sampler, collate_fn=model.collate_fn, batch_size=int(model.hyperparameter_dict['BATCH_SIZE']), drop_last=True)
-                labels, preds = model.evaluate(loader, test_network_config)
-                model_fold_results[model.model_name]["Extract_Test_Labels"].extend(list(labels))
-                model_fold_results[model.model_name]["Extract_Test_Preds"].extend(list(preds))
-            # Save tuned models
-            print(f"Fold {fold_num} fine tuning complete, saving model states and metrics...")
-            for model in model_list:
-                if model.is_nn:
+                    continue
                     torch.save(model.state_dict(), f"{run_folder}{train_network_folder}models/{model.model_name}_tuned_{fold_num}.pt")
                 else:
                     model.save_to(f"{run_folder}{train_network_folder}models/{model.model_name}_tuned_{fold_num}.pkl")
@@ -313,16 +307,6 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Tune_Test_Labels"], model_fold_results[mname]["Tune_Test_Preds"])), 2))
                 _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Tune_Test_Labels"], model_fold_results[mname]["Tune_Test_Preds"]), 2))
                 fold_results['Tune_Test_Losses'].append(_)
-                _ = [mname]
-                _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Extract_Train_Labels"], model_fold_results[mname]["Extract_Train_Preds"]), 2))
-                _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Extract_Train_Labels"], model_fold_results[mname]["Extract_Train_Preds"])), 2))
-                _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Extract_Train_Labels"], model_fold_results[mname]["Extract_Train_Preds"]), 2))
-                fold_results['Extract_Train_Losses'].append(_)
-                _ = [mname]
-                _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Extract_Test_Labels"], model_fold_results[mname]["Extract_Test_Preds"]), 2))
-                _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Extract_Test_Labels"], model_fold_results[mname]["Extract_Test_Preds"])), 2))
-                _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Extract_Test_Labels"], model_fold_results[mname]["Extract_Test_Preds"]), 2))
-                fold_results['Extract_Test_Losses'].append(_)
 
         # Save fold
         run_results.append(fold_results)
@@ -362,55 +346,29 @@ if __name__=="__main__":
         holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
         skip_gtfs=False
     )
-    # DEBUG MIXED
-    run_experiments(
-        run_folder="./results/debug_nosch/",
-        train_network_folder="kcm_atb/",
-        test_network_folder="rut/",
-        tune_network_folder="rut/",
-        TUNE_EPOCHS=2,
-        grid_s_size=500,
-        n_tune_samples=100,
-        n_folds=2,
-        holdout_routes=None,
-        skip_gtfs=True
-    )
 
-    # FULL RUN
-    run_experiments(
-        run_folder="./results/full_run/",
-        train_network_folder="kcm/",
-        test_network_folder="atb/",
-        tune_network_folder="atb/",
-        TUNE_EPOCHS=2,
-        grid_s_size=500,
-        n_tune_samples=100,
-        n_folds=2,
-        holdout_routes=[100252,100139,102581,100341,102720],
-        skip_gtfs=False
-    )
-    run_experiments(
-        run_folder="./results/full_run/",
-        train_network_folder="atb/",
-        test_network_folder="kcm/",
-        tune_network_folder="kcm/",
-        TUNE_EPOCHS=2,
-        grid_s_size=500,
-        n_tune_samples=100,
-        n_folds=2,
-        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
-        skip_gtfs=False
-    )
-    # FULL RUN MIXED
-    run_experiments(
-        run_folder="./results/full_run_nosch/",
-        train_network_folder="kcm_atb/",
-        test_network_folder="rut/",
-        tune_network_folder="rut/",
-        TUNE_EPOCHS=2,
-        grid_s_size=500,
-        n_tune_samples=100,
-        n_folds=2,
-        holdout_routes=None,
-        skip_gtfs=True
-    )
+    # # FULL RUN
+    # run_experiments(
+    #     run_folder="./results/full_run/",
+    #     train_network_folder="kcm/",
+    #     test_network_folder="atb/",
+    #     tune_network_folder="atb/",
+    #     TUNE_EPOCHS=5,
+    #     grid_s_size=500,
+    #     n_tune_samples=100,
+    #     n_folds=5,
+    #     holdout_routes=[100252,100139,102581,100341,102720],
+    #     skip_gtfs=False
+    # )
+    # run_experiments(
+    #     run_folder="./results/full_run/",
+    #     train_network_folder="atb/",
+    #     test_network_folder="kcm/",
+    #     tune_network_folder="kcm/",
+    #     TUNE_EPOCHS=5,
+    #     grid_s_size=500,
+    #     n_tune_samples=100,
+    #     n_folds=5,
+    #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
+    #     skip_gtfs=False
+    # )

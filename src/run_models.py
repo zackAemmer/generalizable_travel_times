@@ -10,9 +10,9 @@ import time
 import lightning.pytorch as pl
 import numpy as np
 import torch
+from tabulate import tabulate
 from lightning.pytorch.loggers import CSVLogger
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
-from lightning.pytorch.tuner import Tuner
 from sklearn import metrics
 from sklearn.model_selection import KFold
 from torch.utils.data import DataLoader, SubsetRandomSampler
@@ -179,6 +179,7 @@ def run_models(run_folder, network_folder, **kwargs):
             test_loader = DataLoader(test_dataset, batch_size=model.batch_size, collate_fn=model.collate_fn, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
             if not model.is_nn:
                 # Train base model on all fold data
+                model.train_time = 0.0
                 model.train(train_loader, config)
                 print(f"Fold final evaluation for: {model.model_name}")
                 labels, preds = model.evaluate(test_loader, config)
@@ -186,6 +187,7 @@ def run_models(run_folder, network_folder, **kwargs):
                 model_fold_results[model.model_name]["Preds"].extend(list(preds))
                 data_utils.write_pkl(model, f"{base_folder}models/{model.model_name}_{fold_num}.pkl")
             else:
+                t0=time.time()
                 trainer = pl.Trainer(
                     limit_val_batches=.50,
                     limit_test_batches=.50,
@@ -198,6 +200,7 @@ def run_models(run_folder, network_folder, **kwargs):
                     # profiler="simple"
                 )
                 trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
+                model.train_time = time.time() - t0
                 trainer.test(model=model, dataloaders=test_loader)
                 preds_and_labels = trainer.predict(model=model, dataloaders=test_loader)
                 preds = np.concatenate([p[0] for p in preds_and_labels])
@@ -205,8 +208,25 @@ def run_models(run_folder, network_folder, **kwargs):
                 model_fold_results[model.model_name]["Labels"].extend(list(labels))
                 model_fold_results[model.model_name]["Preds"].extend(list(preds))
 
-        # Save fold results
-        run_results.append(model_fold_results)
+        # After all models have trained for this fold, calculate various losses
+        train_times = [x.train_time for x in model_list]
+        fold_results = {
+            "Model_Names": model_names,
+            "Fold": fold_num,
+            "All_Losses": [],
+            "Train_Times": train_times
+        }
+        for mname in fold_results["Model_Names"]:
+            _ = [mname]
+            _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Labels"], model_fold_results[mname]["Preds"]), 2))
+            _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Labels"], model_fold_results[mname]["Preds"])), 2))
+            _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Labels"], model_fold_results[mname]["Preds"]), 2))
+            fold_results['All_Losses'].append(_)
+
+        # Print results of this fold
+        print(tabulate(fold_results['All_Losses'], headers=["Model", "MAPE", "RMSE", "MAE"]))
+        run_results.append(fold_results)
+        data_utils.write_pkl(run_results, f"{base_folder}model_results_temp.pkl")
 
     # Save full run results
     data_utils.write_pkl(run_results, f"{base_folder}model_results.pkl")
@@ -218,35 +238,35 @@ if __name__=="__main__":
     torch.set_float32_matmul_precision('medium')
     pl.seed_everything(42, workers=True)
 
-    # # DEBUG
-    # run_models(
-    #     run_folder="./results/debug/",
-    #     network_folder="kcm/",
-    #     grid_s_size=500,
-    #     n_folds=2,
-    #     holdout_routes=[100252,100139,102581,100341,102720],
-    #     skip_gtfs=False,
-    #     is_param_search=False
-    # )
-    # run_models(
-    #     run_folder="./results/debug/",
-    #     network_folder="atb/",
-    #     grid_s_size=500,
-    #     n_folds=2,
-    #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
-    #     skip_gtfs=False,
-    #     is_param_search=False
-    # )
-    # # DEBUG MIXED
-    # run_models(
-    #     run_folder="./results/debug_nosch/",
-    #     network_folder="kcm_atb/",
-    #     grid_s_size=500,
-    #     n_folds=2,
-    #     holdout_routes=None,
-    #     skip_gtfs=True,
-    #     is_param_search=False
-    # )
+    # DEBUG
+    run_models(
+        run_folder="./results/debug/",
+        network_folder="kcm/",
+        grid_s_size=500,
+        n_folds=2,
+        holdout_routes=[100252,100139,102581,100341,102720],
+        skip_gtfs=False,
+        is_param_search=False
+    )
+    run_models(
+        run_folder="./results/debug/",
+        network_folder="atb/",
+        grid_s_size=500,
+        n_folds=2,
+        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
+        skip_gtfs=False,
+        is_param_search=False
+    )
+    # DEBUG MIXED
+    run_models(
+        run_folder="./results/debug_nosch/",
+        network_folder="kcm_atb/",
+        grid_s_size=500,
+        n_folds=2,
+        holdout_routes=None,
+        skip_gtfs=True,
+        is_param_search=False
+    )
 
     # # PARAM SEARCH
     # run_models(
@@ -268,32 +288,32 @@ if __name__=="__main__":
     #     is_param_search=True
     # )
 
-    # FULL RUN
-    run_models(
-        run_folder="./results/full_run/",
-        network_folder="kcm/",
-        grid_s_size=500,
-        n_folds=5,
-        holdout_routes=[100252,100139,102581,100341,102720],
-        skip_gtfs=False,
-        is_param_search=False
-    )
-    run_models(
-        run_folder="./results/full_run/",
-        network_folder="atb/",
-        grid_s_size=500,
-        n_folds=5,
-        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
-        skip_gtfs=False,
-        is_param_search=False
-    )
-    # FULL RUN MIXED
-    run_models(
-        run_folder="./results/full_run_nosch/",
-        network_folder="kcm_atb/",
-        grid_s_size=500,
-        n_folds=5,
-        holdout_routes=None,
-        skip_gtfs=True,
-        is_param_search=False
-    )
+    # # FULL RUN
+    # run_models(
+    #     run_folder="./results/full_run/",
+    #     network_folder="kcm/",
+    #     grid_s_size=500,
+    #     n_folds=5,
+    #     holdout_routes=[100252,100139,102581,100341,102720],
+    #     skip_gtfs=False,
+    #     is_param_search=False
+    # )
+    # run_models(
+    #     run_folder="./results/full_run/",
+    #     network_folder="atb/",
+    #     grid_s_size=500,
+    #     n_folds=5,
+    #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
+    #     skip_gtfs=False,
+    #     is_param_search=False
+    # )
+    # # FULL RUN MIXED
+    # run_models(
+    #     run_folder="./results/full_run_nosch/",
+    #     network_folder="kcm_atb/",
+    #     grid_s_size=500,
+    #     n_folds=5,
+    #     holdout_routes=None,
+    #     skip_gtfs=True,
+    #     is_param_search=False
+    # )

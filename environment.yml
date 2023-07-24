@@ -20,4 +20,5 @@ dependencies:
   - python-dotenv
   - seaborn
   - shapely
+  - tabulate
 prefix: /home/zack/miniconda3/envs/valle_ltn

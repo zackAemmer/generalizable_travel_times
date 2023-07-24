@@ -19,7 +19,7 @@ from statsmodels.stats.weightstats import DescrStatsW
 import torch
 
 from models import grids
-from utils import shape_utils
+from utils import shape_utils, data_loader
 
 
 # Set of unified feature names and dtypes for variables in the GTFS-RT data
@@ -126,14 +126,31 @@ def get_date_list(start, n_days):
     date_list = [base + timedelta(days=x) for x in range(n_days)]
     return [f"{date.strftime('%Y_%m_%d')}.pkl" for date in date_list]
 
-# def load_all_inputs(run_folder, network_folder):
-#     with open(f"{run_folder}{network_folder}/deeptte_formatted/train_config.json") as f:
-#         config = json.load(f)
-#     train_traces = ds.dataset(f"{run_folder}{network_folder}/deeptte_formatted/train", format="parquet")
-#     return {
-#         "config": config,
-#         "train_traces": train_traces.to_table().to_pandas(),
-#     }
+def load_all_inputs(run_folder, network_folder):
+    with open(f"{run_folder}{network_folder}/deeptte_formatted/train_summary_config.json") as f:
+        summary_config = json.load(f)
+    with open(f"{run_folder}{network_folder}/deeptte_formatted/train_shingle_config.json") as f:
+        shingle_config = json.load(f)
+    train_dataset = data_loader.LoadSliceDataset(f"{run_folder}{network_folder}deeptte_formatted/train", summary_config)
+    train_traces = train_dataset.get_all_samples(data_loader.FEATURE_COLS)
+    # Need to invert the dictionary to go from shingle -> values
+    # Dict is set up for index -> shingle
+    vals = list(shingle_config.values())
+    vals = [v['shingle_id'] for v in vals]
+    indexes = list(shingle_config.keys())
+    mapping_dict = dict(zip(vals, indexes))
+    files = [shingle_config[mapping_dict[i]]['file'] for i in train_traces.shingle_id.values]
+    trip_ids = [shingle_config[mapping_dict[i]]['trip_id'] for i in train_traces.shingle_id.values]
+    train_traces['file'] = files
+    train_traces['trip_id'] = trip_ids
+    # Add back correct stop coords
+    train_traces['stop_x'] = train_traces['stop_x_cent'] + summary_config['coord_ref_center'][0][0]
+    train_traces['stop_y'] = train_traces['stop_y_cent'] + summary_config['coord_ref_center'][0][1]
+    return {
+        "summary_config": summary_config,
+        "shingle_config": shingle_config,
+        "train_traces": train_traces
+    }
 
 def combine_config_files(cfg_folder, n_save_files, train_or_test):
     temp = []
@@ -759,7 +776,7 @@ def extract_lightning_results(base_folder, city_name):
     result_df = pd.concat(all_data, axis=0)
     return result_df
 
-def extract_results(city, model_results):
+def extract_results(model_results, city):
     # Extract metric results
     fold_results = [x['All_Losses'] for x in model_results]
     cities = []
@@ -819,7 +836,7 @@ def extract_results(city, model_results):
 def extract_gen_results(city, gen_results):
     # Extract generalization results
     res = []
-    experiments = ["Train_Losses","Test_Losses","Holdout_Losses","Tune_Train_Losses","Tune_Test_Losses","Extract_Train_Losses","Extract_Test_Losses"]
+    experiments = ["Train_Losses","Test_Losses","Holdout_Losses","Tune_Train_Losses","Tune_Test_Losses"]
     for ex in experiments:
         fold_results = [x[ex] for x in gen_results]
         cities = []
@@ -886,18 +903,23 @@ def aggregate_tts(tts, mask, drop_first=True):
     total_tts = np.sum(masked_tts, axis=1)
     return total_tts
 
-def get_dataset_stats(data_folder, given_names):
+def get_dataset_stats(data_folder, given_names, file_sample_size):
     stats = {}
     file_list = os.listdir(data_folder)
     stats["num_days"] = len(file_list)
     stats["start_day"] = min(file_list)
     stats["end_day"] = max(file_list)
+    sub_file_list = sample(file_list, file_sample_size)
     stats["num_obs"] = 0
     stats["num_traj"] = 0
-    for pkl_file in file_list:
+    for pkl_file in sub_file_list:
         data, _ = combine_pkl_data(data_folder, [pkl_file], given_names)
         stats["num_obs"] += len(data)
         stats["num_traj"] += len(np.unique(data.trip_id))
+    stats["num_obs"] = stats["num_obs"] / file_sample_size
+    stats["num_obs"] = stats["num_obs"] * len(file_list)
+    stats["num_traj"] = stats["num_traj"] / file_sample_size
+    stats["num_traj"] = stats["num_traj"] * len(file_list)
     return stats
 
 def create_grid_of_shingles(point_resolution, grid_bounds, coord_ref_center):
