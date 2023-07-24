@@ -334,11 +334,10 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
 
 if __name__=="__main__":
     torch.set_default_dtype(torch.float)
+    torch.set_float32_matmul_precision('medium')
+    pl.seed_everything(42, workers=True)
 
     # DEBUG
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
     run_experiments(
         run_folder="./results/debug/",
         train_network_folder="kcm/",
@@ -351,9 +350,6 @@ if __name__=="__main__":
         holdout_routes=[100252,100139,102581,100341,102720],
         skip_gtfs=False
     )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
     run_experiments(
         run_folder="./results/debug/",
         train_network_folder="atb/",
@@ -367,11 +363,47 @@ if __name__=="__main__":
         skip_gtfs=False
     )
     # DEBUG MIXED
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
     run_experiments(
         run_folder="./results/debug_nosch/",
+        train_network_folder="kcm_atb/",
+        test_network_folder="rut/",
+        tune_network_folder="rut/",
+        TUNE_EPOCHS=2,
+        grid_s_size=500,
+        n_tune_samples=100,
+        n_folds=2,
+        holdout_routes=None,
+        skip_gtfs=True
+    )
+
+    # FULL RUN
+    run_experiments(
+        run_folder="./results/full_run/",
+        train_network_folder="kcm/",
+        test_network_folder="atb/",
+        tune_network_folder="atb/",
+        TUNE_EPOCHS=2,
+        grid_s_size=500,
+        n_tune_samples=100,
+        n_folds=2,
+        holdout_routes=[100252,100139,102581,100341,102720],
+        skip_gtfs=False
+    )
+    run_experiments(
+        run_folder="./results/full_run/",
+        train_network_folder="atb/",
+        test_network_folder="kcm/",
+        tune_network_folder="kcm/",
+        TUNE_EPOCHS=2,
+        grid_s_size=500,
+        n_tune_samples=100,
+        n_folds=2,
+        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
+        skip_gtfs=False
+    )
+    # FULL RUN MIXED
+    run_experiments(
+        run_folder="./results/full_run_nosch/",
         train_network_folder="kcm_atb/",
         test_network_folder="rut/",
         tune_network_folder="rut/",

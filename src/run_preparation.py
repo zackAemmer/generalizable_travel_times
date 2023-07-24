@@ -7,6 +7,7 @@ import random
 import shutil
 
 import h5py
+import lightning.pytorch as pl
 import numpy as np
 import torch
 from joblib import Parallel, delayed
@@ -190,11 +191,11 @@ def prepare_run(overwrite, run_name, network_name, train_dates, test_dates, **kw
     print(f"RUN PREPARATION COMPLETED '{run_name}/{network_name}'")
 
 if __name__=="__main__":
+    torch.set_default_dtype(torch.float)
+    torch.set_float32_matmul_precision('medium')
+    pl.seed_everything(42, workers=True)
 
     # # DEBUG
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
     # prepare_run(
     #     overwrite=True,
     #     run_name="debug",
@@ -213,9 +214,6 @@ if __name__=="__main__":
     #     given_names=[['trip_id','file','locationtime','lat','lon','vehicle_id']],
     #     skip_gtfs=False
     # )
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
     # prepare_run(
     #     overwrite=True,
     #     run_name="debug",
@@ -235,9 +233,6 @@ if __name__=="__main__":
     #     skip_gtfs=False
     # )
     # # DEBUG MIXED
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
     # prepare_run(
     #     overwrite=True,
     #     run_name="debug_nosch",
@@ -256,9 +251,6 @@ if __name__=="__main__":
     #     given_names=[['trip_id','file','locationtime','lat','lon','vehicle_id'],['trip_id','file','locationtime','lat','lon','vehicle_id']],
     #     skip_gtfs=True
     # )
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
     # prepare_run(
     #     overwrite=True,
     #     run_name="debug_nosch",
@@ -279,9 +271,6 @@ if __name__=="__main__":
     # )
 
     # # PARAM SEARCH
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
     # prepare_run(
     #     overwrite=True,
     #     run_name="param_search",
@@ -300,9 +289,6 @@ if __name__=="__main__":
     #     given_names=[['trip_id','file','locationtime','lat','lon','vehicle_id']],
     #     skip_gtfs=False
     # )
-    # random.seed(0)
-    # np.random.seed(0)
-    # torch.manual_seed(0)
     # prepare_run(
     #     overwrite=True,
     #     run_name="param_search",
@@ -322,15 +308,87 @@ if __name__=="__main__":
     #     skip_gtfs=False
     # )
 
-    # FULL RUN
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
+    # # FULL RUN
+    # prepare_run(
+    #     overwrite=True,
+    #     run_name="full_run",
+    #     network_name=["kcm"],
+    #     train_dates=data_utils.get_date_list("2023_02_15", 30),
+    #     test_dates=data_utils.get_date_list("2023_04_01", 7),
+    #     n_workers=2,
+    #     n_jobs=8,
+    #     data_dropout=0.2,
+    #     gtfs_folder=["./data/kcm_gtfs/"],
+    #     raw_data_folder=["./data/kcm_all_new/"],
+    #     timezone=["America/Los_Angeles"],
+    #     epsg=["32148"],
+    #     grid_bounds=[[369903,37911,409618,87758]],
+    #     coord_ref_center=[[386910,69022]],
+    #     given_names=[['trip_id','file','locationtime','lat','lon','vehicle_id']],
+    #     skip_gtfs=False
+    # )
+    # prepare_run(
+    #     overwrite=True,
+    #     run_name="full_run",
+    #     network_name=["atb"],
+    #     train_dates=data_utils.get_date_list("2023_02_15", 30),
+    #     test_dates=data_utils.get_date_list("2023_04_01", 7),
+    #     n_workers=2,
+    #     n_jobs=8,
+    #     data_dropout=0.2,
+    #     gtfs_folder=["./data/atb_gtfs/"],
+    #     raw_data_folder=["./data/atb_all_new/"],
+    #     timezone=["Europe/Oslo"],
+    #     epsg=["32632"],
+    #     grid_bounds=[[550869,7012847,579944,7039521]],
+    #     coord_ref_center=[[569472,7034350]],
+    #     given_names=[['trip_id','file','locationtime','lat','lon','vehicle_id']],
+    #     skip_gtfs=False
+    # )
+    # # FULL RUN MIXED
+    # prepare_run(
+    #     overwrite=True,
+    #     run_name="full_run_nosch",
+    #     network_name=["kcm","atb"],
+    #     train_dates=data_utils.get_date_list("2023_02_15", 30),
+    #     test_dates=data_utils.get_date_list("2023_04_01", 7),
+    #     n_workers=2,
+    #     n_jobs=8,
+    #     data_dropout=0.2,
+    #     gtfs_folder=["./data/kcm_gtfs/","./data/atb_gtfs/"],
+    #     raw_data_folder=["./data/kcm_all_new/","./data/atb_all_new/"],
+    #     timezone=["America/Los_Angeles","Europe/Oslo"],
+    #     epsg=["32148","32632"],
+    #     grid_bounds=[[369903,37911,409618,87758],[550869,7012847,579944,7039521]],
+    #     coord_ref_center=[[386910,69022],[569472,7034350]],
+    #     given_names=[['trip_id','file','locationtime','lat','lon','vehicle_id'],['trip_id','file','locationtime','lat','lon','vehicle_id']],
+    #     skip_gtfs=True
+    # )
+    # prepare_run(
+    #     overwrite=True,
+    #     run_name="full_run_nosch",
+    #     network_name=["rut"],
+    #     train_dates=data_utils.get_date_list("2023_02_15", 30),
+    #     test_dates=data_utils.get_date_list("2023_04_01", 7),
+    #     n_workers=2,
+    #     n_jobs=8,
+    #     data_dropout=0.2,
+    #     gtfs_folder=["./data/rut_gtfs/"],
+    #     raw_data_folder=["./data/rut_all_new/"],
+    #     timezone=["Europe/Oslo"],
+    #     epsg=["32632"],
+    #     grid_bounds=[[589080,6631314,604705,6648420]],
+    #     coord_ref_center=[[597427,6642805]],
+    #     given_names=[['trip_id','file','locationtime','lat','lon','vehicle_id']],
+    #     skip_gtfs=True
+    # )
+
+    # BIG RUN
     prepare_run(
         overwrite=True,
         run_name="full_run",
         network_name=["kcm"],
-        train_dates=data_utils.get_date_list("2023_02_15", 30),
+        train_dates=data_utils.get_date_list("2023_02_15", 120),
         test_dates=data_utils.get_date_list("2023_04_01", 7),
         n_workers=2,
         n_jobs=8,
@@ -344,14 +402,11 @@ if __name__=="__main__":
         given_names=[['trip_id','file','locationtime','lat','lon','vehicle_id']],
         skip_gtfs=False
     )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
     prepare_run(
         overwrite=True,
         run_name="full_run",
         network_name=["atb"],
-        train_dates=data_utils.get_date_list("2023_02_15", 30),
+        train_dates=data_utils.get_date_list("2023_02_15", 120),
         test_dates=data_utils.get_date_list("2023_04_01", 7),
         n_workers=2,
         n_jobs=8,
@@ -365,15 +420,12 @@ if __name__=="__main__":
         given_names=[['trip_id','file','locationtime','lat','lon','vehicle_id']],
         skip_gtfs=False
     )
-    # FULL RUN MIXED
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
+    # BIG RUN MIXED
     prepare_run(
         overwrite=True,
         run_name="full_run_nosch",
         network_name=["kcm","atb"],
-        train_dates=data_utils.get_date_list("2023_02_15", 30),
+        train_dates=data_utils.get_date_list("2023_02_15", 120),
         test_dates=data_utils.get_date_list("2023_04_01", 7),
         n_workers=2,
         n_jobs=8,
@@ -387,14 +439,11 @@ if __name__=="__main__":
         given_names=[['trip_id','file','locationtime','lat','lon','vehicle_id'],['trip_id','file','locationtime','lat','lon','vehicle_id']],
         skip_gtfs=True
     )
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
     prepare_run(
         overwrite=True,
         run_name="full_run_nosch",
         network_name=["rut"],
-        train_dates=data_utils.get_date_list("2023_02_15", 30),
+        train_dates=data_utils.get_date_list("2023_02_15", 120),
         test_dates=data_utils.get_date_list("2023_04_01", 7),
         n_workers=2,
         n_jobs=8,
