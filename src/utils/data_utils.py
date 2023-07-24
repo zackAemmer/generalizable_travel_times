@@ -801,25 +801,25 @@ def extract_results(model_results, city):
         "RMSE": rmses,
         "MAE": maes
     })
-    # Extract NN loss curves
-    loss_df = []
-    # Iterate folds
-    for fold_results in model_results:
-        # Iterate models
-        for model in fold_results['Loss_Curves']:
-            for mname, loss_curves in model.items():
-                # Iterate loss curves
-                for lname, loss in loss_curves.items():
-                    df = pd.DataFrame({
-                        "City": city,
-                        "Fold": fold_results['Fold'],
-                        "Model": mname,
-                        "Loss Set": lname,
-                        "Epoch": np.arange(len(loss)),
-                        "Loss": loss
-                    })
-                    loss_df.append(df)
-    loss_df = pd.concat(loss_df)
+    # # Extract NN loss curves
+    # loss_df = []
+    # # Iterate folds
+    # for fold_results in model_results:
+    #     # Iterate models
+    #     for model in fold_results['Loss_Curves']:
+    #         for mname, loss_curves in model.items():
+    #             # Iterate loss curves
+    #             for lname, loss in loss_curves.items():
+    #                 df = pd.DataFrame({
+    #                     "City": city,
+    #                     "Fold": fold_results['Fold'],
+    #                     "Model": mname,
+    #                     "Loss Set": lname,
+    #                     "Epoch": np.arange(len(loss)),
+    #                     "Loss": loss
+    #                 })
+    #                 loss_df.append(df)
+    # loss_df = pd.concat(loss_df)
     # Extract train times
     names_df = np.array([x['Model_Names'] for x in model_results]).flatten()
     train_time_df = np.array([x['Train_Times'] for x in model_results]).flatten()
@@ -831,7 +831,7 @@ def extract_results(model_results, city):
         "Model":  names_df,
         "Time": train_time_df
     })
-    return result_df, loss_df, train_time_df
+    return result_df, train_time_df
 
 def extract_gen_results(city, gen_results):
     # Extract generalization results

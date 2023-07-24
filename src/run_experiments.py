@@ -321,54 +321,54 @@ if __name__=="__main__":
     torch.set_float32_matmul_precision('medium')
     pl.seed_everything(42, workers=True)
 
-    # DEBUG
-    run_experiments(
-        run_folder="./results/debug/",
-        train_network_folder="kcm/",
-        test_network_folder="atb/",
-        tune_network_folder="atb/",
-        TUNE_EPOCHS=2,
-        grid_s_size=500,
-        n_tune_samples=100,
-        n_folds=2,
-        holdout_routes=[100252,100139,102581,100341,102720],
-        skip_gtfs=False
-    )
-    run_experiments(
-        run_folder="./results/debug/",
-        train_network_folder="atb/",
-        test_network_folder="kcm/",
-        tune_network_folder="kcm/",
-        TUNE_EPOCHS=2,
-        grid_s_size=500,
-        n_tune_samples=100,
-        n_folds=2,
-        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
-        skip_gtfs=False
-    )
-
-    # # FULL RUN
+    # # DEBUG
     # run_experiments(
-    #     run_folder="./results/full_run/",
+    #     run_folder="./results/debug/",
     #     train_network_folder="kcm/",
     #     test_network_folder="atb/",
     #     tune_network_folder="atb/",
-    #     TUNE_EPOCHS=5,
+    #     TUNE_EPOCHS=2,
     #     grid_s_size=500,
     #     n_tune_samples=100,
-    #     n_folds=5,
+    #     n_folds=2,
     #     holdout_routes=[100252,100139,102581,100341,102720],
     #     skip_gtfs=False
     # )
     # run_experiments(
-    #     run_folder="./results/full_run/",
+    #     run_folder="./results/debug/",
     #     train_network_folder="atb/",
     #     test_network_folder="kcm/",
     #     tune_network_folder="kcm/",
-    #     TUNE_EPOCHS=5,
+    #     TUNE_EPOCHS=2,
     #     grid_s_size=500,
     #     n_tune_samples=100,
-    #     n_folds=5,
+    #     n_folds=2,
     #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
     #     skip_gtfs=False
     # )
+
+    # FULL RUN
+    run_experiments(
+        run_folder="./results/full_run/",
+        train_network_folder="kcm/",
+        test_network_folder="atb/",
+        tune_network_folder="atb/",
+        TUNE_EPOCHS=5,
+        grid_s_size=500,
+        n_tune_samples=100,
+        n_folds=5,
+        holdout_routes=[100252,100139,102581,100341,102720],
+        skip_gtfs=False
+    )
+    run_experiments(
+        run_folder="./results/full_run/",
+        train_network_folder="atb/",
+        test_network_folder="kcm/",
+        tune_network_folder="kcm/",
+        TUNE_EPOCHS=5,
+        grid_s_size=500,
+        n_tune_samples=100,
+        n_folds=5,
+        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
+        skip_gtfs=False
+    )

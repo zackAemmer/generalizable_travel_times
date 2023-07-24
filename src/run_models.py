@@ -238,35 +238,35 @@ if __name__=="__main__":
     torch.set_float32_matmul_precision('medium')
     pl.seed_everything(42, workers=True)
 
-    # DEBUG
-    run_models(
-        run_folder="./results/debug/",
-        network_folder="kcm/",
-        grid_s_size=500,
-        n_folds=2,
-        holdout_routes=[100252,100139,102581,100341,102720],
-        skip_gtfs=False,
-        is_param_search=False
-    )
-    run_models(
-        run_folder="./results/debug/",
-        network_folder="atb/",
-        grid_s_size=500,
-        n_folds=2,
-        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
-        skip_gtfs=False,
-        is_param_search=False
-    )
-    # DEBUG MIXED
-    run_models(
-        run_folder="./results/debug_nosch/",
-        network_folder="kcm_atb/",
-        grid_s_size=500,
-        n_folds=2,
-        holdout_routes=None,
-        skip_gtfs=True,
-        is_param_search=False
-    )
+    # # DEBUG
+    # run_models(
+    #     run_folder="./results/debug/",
+    #     network_folder="kcm/",
+    #     grid_s_size=500,
+    #     n_folds=2,
+    #     holdout_routes=[100252,100139,102581,100341,102720],
+    #     skip_gtfs=False,
+    #     is_param_search=False
+    # )
+    # run_models(
+    #     run_folder="./results/debug/",
+    #     network_folder="atb/",
+    #     grid_s_size=500,
+    #     n_folds=2,
+    #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
+    #     skip_gtfs=False,
+    #     is_param_search=False
+    # )
+    # # DEBUG MIXED
+    # run_models(
+    #     run_folder="./results/debug_nosch/",
+    #     network_folder="kcm_atb/",
+    #     grid_s_size=500,
+    #     n_folds=2,
+    #     holdout_routes=None,
+    #     skip_gtfs=True,
+    #     is_param_search=False
+    # )
 
     # # PARAM SEARCH
     # run_models(
@@ -288,32 +288,32 @@ if __name__=="__main__":
     #     is_param_search=True
     # )
 
-    # # FULL RUN
-    # run_models(
-    #     run_folder="./results/full_run/",
-    #     network_folder="kcm/",
-    #     grid_s_size=500,
-    #     n_folds=5,
-    #     holdout_routes=[100252,100139,102581,100341,102720],
-    #     skip_gtfs=False,
-    #     is_param_search=False
-    # )
-    # run_models(
-    #     run_folder="./results/full_run/",
-    #     network_folder="atb/",
-    #     grid_s_size=500,
-    #     n_folds=5,
-    #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
-    #     skip_gtfs=False,
-    #     is_param_search=False
-    # )
-    # # FULL RUN MIXED
-    # run_models(
-    #     run_folder="./results/full_run_nosch/",
-    #     network_folder="kcm_atb/",
-    #     grid_s_size=500,
-    #     n_folds=5,
-    #     holdout_routes=None,
-    #     skip_gtfs=True,
-    #     is_param_search=False
-    # )
+    # FULL RUN
+    run_models(
+        run_folder="./results/full_run/",
+        network_folder="kcm/",
+        grid_s_size=500,
+        n_folds=5,
+        holdout_routes=[100252,100139,102581,100341,102720],
+        skip_gtfs=False,
+        is_param_search=False
+    )
+    run_models(
+        run_folder="./results/full_run/",
+        network_folder="atb/",
+        grid_s_size=500,
+        n_folds=5,
+        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
+        skip_gtfs=False,
+        is_param_search=False
+    )
+    # FULL RUN MIXED
+    run_models(
+        run_folder="./results/full_run_nosch/",
+        network_folder="kcm_atb/",
+        grid_s_size=500,
+        n_folds=5,
+        holdout_routes=None,
+        skip_gtfs=True,
+        is_param_search=False
+    )
