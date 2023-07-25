@@ -37,7 +37,7 @@ def run_models(run_folder, network_folder, **kwargs):
     print(f"RUN MODELS: '{run_folder}'")
     print(f"NETWORK: '{network_folder}'")
 
-    NUM_WORKERS=4
+    NUM_WORKERS=8
     PIN_MEMORY=True
 
     # Create folder structure; delete older results
@@ -90,31 +90,31 @@ def run_models(run_folder, network_folder, **kwargs):
     else:
         hyperparameter_dict = {
             'FF': {
-                'batch_size': 128,
+                'batch_size': 1024,
                 'hidden_size': 128,
                 'num_layers': 2,
                 'dropout_rate': .2
             },
             'CONV': {
-                'batch_size': 128,
+                'batch_size': 1024,
                 'hidden_size': 64,
                 'num_layers': 3,
                 'dropout_rate': .1
             },
             'GRU': {
-                'batch_size': 128,
+                'batch_size': 1024,
                 'hidden_size': 64,
                 'num_layers': 2,
                 'dropout_rate': .05
             },
             'TRSF': {
-                'batch_size': 128,
+                'batch_size': 1024,
                 'hidden_size': 64,
                 'num_layers': 3,
                 'dropout_rate': .1
             },
             'DEEPTTE': {
-                'batch_size': 10
+                'batch_size': 1024
             }
         }
 
@@ -268,26 +268,6 @@ if __name__=="__main__":
     #     is_param_search=False
     # )
 
-    # # PARAM SEARCH
-    # run_models(
-    #     run_folder="./results/param_search/",
-    #     network_folder="kcm/",
-    #     grid_s_size=500,
-    #     n_folds=3,
-    #     holdout_routes=None,
-    #     skip_gtfs=False,
-    #     is_param_search=True
-    # )
-    # run_models(
-    #     run_folder="./results/param_search/",
-    #     network_folder="atb/",
-    #     grid_s_size=500,
-    #     n_folds=3,
-    #     holdout_routes=None,
-    #     skip_gtfs=False,
-    #     is_param_search=True
-    # )
-
     # FULL RUN
     run_models(
         run_folder="./results/full_run/",
@@ -317,3 +297,23 @@ if __name__=="__main__":
         skip_gtfs=True,
         is_param_search=False
     )
+
+    # # PARAM SEARCH
+    # run_models(
+    #     run_folder="./results/param_search/",
+    #     network_folder="kcm/",
+    #     grid_s_size=500,
+    #     n_folds=3,
+    #     holdout_routes=None,
+    #     skip_gtfs=False,
+    #     is_param_search=True
+    # )
+    # run_models(
+    #     run_folder="./results/param_search/",
+    #     network_folder="atb/",
+    #     grid_s_size=500,
+    #     n_folds=3,
+    #     holdout_routes=None,
+    #     skip_gtfs=False,
+    #     is_param_search=True
+    # )

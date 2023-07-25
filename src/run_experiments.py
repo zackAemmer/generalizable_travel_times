@@ -24,7 +24,7 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
     print(f"TUNE ON NETWORK: '{tune_network_folder}'")
     print(f"TEST ON NETWORK: '{test_network_folder}'")
 
-    NUM_WORKERS=4
+    NUM_WORKERS=8
     PIN_MEMORY=True
 
     try:
@@ -45,31 +45,31 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
     }
     hyperparameter_dict = {
         'FF': {
-            'batch_size': 128,
+            'batch_size': 1024,
             'hidden_size': 128,
             'num_layers': 2,
             'dropout_rate': .2
         },
         'CONV': {
-            'batch_size': 128,
+            'batch_size': 1024,
             'hidden_size': 64,
             'num_layers': 3,
             'dropout_rate': .1
         },
         'GRU': {
-            'batch_size': 128,
+            'batch_size': 1024,
             'hidden_size': 64,
             'num_layers': 2,
             'dropout_rate': .05
         },
         'TRSF': {
-            'batch_size': 128,
+            'batch_size': 1024,
             'hidden_size': 64,
             'num_layers': 3,
             'dropout_rate': .1
         },
         'DEEPTTE': {
-            'batch_size': 10
+            'batch_size': 1024
         }
     }
 
@@ -153,7 +153,6 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 train_network_dataset.add_grid_features = model.requires_grid
                 loader = DataLoader(train_network_dataset, collate_fn=model.collate_fn, batch_size=model.batch_size, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
                 trainer = pl.Trainer(
-                    limit_predict_batches=.20,
                     logger=CSVLogger(save_dir=f"{run_folder}{train_network_folder}gen_logs/", name=f"{model.model_name}_SAME"),
                 )
                 preds_and_labels = trainer.predict(model=model, dataloaders=loader)
@@ -176,7 +175,6 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                 test_network_dataset.add_grid_features = model.requires_grid
                 loader = DataLoader(test_network_dataset, collate_fn=model.collate_fn, batch_size=model.batch_size, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
                 trainer = pl.Trainer(
-                    limit_predict_batches=.20,
                     logger=CSVLogger(save_dir=f"{run_folder}{train_network_folder}gen_logs/", name=f"{model.model_name}_DIFF"),
                 )
                 preds_and_labels = trainer.predict(model=model, dataloaders=loader)
@@ -200,7 +198,6 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                     holdout_network_dataset.add_grid_features = model.requires_grid
                     loader = DataLoader(holdout_network_dataset, collate_fn=model.collate_fn, batch_size=model.batch_size, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
                     trainer = pl.Trainer(
-                        limit_predict_batches=.20,
                         logger=CSVLogger(save_dir=f"{run_folder}{train_network_folder}gen_logs/", name=f"{model.model_name}_HOLD"),
                     )
                     preds_and_labels = trainer.predict(model=model, dataloaders=loader)
@@ -235,7 +232,6 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
                     tune_network_dataset.add_grid_features = model.requires_grid
                     loader = DataLoader(tune_network_dataset, collate_fn=model.collate_fn, batch_size=model.batch_size, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
                     trainer = pl.Trainer(
-                        limit_predict_batches=.20,
                         check_val_every_n_epoch=2,
                         max_epochs=kwargs['TUNE_EPOCHS'],
                         min_epochs=1,
