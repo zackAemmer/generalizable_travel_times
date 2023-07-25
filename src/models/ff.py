@@ -85,7 +85,7 @@ class FF_L(pl.LightningModule):
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze()
         out  = (out * self.config['time_std']) + self.config['time_mean']
         y = (y * self.config['time_std']) + self.config['time_mean']
-        return (out.detach().numpy(), y.detach().numpy())
+        return (out.detach().cpu().numpy(), y.detach().cpu().numpy())
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
@@ -204,7 +204,7 @@ class FF_GRID_L(pl.LightningModule):
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze()
         out  = (out * self.config['time_std']) + self.config['time_mean']
         y = (y * self.config['time_std']) + self.config['time_mean']
-        return (out.detach().numpy(), y.detach().numpy())
+        return (out.detach().cpu().numpy(), y.detach().cpu().numpy())
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer

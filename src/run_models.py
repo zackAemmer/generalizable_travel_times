@@ -37,8 +37,8 @@ def run_models(run_folder, network_folder, **kwargs):
     print(f"RUN MODELS: '{run_folder}'")
     print(f"NETWORK: '{network_folder}'")
 
-    NUM_WORKERS=0
-    PIN_MEMORY=False
+    NUM_WORKERS=4
+    PIN_MEMORY=True
 
     # Create folder structure; delete older results
     base_folder = f"{run_folder}{network_folder}"
@@ -194,7 +194,7 @@ def run_models(run_folder, network_folder, **kwargs):
                     check_val_every_n_epoch=2,
                     max_epochs=50,
                     min_epochs=10,
-                    accelerator="cpu",
+                    # accelerator="cpu",
                     logger=CSVLogger(save_dir=f"{run_folder}{network_folder}logs/", name=model.model_name),
                     callbacks=[EarlyStopping(monitor=f"{model.model_name}_valid_loss", min_delta=.001, patience=3)]
                     # profiler="simple"

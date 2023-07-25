@@ -346,6 +346,18 @@ if __name__=="__main__":
     #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
     #     skip_gtfs=False
     # )
+    # run_experiments(
+    #     run_folder="./results/debug_nosch/",
+    #     train_network_folder="kcm_atb/",
+    #     test_network_folder="rut/",
+    #     tune_network_folder="rut/",
+    #     TUNE_EPOCHS=2,
+    #     grid_s_size=500,
+    #     n_tune_samples=100,
+    #     n_folds=2,
+    #     holdout_routes=None,
+    #     skip_gtfs=True
+    # )
 
     # FULL RUN
     run_experiments(
@@ -371,4 +383,16 @@ if __name__=="__main__":
         n_folds=5,
         holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
         skip_gtfs=False
+    )
+    run_experiments(
+        run_folder="./results/full_run_nosch/",
+        train_network_folder="kcm_atb/",
+        test_network_folder="rut/",
+        tune_network_folder="rut/",
+        TUNE_EPOCHS=5,
+        grid_s_size=500,
+        n_tune_samples=100,
+        n_folds=5,
+        holdout_routes=None,
+        skip_gtfs=True
     )
