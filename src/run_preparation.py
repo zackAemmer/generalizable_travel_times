@@ -176,6 +176,7 @@ def prepare_run(overwrite, run_name, network_name, train_dates, test_dates, **kw
         os.mkdir(base_folder)
         os.mkdir(f"{base_folder}deeptte_formatted/")
         os.mkdir(f"{base_folder}models/")
+        os.mkdir(f"{base_folder}logs/")
         print(f"Created new results folder for '{run_name}'")
     else:
         print(f"Run '{run_name}/{network_name}' folder already exists in 'results/', delete the folder if new run desired.")
