@@ -85,7 +85,7 @@ class FF_L(pl.LightningModule):
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze()
         out  = (out * self.config['time_std']) + self.config['time_mean']
         y = (y * self.config['time_std']) + self.config['time_mean']
-        return (out.cpu().numpy(), y.cpu().numpy())
+        return (out.detach().numpy(), y.detach().numpy())
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
@@ -204,7 +204,7 @@ class FF_GRID_L(pl.LightningModule):
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze()
         out  = (out * self.config['time_std']) + self.config['time_mean']
         y = (y * self.config['time_std']) + self.config['time_mean']
-        return (out.cpu().numpy(), y.cpu().numpy())
+        return (out.detach().numpy(), y.detach().numpy())
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
@@ -269,15 +269,3 @@ class FF_GRID_L(pl.LightningModule):
 #         x = self.linear_relu_stack(x)
 #         pred = self.feature_extract(self.feature_extract_activation(x))
 #         return pred.squeeze()
-#     def batch_step(self, data):
-#         inputs, labels = data
-#         inputs[:3] = [i.to(self.device) for i in inputs[:3]]
-#         labels = labels.to(self.device)
-#         preds = self(inputs)
-#         loss = self.loss_fn(preds, labels)
-#         return labels, preds, loss
-#     def evaluate(self, test_dataloader, config):
-#         labels, preds, avg_batch_loss = model_utils.predict(self, test_dataloader)
-#         labels = data_utils.de_normalize(labels, config['time_mean'], config['time_std'])
-#         preds = data_utils.de_normalize(preds, config['time_mean'], config['time_std'])
-#         return labels, preds

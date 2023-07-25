@@ -865,12 +865,12 @@ def extract_gen_results(city, gen_results):
         res.append(gen_df)
     return pd.concat(res, axis=0)
 
-def create_tensor_mask(seq_lens, drop_first=True):
+def create_tensor_mask(seq_lens, device, drop_first=True):
     """
     Create a mask based on a tensor of sequence lengths.
     """
     max_len = max(seq_lens)
-    mask = torch.zeros(len(seq_lens), max_len, dtype=torch.bool)
+    mask = torch.zeros(len(seq_lens), max_len, dtype=torch.bool, device=device)
     for i, seq_len in enumerate(seq_lens):
         mask[i, :seq_len] = 1
     mask[:,0] = 0

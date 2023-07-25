@@ -56,7 +56,7 @@ class CONV_L(pl.LightningModule):
         out = torch.cat([x_em, x_ct], dim=1)
         out = torch.swapaxes(out, 1, 2)
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
-        mask = data_utils.create_tensor_mask(x_sl).to(x_sl)
+        mask = data_utils.create_tensor_mask(x_sl, self.device)
         loss = self.loss_fn(out, y, mask)
         self.log(f"{self.model_name}_train_loss", loss, on_epoch=True, prog_bar=True, logger=True)
         return loss
@@ -78,7 +78,7 @@ class CONV_L(pl.LightningModule):
         out = torch.cat([x_em, x_ct], dim=1)
         out = torch.swapaxes(out, 1, 2)
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
-        mask = data_utils.create_tensor_mask(x_sl).to(x_sl)
+        mask = data_utils.create_tensor_mask(x_sl, self.device)
         loss = self.loss_fn(out, y, mask)
         self.log(f"{self.model_name}_valid_loss", loss, on_epoch=True, prog_bar=True, logger=True)
         return loss
@@ -100,7 +100,7 @@ class CONV_L(pl.LightningModule):
         out = torch.cat([x_em, x_ct], dim=1)
         out = torch.swapaxes(out, 1, 2)
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
-        mask = data_utils.create_tensor_mask(x_sl).to(x_sl)
+        mask = data_utils.create_tensor_mask(x_sl, self.device)
         loss = self.loss_fn(out, y, mask)
         self.log(f"{self.model_name}_test_loss", loss, on_epoch=True, prog_bar=True, logger=True)
         return loss
@@ -122,10 +122,10 @@ class CONV_L(pl.LightningModule):
         out = torch.cat([x_em, x_ct], dim=1)
         out = torch.swapaxes(out, 1, 2)
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
-        mask = data_utils.create_tensor_mask(x_sl).to(x_sl)
-        mask = mask.cpu().numpy()
-        out  = (out.cpu().numpy() * self.config['time_calc_s_std']) + self.config['time_calc_s_mean']
-        y = (y.cpu().numpy() * self.config['time_calc_s_std']) + self.config['time_calc_s_mean']
+        mask = data_utils.create_tensor_mask(x_sl, self.device)
+        mask = mask.detach().numpy()
+        out  = (out.detach().numpy() * self.config['time_calc_s_std']) + self.config['time_calc_s_mean']
+        y = (y.detach().numpy() * self.config['time_calc_s_std']) + self.config['time_calc_s_mean']
         out = data_utils.aggregate_tts(out, mask)
         y = data_utils.aggregate_tts(y, mask)
         return (out, y)
@@ -200,7 +200,7 @@ class CONV_GRID_L(pl.LightningModule):
         out = torch.cat([x_em, x_ct], dim=1)
         out = torch.swapaxes(out, 1, 2)
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
-        mask = data_utils.create_tensor_mask(x_sl).to(x_sl)
+        mask = data_utils.create_tensor_mask(x_sl, self.device)
         loss = self.loss_fn(out, y, mask)
         self.log(f"{self.model_name}_train_loss", loss, on_epoch=True, prog_bar=True, logger=True)
         return loss
@@ -230,7 +230,7 @@ class CONV_GRID_L(pl.LightningModule):
         out = torch.cat([x_em, x_ct], dim=1)
         out = torch.swapaxes(out, 1, 2)
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
-        mask = data_utils.create_tensor_mask(x_sl).to(x_sl)
+        mask = data_utils.create_tensor_mask(x_sl, self.device)
         loss = self.loss_fn(out, y, mask)
         self.log(f"{self.model_name}_valid_loss", loss, on_epoch=True, prog_bar=True, logger=True)
         return loss
@@ -260,7 +260,7 @@ class CONV_GRID_L(pl.LightningModule):
         out = torch.cat([x_em, x_ct], dim=1)
         out = torch.swapaxes(out, 1, 2)
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
-        mask = data_utils.create_tensor_mask(x_sl).to(x_sl)
+        mask = data_utils.create_tensor_mask(x_sl, self.device)
         loss = self.loss_fn(out, y, mask)
         self.log(f"{self.model_name}_test_loss", loss, on_epoch=True, prog_bar=True, logger=True)
         return loss
@@ -290,10 +290,10 @@ class CONV_GRID_L(pl.LightningModule):
         out = torch.cat([x_em, x_ct], dim=1)
         out = torch.swapaxes(out, 1, 2)
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
-        mask = data_utils.create_tensor_mask(x_sl).to(x_sl)
-        mask = mask.cpu().numpy()
-        out  = (out.cpu().numpy() * self.config['time_calc_s_std']) + self.config['time_calc_s_mean']
-        y = (y.cpu().numpy() * self.config['time_calc_s_std']) + self.config['time_calc_s_mean']
+        mask = data_utils.create_tensor_mask(x_sl, self.device)
+        mask = mask.detach().numpy()
+        out  = (out.detach().numpy() * self.config['time_calc_s_std']) + self.config['time_calc_s_mean']
+        y = (y.detach().numpy() * self.config['time_calc_s_std']) + self.config['time_calc_s_mean']
         out = data_utils.aggregate_tts(out, mask)
         y = data_utils.aggregate_tts(y, mask)
         return (out, y)
