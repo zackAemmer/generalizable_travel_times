@@ -15,6 +15,7 @@ from lightning.pytorch.loggers import CSVLogger
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from sklearn import metrics
 from sklearn.model_selection import KFold
+from lightning.pytorch.profilers import AdvancedProfiler, SimpleProfiler
 from torch.utils.data import DataLoader, SubsetRandomSampler
 
 from models import grids
@@ -37,7 +38,7 @@ def run_models(run_folder, network_folder, **kwargs):
     print(f"RUN MODELS: '{run_folder}'")
     print(f"NETWORK: '{network_folder}'")
 
-    NUM_WORKERS=8
+    NUM_WORKERS=4
     PIN_MEMORY=True
 
     # Create folder structure; delete older results
@@ -187,6 +188,7 @@ def run_models(run_folder, network_folder, **kwargs):
                 model_fold_results[model.model_name]["Preds"].extend(list(preds))
                 data_utils.write_pkl(model, f"{base_folder}models/{model.model_name}_{fold_num}.pkl")
             else:
+                # profiler = SimpleProfiler(dirpath="./", filename="adv_prof")
                 t0=time.time()
                 trainer = pl.Trainer(
                     limit_val_batches=.50,
@@ -196,8 +198,8 @@ def run_models(run_folder, network_folder, **kwargs):
                     min_epochs=10,
                     # accelerator="cpu",
                     logger=CSVLogger(save_dir=f"{run_folder}{network_folder}logs/", name=model.model_name),
-                    callbacks=[EarlyStopping(monitor=f"{model.model_name}_valid_loss", min_delta=.001, patience=3)]
-                    # profiler="simple"
+                    callbacks=[EarlyStopping(monitor=f"{model.model_name}_valid_loss", min_delta=.001, patience=3)],
+                    # profiler=profiler
                 )
                 trainer.fit(model=model, train_dataloaders=train_loader, val_dataloaders=val_loader)
                 model.train_time = time.time() - t0
@@ -238,16 +240,16 @@ if __name__=="__main__":
     torch.set_float32_matmul_precision('medium')
     pl.seed_everything(42, workers=True)
 
-    # # DEBUG
-    # run_models(
-    #     run_folder="./results/debug/",
-    #     network_folder="kcm/",
-    #     grid_s_size=500,
-    #     n_folds=2,
-    #     holdout_routes=[100252,100139,102581,100341,102720],
-    #     skip_gtfs=False,
-    #     is_param_search=False
-    # )
+    # DEBUG
+    run_models(
+        run_folder="./results/debug/",
+        network_folder="kcm/",
+        grid_s_size=500,
+        n_folds=2,
+        holdout_routes=[100252,100139,102581,100341,102720],
+        skip_gtfs=False,
+        is_param_search=False
+    )
     # run_models(
     #     run_folder="./results/debug/",
     #     network_folder="atb/",
@@ -268,35 +270,35 @@ if __name__=="__main__":
     #     is_param_search=False
     # )
 
-    # FULL RUN
-    run_models(
-        run_folder="./results/full_run/",
-        network_folder="kcm/",
-        grid_s_size=500,
-        n_folds=5,
-        holdout_routes=[100252,100139,102581,100341,102720],
-        skip_gtfs=False,
-        is_param_search=False
-    )
-    run_models(
-        run_folder="./results/full_run/",
-        network_folder="atb/",
-        grid_s_size=500,
-        n_folds=5,
-        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
-        skip_gtfs=False,
-        is_param_search=False
-    )
-    # FULL RUN MIXED
-    run_models(
-        run_folder="./results/full_run_nosch/",
-        network_folder="kcm_atb/",
-        grid_s_size=500,
-        n_folds=5,
-        holdout_routes=None,
-        skip_gtfs=True,
-        is_param_search=False
-    )
+    # # FULL RUN
+    # run_models(
+    #     run_folder="./results/full_run/",
+    #     network_folder="kcm/",
+    #     grid_s_size=500,
+    #     n_folds=5,
+    #     holdout_routes=[100252,100139,102581,100341,102720],
+    #     skip_gtfs=False,
+    #     is_param_search=False
+    # )
+    # run_models(
+    #     run_folder="./results/full_run/",
+    #     network_folder="atb/",
+    #     grid_s_size=500,
+    #     n_folds=5,
+    #     holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"],
+    #     skip_gtfs=False,
+    #     is_param_search=False
+    # )
+    # # FULL RUN MIXED
+    # run_models(
+    #     run_folder="./results/full_run_nosch/",
+    #     network_folder="kcm_atb/",
+    #     grid_s_size=500,
+    #     n_folds=5,
+    #     holdout_routes=None,
+    #     skip_gtfs=True,
+    #     is_param_search=False
+    # )
 
     # # PARAM SEARCH
     # run_models(
