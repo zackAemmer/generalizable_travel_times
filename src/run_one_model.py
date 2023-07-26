@@ -34,13 +34,14 @@ if __name__=="__main__":
     network_folder = sys.argv[3]
     skip_gtfs = sys.argv[4]
     is_param_search = sys.argv[5]
-    # run_folder="./results/full_run/"
-    # network_folder="kcm/"
     grid_s_size=500
     n_folds=5
-    holdout_routes=[100252,100139,102581,100341,102720]
-    # skip_gtfs=False
-    # is_param_search=False
+    if network_folder=="kcm/":
+        holdout_routes=[100252,100139,102581,100341,102720]
+    elif network_folder=="atb/":
+        holdout_routs=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
+    else:
+        holdout_routes=None
 
     NUM_WORKERS=4
     PIN_MEMORY=False
@@ -164,9 +165,9 @@ if __name__=="__main__":
 
         # Train/Test baseline models
         for b_model in base_model_list:
-            train_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=b_model.collate_fn, sampler=train_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
-            val_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=b_model.collate_fn, sampler=val_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
-            test_loader = DataLoader(test_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=True, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
+            train_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=b_model.collate_fn, sampler=train_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+            val_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=b_model.collate_fn, sampler=val_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+            test_loader = DataLoader(test_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=True, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
             print(f"Network {network_folder} Fold {fold_num} Model {b_model.model_name}")
             # Train base model on all fold data
             b_model.train_time = 0.0
@@ -180,21 +181,19 @@ if __name__=="__main__":
         # Train/Test nn model
         train_dataset.add_grid_features = nn_model.requires_grid
         test_dataset.add_grid_features = nn_model.requires_grid
-        train_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=nn_model.collate_fn, sampler=train_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
-        val_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=nn_model.collate_fn, sampler=val_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
-        test_loader = DataLoader(test_dataset, batch_size=1024, collate_fn=nn_model.collate_fn, shuffle=True, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY)
-        # profiler = SimpleProfiler(dirpath="./", filename="adv_prof")
+        train_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=nn_model.collate_fn, sampler=train_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+        val_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=nn_model.collate_fn, sampler=val_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+        test_loader = DataLoader(test_dataset, batch_size=1024, collate_fn=nn_model.collate_fn, shuffle=True, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
         t0=time.time()
         trainer = pl.Trainer(
             limit_val_batches=.50,
             limit_test_batches=.50,
             check_val_every_n_epoch=2,
-            max_epochs=2,
-            min_epochs=1,
+            max_epochs=50,
+            min_epochs=10,
             # accelerator="cpu",
             logger=CSVLogger(save_dir=f"{model_folder}logs/", name=nn_model.model_name),
             callbacks=[EarlyStopping(monitor=f"{nn_model.model_name}_valid_loss", min_delta=.001, patience=3)],
-            # profiler=profiler
         )
         trainer.fit(model=nn_model, train_dataloaders=train_loader, val_dataloaders=val_loader)
         nn_model.train_time = time.time() - t0
