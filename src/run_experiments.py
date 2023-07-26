@@ -19,7 +19,6 @@ from utils import data_utils, model_utils, data_loader
 
 
 if __name__=="__main__":
-# def run_experiments(run_folder, train_network_folder, test_network_folder, tune_network_folder, **kwargs):
 
     torch.set_default_dtype(torch.float)
     torch.set_float32_matmul_precision('medium')
@@ -53,8 +52,14 @@ if __name__=="__main__":
     else:
         holdout_routes=None
 
-    NUM_WORKERS=4
-    PIN_MEMORY=False
+    if torch.cuda.is_available():
+        num_workers=4
+        pin_memory=False
+        accelerator="auto"
+    else:
+        num_workers=0
+        pin_memory=False
+        accelerator="cpu"
 
     print("="*30)
     print(f"RUN EXPERIMENTS: '{run_folder}'")
@@ -62,8 +67,8 @@ if __name__=="__main__":
     print(f"TRAINED ON NETWORK: '{train_network_folder}'")
     print(f"TUNE ON NETWORK: '{tune_network_folder}'")
     print(f"TEST ON NETWORK: '{test_network_folder}'")
-    print(f"NUM_WORKERS: {NUM_WORKERS}")
-    print(f"PIN_MEMORY: {PIN_MEMORY}")
+    print(f"num_workers: {num_workers}")
+    print(f"pin_memory: {pin_memory}")
 
     base_folder = f"{run_folder}{train_network_folder}"
     model_folder = f"{run_folder}{train_network_folder}models/{model_type}/"
@@ -86,31 +91,31 @@ if __name__=="__main__":
     }
     hyperparameter_dict = {
         'FF': {
-            'batch_size': 1024,
+            'batch_size': 512,
             'hidden_size': 128,
             'num_layers': 2,
             'dropout_rate': .2
         },
         'CONV': {
-            'batch_size': 1024,
+            'batch_size': 512,
             'hidden_size': 64,
             'num_layers': 3,
             'dropout_rate': .1
         },
         'GRU': {
-            'batch_size': 1024,
+            'batch_size': 512,
             'hidden_size': 64,
             'num_layers': 2,
             'dropout_rate': .05
         },
         'TRSF': {
-            'batch_size': 1024,
+            'batch_size': 512,
             'hidden_size': 64,
             'num_layers': 3,
             'dropout_rate': .1
         },
         'DEEPTTE': {
-            'batch_size': 1024
+            'batch_size': 512
         }
     }
 
@@ -176,14 +181,14 @@ if __name__=="__main__":
     print(f"EXPERIMENT: SAME NETWORK")
     for b_model in base_model_list:
         print(f"Fold final evaluation for: {b_model.model_name}")
-        loader = DataLoader(train_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+        loader = DataLoader(train_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
         labels, preds = b_model.evaluate(loader, train_network_config)
         model_fold_results[b_model.model_name]["Train_Labels"].extend(list(labels))
         model_fold_results[b_model.model_name]["Train_Preds"].extend(list(preds))
     print(f"Fold final evaluation for: {nn_model.model_name}")
     train_network_dataset.add_grid_features = nn_model.requires_grid
-    loader = DataLoader(train_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
-    trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_SAME"))
+    loader = DataLoader(train_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
+    trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_SAME"), accelerator=accelerator)
     preds_and_labels = trainer.predict(model=nn_model, dataloaders=loader)
     preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
     labels = np.concatenate([l['y_agg'] for l in preds_and_labels])
@@ -193,14 +198,14 @@ if __name__=="__main__":
     print(f"EXPERIMENT: DIFFERENT NETWORK")
     for b_model in base_model_list:
         print(f"Fold final evaluation for: {b_model.model_name}")
-        loader = DataLoader(test_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+        loader = DataLoader(test_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
         labels, preds = b_model.evaluate(loader, train_network_config)
         model_fold_results[b_model.model_name]["Test_Labels"].extend(list(labels))
         model_fold_results[b_model.model_name]["Test_Preds"].extend(list(preds))
     print(f"Fold final evaluation for: {nn_model.model_name}")
     test_network_dataset.add_grid_features = nn_model.requires_grid
-    loader = DataLoader(test_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
-    trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_DIFF"))
+    loader = DataLoader(test_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
+    trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_DIFF"), accelerator=accelerator)
     preds_and_labels = trainer.predict(model=nn_model, dataloaders=loader)
     preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
     labels = np.concatenate([l['y_agg'] for l in preds_and_labels])
@@ -211,14 +216,14 @@ if __name__=="__main__":
         print(f"EXPERIMENT: HOLDOUT ROUTES")
         for b_model in base_model_list:
             print(f"Fold final evaluation for: {b_model.model_name}")
-            loader = DataLoader(holdout_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+            loader = DataLoader(holdout_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
             labels, preds = b_model.evaluate(loader, train_network_config)
             model_fold_results[b_model.model_name]["Holdout_Labels"].extend(list(labels))
             model_fold_results[b_model.model_name]["Holdout_Preds"].extend(list(preds))
         print(f"Fold final evaluation for: {nn_model.model_name}")
         holdout_network_dataset.add_grid_features = nn_model.requires_grid
-        loader = DataLoader(holdout_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
-        trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_HOLDOUT"))
+        loader = DataLoader(holdout_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
+        trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_HOLDOUT"), accelerator=accelerator)
         preds_and_labels = trainer.predict(model=nn_model, dataloaders=loader)
         preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
         labels = np.concatenate([l['y_agg'] for l in preds_and_labels])
@@ -230,35 +235,36 @@ if __name__=="__main__":
         base_model_list, nn_model = model_utils.make_one_model(model_type, hyperparameter_dict=hyperparameter_dict, embed_dict=embed_dict, config=train_network_config, skip_gtfs=skip_gtfs, load_weights=True, weight_folder=f"{model_folder}logs/{model_type}/version_{fold_num}/checkpoints/", fold_num=4)
         for b_model in base_model_list:
             print(f"Fold final evaluation for: {b_model.model_name}")
-            loader = DataLoader(train_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+            loader = DataLoader(train_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
             labels, preds = b_model.evaluate(loader, train_network_config)
             model_fold_results[b_model.model_name]["Tune_Train_Labels"].extend(list(labels))
             model_fold_results[b_model.model_name]["Tune_Train_Preds"].extend(list(preds))
-            loader = DataLoader(test_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+            loader = DataLoader(test_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
             labels, preds = b_model.evaluate(loader, train_network_config)
             model_fold_results[b_model.model_name]["Tune_Test_Labels"].extend(list(labels))
             model_fold_results[b_model.model_name]["Tune_Test_Preds"].extend(list(preds))
         print(f"Fold training for: {nn_model.model_name}")
         tune_network_dataset.add_grid_features = nn_model.requires_grid
-        loader = DataLoader(tune_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=True, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+        loader = DataLoader(tune_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=True, drop_last=True, num_workers=num_workers, pin_memory=pin_memory)
         trainer = pl.Trainer(
             max_epochs=tune_epochs,
             min_epochs=1,
-            logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_TUNE")
+            logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_TUNE"),
+            accelerator=accelerator
         )
         trainer.fit(model=nn_model, train_dataloaders=loader)
         print(f"Fold final evaluation for: {nn_model.model_name}")
         train_network_dataset.add_grid_features = nn_model.requires_grid
-        loader = DataLoader(train_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
-        trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_TUNE_TRAIN"))
+        loader = DataLoader(train_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
+        trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_TUNE_TRAIN"), accelerator=accelerator)
         preds_and_labels = trainer.predict(model=nn_model, dataloaders=loader)
         preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
         labels = np.concatenate([l['y_agg'] for l in preds_and_labels])
         model_fold_results[nn_model.model_name]["Tune_Train_Labels"].extend(list(labels))
         model_fold_results[nn_model.model_name]["Tune_Train_Preds"].extend(list(preds))
         test_network_dataset.add_grid_features = nn_model.requires_grid
-        loader = DataLoader(test_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
-        trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_TUNE_TEST"))
+        loader = DataLoader(test_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
+        trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_TUNE_TEST"), accelerator=accelerator)
         preds_and_labels = trainer.predict(model=nn_model, dataloaders=loader)
         preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
         labels = np.concatenate([l['y_agg'] for l in preds_and_labels])
