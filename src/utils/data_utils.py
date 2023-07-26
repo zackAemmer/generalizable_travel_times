@@ -873,7 +873,8 @@ def create_tensor_mask(seq_lens, device, drop_first=True):
     mask = torch.zeros(len(seq_lens), max_len, dtype=torch.bool, device=device)
     for i, seq_len in enumerate(seq_lens):
         mask[i, :seq_len] = 1
-    mask[:,0] = 0
+    if drop_first:
+        mask[:,0] = 0
     return mask
 
 def pad_tensors(tensor_list, pad_dim):
@@ -892,13 +893,10 @@ def pad_tensors(tensor_list, pad_dim):
     padded_tensor_list = torch.cat(padded_tensor_list, dim=0)
     return padded_tensor_list
 
-def aggregate_tts(tts, mask, drop_first=True):
+def aggregate_tts(tts, mask):
     """
     Convert a sequence of predicted travel times to total travel time.
     """
-    if drop_first:
-        # The first point has a predicted tt, but don't sum it to match total time
-        mask[:,0] = False
     masked_tts = (tts*mask)
     total_tts = np.sum(masked_tts, axis=1)
     return total_tts
@@ -962,14 +960,25 @@ def create_grid_of_shingles(point_resolution, grid_bounds, coord_ref_center):
     # Add dummy and calculated variables
     shingle_id = 0
     for curr_shingle in shingles:
-        curr_shingle['shingle_id'] = shingle_id
-        curr_shingle['timeID'] = 60*9
-        curr_shingle['weekID'] = 3
+        curr_shingle['lat'] = curr_shingle['y']
+        curr_shingle['lon'] = curr_shingle['x']
+        curr_shingle['shingle_id'] = [shingle_id for x in curr_shingle['lon']]
+        curr_shingle['timeID'] = [60*9 for x in curr_shingle['lon']]
+        curr_shingle['weekID'] = [3 for x in curr_shingle['lon']]
         curr_shingle['x_cent'] = [x - coord_ref_center[0] for x in curr_shingle['x']]
         curr_shingle['y_cent'] = [y - coord_ref_center[1] for y in curr_shingle['y']]
-        curr_shingle['lat'] = curr_shingle['y']
-        curr_shingle['lons'] = curr_shingle['x']
-        curr_shingle['locationtime'] = [1 for x in curr_shingle['lons']]
-        curr_shingle['time_calc_s'] = [1 for x in curr_shingle['lons']]
+        curr_shingle['locationtime'] = [1 for x in curr_shingle['lon']]
+        curr_shingle['time_calc_s'] = [1 for x in curr_shingle['lon']]
+        curr_shingle['dist_cumulative_km'] = [1 for x in curr_shingle['lon']]
+        curr_shingle['time_cumulative_s'] = [1 for x in curr_shingle['lon']]
+        curr_shingle['speed_m_s'] = [1 for x in curr_shingle['lon']]
+        curr_shingle['timeID_s'] = [1 for x in curr_shingle['lon']]
         shingle_id += 1
-    return shingles
+    # Convert to tabular format, create shingle lookup
+    res_dict = {}
+    for cname in shingles[0].keys():
+        res_dict[cname] = []
+        vals = np.array([s[cname] for s in shingles]).flatten()
+        res_dict[cname].extend(vals)
+    res = pd.DataFrame(res_dict)
+    return res

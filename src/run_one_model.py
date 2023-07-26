@@ -17,7 +17,7 @@ from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 from sklearn import metrics
 from sklearn.model_selection import KFold
 from lightning.pytorch.profilers import AdvancedProfiler, SimpleProfiler
-from torch.utils.data import DataLoader, SubsetRandomSampler
+from torch.utils.data import DataLoader, SubsetRandomSampler, SequentialSampler
 
 from models import grids
 from models import ff, conv, rnn, transformer, avg_speed, schedule, persistent
@@ -154,7 +154,7 @@ if __name__=="__main__":
         # Declare models
         base_model_list, nn_model = model_utils.make_one_model(model_type, hyperparameter_dict=hyperparameter_dict, embed_dict=embed_dict, config=config, skip_gtfs=skip_gtfs)
         train_sampler = SubsetRandomSampler(train_idx)
-        val_sampler = SubsetRandomSampler(val_idx)
+        val_sampler = SequentialSampler(val_idx)
         model_names = [m.model_name for m in base_model_list]
         model_names.append(nn_model.model_name)
         print(f"Model name: {model_names}")
@@ -175,7 +175,7 @@ if __name__=="__main__":
         for b_model in base_model_list:
             train_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=b_model.collate_fn, sampler=train_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
             val_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=b_model.collate_fn, sampler=val_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
-            test_loader = DataLoader(test_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=True, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+            test_loader = DataLoader(test_dataset, batch_size=1024, collate_fn=b_model.collate_fn, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
             print(f"Network {network_folder} Fold {fold_num} Model {b_model.model_name}")
             # Train base model on all fold data
             b_model.train_time = 0.0

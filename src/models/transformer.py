@@ -130,9 +130,9 @@ class TRSF_L(pl.LightningModule):
         mask = mask.detach().cpu().numpy()
         out  = (out.detach().cpu().numpy() * self.config['time_calc_s_std']) + self.config['time_calc_s_mean']
         y = (y.detach().cpu().numpy() * self.config['time_calc_s_std']) + self.config['time_calc_s_mean']
-        out = data_utils.aggregate_tts(out, mask)
-        y = data_utils.aggregate_tts(y, mask)
-        return (out, y)
+        out_agg = data_utils.aggregate_tts(out, mask)
+        y_agg = data_utils.aggregate_tts(y, mask)
+        return (out_agg, y_agg), (out, y, mask)
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer

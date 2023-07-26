@@ -127,6 +127,34 @@ class LoadSliceDataset(Dataset):
             res = res[res['shingle_id'].isin(keep_shingles)]
         return res
 
+class ContentDataset(Dataset):
+    def __init__(self, dataframe, config, grid=None, add_grid_features=False, skip_gtfs=False):
+        self.config = config
+        self.grid = grid
+        self.add_grid_features = add_grid_features
+        self.skip_gtfs = skip_gtfs
+        # Necessary to convert from np array tabular format saved in h5 files
+        if not self.skip_gtfs:
+            self.col_names = FEATURE_COLS
+        else:
+            self.col_names = SKIP_FEATURE_COLS
+        self.dataframe = dataframe[self.col_names]
+        # Cache column name indices
+        self.time_cumulative_s_idx = self.col_names.index("time_cumulative_s")
+        self.time_calc_s_idx = self.col_names.index("time_calc_s")
+        self.x_idx = self.col_names.index("x")
+        self.y_idx = self.col_names.index("y")
+        self.locationtime_idx = self.col_names.index("locationtime")
+    def __getitem__(self, index):
+        samp = self.dataframe.loc[self.dataframe['shingle_id']==index].values
+        label = samp[-1,self.time_cumulative_s_idx]
+        norm_label = (label - self.config['time_mean']) / self.config['time_std']
+        label_seq = samp[:,self.time_calc_s_idx]
+        norm_label_seq = (label_seq - self.config['time_calc_s_mean']) / self.config['time_calc_s_std']
+        return {"samp": samp, "norm_label": norm_label, "norm_label_seq": norm_label_seq}
+    def __len__(self):
+        return len(pd.unique(self.dataframe.shingle_id))
+
 def apply_normalization(sample, config):
     for var_name in sample.keys():
         if f"{var_name}_mean" in config.keys():

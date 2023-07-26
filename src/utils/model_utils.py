@@ -199,8 +199,11 @@ def make_one_model(model_type, hyperparameter_dict, embed_dict, config, load_wei
         base_model_list = []
         for b in base_model_list:
             b = data_utils.load_pkl(f"{weight_folder}{b.name}_{fold_num}.pkl")
-        last_ckpt = os.listdir(f"{weight_folder}../logs/{m.model_name}/version_{fold_num}/checkpoints")
-        model = model.load_from_checkpoint(f"{weight_folder}../logs/{model.model_name}/version_{fold_num}/checkpoints/{last_ckpt[0]}").eval()
+        last_ckpt = os.listdir(f"{weight_folder}logs/version_{fold_num}/checkpoints")
+        if not torch.cuda.is_available():
+            model = model.load_from_checkpoint(f"{weight_folder}logs/version_{fold_num}/checkpoints/{last_ckpt[0]}", map_location=torch.device('cpu')).eval()
+        else:
+            model = model.load_from_checkpoint(f"{weight_folder}logs/version_{fold_num}/checkpoints/{last_ckpt[0]}").eval()
     return base_model_list, model
 
 def make_all_models(hyperparameter_dict, embed_dict, config, load_weights=False, weight_folder=None, fold_num=None):

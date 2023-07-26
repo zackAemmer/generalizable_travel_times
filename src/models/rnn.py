@@ -116,13 +116,13 @@ class GRU_L(pl.LightningModule):
         # Combine all variables
         out = torch.cat([x_em, x_ct], dim=2)
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
-        mask = data_utils.create_tensor_mask(x_sl, self.device)
+        mask = data_utils.create_tensor_mask(x_sl, self.device, drop_first=False)
         mask = mask.detach().cpu().numpy()
         out  = (out.detach().cpu().numpy() * self.config['time_calc_s_std']) + self.config['time_calc_s_mean']
         y = (y.detach().cpu().numpy() * self.config['time_calc_s_std']) + self.config['time_calc_s_mean']
-        out = data_utils.aggregate_tts(out, mask)
-        y = data_utils.aggregate_tts(y, mask)
-        return (out, y)
+        out_agg = data_utils.aggregate_tts(out, mask)
+        y_agg = data_utils.aggregate_tts(y, mask)
+        return {"out_agg":out_agg, "y_agg":y_agg, "out":out, "y":y, "mask":mask}
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
