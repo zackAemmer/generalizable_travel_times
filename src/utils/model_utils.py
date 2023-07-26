@@ -106,10 +106,10 @@ def make_one_model(model_type, hyperparameter_dict, embed_dict, config, load_wei
         case "FF":
             model = ff.FF_L(
                 "FF",
-                n_features=14,
+                n_features=14 if not skip_gtfs else 8,
                 hyperparameter_dict=hyperparameter_dict['FF'],
                 embed_dict=embed_dict,
-                collate_fn=data_loader.basic_collate,
+                collate_fn=data_loader.basic_collate if not skip_gtfs else data_loader.basic_collate_nosch,
                 config=config
             )
         case "FF_GRID":
@@ -127,10 +127,10 @@ def make_one_model(model_type, hyperparameter_dict, embed_dict, config, load_wei
         case "CONV":
             model = conv.CONV_L(
                 "CONV",
-                n_features=10,
+                n_features=10 if not skip_gtfs else 4,
                 hyperparameter_dict=hyperparameter_dict['CONV'],
                 embed_dict=embed_dict,
-                collate_fn=data_loader.sequential_collate,
+                collate_fn=data_loader.sequential_collate if not skip_gtfs else data_loader.sequential_collate_nosch,
                 config=config
             )
         case "CONV_GRID":
@@ -148,10 +148,10 @@ def make_one_model(model_type, hyperparameter_dict, embed_dict, config, load_wei
         case "GRU":
             model = rnn.GRU_L(
                 "GRU",
-                n_features=10,
+                n_features=10 if not skip_gtfs else 4,
                 hyperparameter_dict=hyperparameter_dict['GRU'],
                 embed_dict=embed_dict,
-                collate_fn=data_loader.sequential_collate,
+                collate_fn=data_loader.sequential_collate if not skip_gtfs else data_loader.sequential_collate_nosch,
                 config=config
             )
         case "GRU_GRID":
@@ -169,10 +169,10 @@ def make_one_model(model_type, hyperparameter_dict, embed_dict, config, load_wei
         case "TRSF":
             model = transformer.TRSF_L(
                 "TRSF",
-                n_features=10,
+                n_features=10 if not skip_gtfs else 4,
                 hyperparameter_dict=hyperparameter_dict['TRSF'],
                 embed_dict=embed_dict,
-                collate_fn=data_loader.sequential_collate,
+                collate_fn=data_loader.sequential_collate if not skip_gtfs else data_loader.sequential_collate_nosch,
                 config=config
             )
         case "TRSF_GRID":
@@ -191,7 +191,7 @@ def make_one_model(model_type, hyperparameter_dict, embed_dict, config, load_wei
             model = DeepTTE.Net(
                 "DEEP_TTE",
                 hyperparameter_dict=hyperparameter_dict['DEEPTTE'],
-                collate_fn=data_loader.deeptte_collate,
+                collate_fn=data_loader.deeptte_collate if not skip_gtfs else data_loader.deeptte_collate_nosch,
                 config=config
             )
     # Load weights if applicable
