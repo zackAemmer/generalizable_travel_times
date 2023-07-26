@@ -34,6 +34,14 @@ if __name__=="__main__":
     network_folder = sys.argv[3]
     skip_gtfs = sys.argv[4]
     is_param_search = sys.argv[5]
+    if skip_gtfs=="True":
+        skip_gtfs=True
+    else:
+        skip_gtfs=False
+    if is_param_search=="True":
+        is_param_search=True
+    else:
+        is_param_search=False
     grid_s_size=500
     n_folds=5
     if network_folder=="kcm/":
