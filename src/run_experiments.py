@@ -5,6 +5,7 @@ import json
 import shutil
 import random
 import lightning.pytorch as pl
+import sys
 from lightning.pytorch.loggers import CSVLogger
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 
@@ -17,15 +18,38 @@ from models import grids
 from utils import data_utils, model_utils, data_loader
 
 
-def run_experiments(run_folder, train_network_folder, test_network_folder, tune_network_folder, **kwargs):
+if __name__=="__main__":
+# def run_experiments(run_folder, train_network_folder, test_network_folder, tune_network_folder, **kwargs):
+
+    torch.set_default_dtype(torch.float)
+    torch.set_float32_matmul_precision('medium')
+    pl.seed_everything(42, workers=True)
+
+    model_type = sys.argv[1]
+    run_folder = sys.argv[2]
+    network_folder = sys.argv[3]
+    skip_gtfs = sys.argv[4]
+    is_param_search = sys.argv[5]
+
+    run_folder="./results/full_run/",
+    train_network_folder="kcm/",
+    test_network_folder="atb/",
+    tune_network_folder="atb/",
+    TUNE_EPOCHS=5,
+    grid_s_size=500,
+    n_tune_samples=100,
+    n_folds=5,
+    holdout_routes=[100252,100139,102581,100341,102720],
+    skip_gtfs=False
+
     print("="*30)
     print(f"RUN EXPERIMENTS: '{run_folder}'")
     print(f"TRAINED ON NETWORK: '{train_network_folder}'")
     print(f"TUNE ON NETWORK: '{tune_network_folder}'")
     print(f"TEST ON NETWORK: '{test_network_folder}'")
 
-    NUM_WORKERS=8
-    PIN_MEMORY=True
+    NUM_WORKERS=4
+    PIN_MEMORY=False
 
     try:
         shutil.rmtree(f"{run_folder}{train_network_folder}gen_logs/")
@@ -115,6 +139,8 @@ def run_experiments(run_folder, train_network_folder, test_network_folder, tune_
         print(f"BEGIN FOLD: {fold_num}")
 
         # Declare models
+        base_model_list, nn_model = model_utils.make_one_model(model_type, hyperparameter_dict=hyperparameter_dict, embed_dict=embed_dict, config=config, skip_gtfs=skip_gtfs)
+
         if not kwargs['skip_gtfs']:
             model_list = model_utils.make_all_models(hyperparameter_dict, embed_dict, train_network_config, load_weights=True, weight_folder=f"{run_folder}{train_network_folder}models/", fold_num=fold_num)
         else:

@@ -23,6 +23,7 @@ from models import grids
 from models import ff, conv, rnn, transformer, avg_speed, schedule, persistent
 from utils import data_loader, data_utils, model_utils
 
+
 if __name__=="__main__":
 
     torch.set_default_dtype(torch.float)
@@ -175,7 +176,7 @@ if __name__=="__main__":
         for b_model in base_model_list:
             train_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=b_model.collate_fn, sampler=train_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
             val_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=b_model.collate_fn, sampler=val_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
-            test_loader = DataLoader(test_dataset, batch_size=1024, collate_fn=b_model.collate_fn, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+            test_loader = DataLoader(test_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=True, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
             print(f"Network {network_folder} Fold {fold_num} Model {b_model.model_name}")
             # Train base model on all fold data
             b_model.train_time = 0.0
@@ -191,14 +192,12 @@ if __name__=="__main__":
         test_dataset.add_grid_features = nn_model.requires_grid
         train_loader = DataLoader(train_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, sampler=train_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
         val_loader = DataLoader(train_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, sampler=val_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
-        test_loader = DataLoader(test_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=True, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+        test_loader = DataLoader(test_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
         t0=time.time()
         trainer = pl.Trainer(
-            limit_val_batches=.50,
-            limit_test_batches=.50,
-            check_val_every_n_epoch=2,
-            max_epochs=50,
-            min_epochs=10,
+            check_val_every_n_epoch=1,
+            max_epochs=30,
+            min_epochs=5,
             # accelerator="cpu",
             logger=CSVLogger(save_dir=f"{model_folder}logs/", name=nn_model.model_name),
             callbacks=[EarlyStopping(monitor=f"{nn_model.model_name}_valid_loss", min_delta=.001, patience=3)],

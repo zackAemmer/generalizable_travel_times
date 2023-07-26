@@ -106,15 +106,24 @@ def make_one_model(model_type, hyperparameter_dict, embed_dict, config, load_wei
         case "FF":
             model = ff.FF_L(
                 "FF",
-                n_features=14 if not skip_gtfs else 8,
+                n_features=8,
                 hyperparameter_dict=hyperparameter_dict['FF'],
                 embed_dict=embed_dict,
-                collate_fn=data_loader.basic_collate if not skip_gtfs else data_loader.basic_collate_nosch,
+                collate_fn=data_loader.basic_collate_nosch,
+                config=config
+            )
+        case "FF_GTFS":
+            model = ff.FF_L(
+                "FF_GTFS",
+                n_features=14,
+                hyperparameter_dict=hyperparameter_dict['FF'],
+                embed_dict=embed_dict,
+                collate_fn=data_loader.basic_collate,
                 config=config
             )
         case "FF_GRID":
             model = ff.FF_GRID_L(
-                "FF_NGRID_IND",
+                "FF_GRID",
                 n_features=14,
                 n_grid_features=3*3*1,
                 # n_grid_features=3*3*3*3,
@@ -127,15 +136,24 @@ def make_one_model(model_type, hyperparameter_dict, embed_dict, config, load_wei
         case "CONV":
             model = conv.CONV_L(
                 "CONV",
-                n_features=10 if not skip_gtfs else 4,
+                n_features=4,
                 hyperparameter_dict=hyperparameter_dict['CONV'],
                 embed_dict=embed_dict,
-                collate_fn=data_loader.sequential_collate if not skip_gtfs else data_loader.sequential_collate_nosch,
+                collate_fn=data_loader.sequential_collate_nosch,
+                config=config
+            )
+        case "CONV_GTFS":
+            model = conv.CONV_L(
+                "CONV_GTFS",
+                n_features=10,
+                hyperparameter_dict=hyperparameter_dict['CONV'],
+                embed_dict=embed_dict,
+                collate_fn=data_loader.sequential_collate,
                 config=config
             )
         case "CONV_GRID":
             model = conv.CONV_GRID_L(
-                "CONV_NGRID_IND",
+                "CONV_GRID",
                 n_features=10,
                 n_grid_features=3*3*1,
                 # n_grid_features=3*3*3*3,
@@ -148,15 +166,24 @@ def make_one_model(model_type, hyperparameter_dict, embed_dict, config, load_wei
         case "GRU":
             model = rnn.GRU_L(
                 "GRU",
-                n_features=10 if not skip_gtfs else 4,
+                n_features=4,
                 hyperparameter_dict=hyperparameter_dict['GRU'],
                 embed_dict=embed_dict,
-                collate_fn=data_loader.sequential_collate if not skip_gtfs else data_loader.sequential_collate_nosch,
+                collate_fn=data_loader.sequential_collate_nosch,
+                config=config
+            )
+        case "GRU_GTFS":
+            model = rnn.GRU_L(
+                "GRU_GTFS",
+                n_features=10,
+                hyperparameter_dict=hyperparameter_dict['GRU'],
+                embed_dict=embed_dict,
+                collate_fn=data_loader.sequential_collate,
                 config=config
             )
         case "GRU_GRID":
             model = rnn.GRU_GRID_L(
-                "GRU_NGRID_IND",
+                "GRU_GRID",
                 n_features=10,
                 n_grid_features=3*3*1,
                 # n_grid_features=3*3*3*3,
@@ -169,15 +196,24 @@ def make_one_model(model_type, hyperparameter_dict, embed_dict, config, load_wei
         case "TRSF":
             model = transformer.TRSF_L(
                 "TRSF",
-                n_features=10 if not skip_gtfs else 4,
+                n_features=4,
                 hyperparameter_dict=hyperparameter_dict['TRSF'],
                 embed_dict=embed_dict,
-                collate_fn=data_loader.sequential_collate if not skip_gtfs else data_loader.sequential_collate_nosch,
+                collate_fn=data_loader.sequential_collate_nosch,
+                config=config
+            )
+        case "TRSF_GTFS":
+            model = transformer.TRSF_L(
+                "TRSF_GTFS",
+                n_features=10,
+                hyperparameter_dict=hyperparameter_dict['TRSF'],
+                embed_dict=embed_dict,
+                collate_fn=data_loader.sequential_collate,
                 config=config
             )
         case "TRSF_GRID":
             model = transformer.TRSF_GRID_L(
-                "TRSF_NGRID_IND",
+                "TRSF_GRID",
                 n_features=10,
                 n_grid_features=3*3*1,
                 # n_grid_features=3*3*3*3,
@@ -191,7 +227,14 @@ def make_one_model(model_type, hyperparameter_dict, embed_dict, config, load_wei
             model = DeepTTE.Net(
                 "DEEP_TTE",
                 hyperparameter_dict=hyperparameter_dict['DEEPTTE'],
-                collate_fn=data_loader.deeptte_collate if not skip_gtfs else data_loader.deeptte_collate_nosch,
+                collate_fn=data_loader.deeptte_collate_nosch,
+                config=config
+            )
+        case "DEEP_TTE_GTFS":
+            model = DeepTTE.Net(
+                "DEEP_TTE_GTFS",
+                hyperparameter_dict=hyperparameter_dict['DEEPTTE'],
+                collate_fn=data_loader.deeptte_collate,
                 config=config
             )
     # Load weights if applicable
@@ -205,203 +248,3 @@ def make_one_model(model_type, hyperparameter_dict, embed_dict, config, load_wei
         else:
             model = model.load_from_checkpoint(f"{weight_folder}logs/version_{fold_num}/checkpoints/{last_ckpt[0]}").eval()
     return base_model_list, model
-
-def make_all_models(hyperparameter_dict, embed_dict, config, load_weights=False, weight_folder=None, fold_num=None):
-    # Declare base models
-    base_model_list = []
-    base_model_list.append(avg_speed.AvgHourlySpeedModel("AVG"))
-    base_model_list.append(schedule.TimeTableModel("SCH"))
-    base_model_list.append(persistent.PersistentTimeSeqModel("PER_TIM"))
-    # Declare neural network models
-    nn_model_list = []
-    # nn_model_list.append(ff.FF_L(
-    #     "FF",
-    #     n_features=14,
-    #     hyperparameter_dict=hyperparameter_dict['FF'],
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.basic_collate,
-    #     config=config
-    # ))
-    # nn_model_list.append(ff.FF_GRID_L(
-    #     "FF_NGRID_IND",
-    #     n_features=14,
-    #     n_grid_features=3*3*1,
-    #     n_grid_features=3*3*3*3,
-    #     grid_compression_size=8,
-    #     hyperparameter_dict=hyperparameter_dict['FF'],
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.basic_grid_collate,
-    #     config=config
-    # ))
-    # nn_model_list.append(conv.CONV_L(
-    #     "CONV",
-    #     n_features=10,
-    #     hyperparameter_dict=hyperparameter_dict['CONV'],
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.sequential_collate,
-    #     config=config
-    # ))
-    # nn_model_list.append(conv.CONV_GRID_L(
-    #     "CONV_NGRID_IND",
-    #     n_features=10,
-    #     n_grid_features=3*3*1,
-    #     n_grid_features=3*3*3*3,
-    #     grid_compression_size=8,
-    #     hyperparameter_dict=hyperparameter_dict['CONV'],
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.sequential_grid_collate,
-    #     config=config
-    # ))
-    # nn_model_list.append(rnn.GRU_L(
-    #     "GRU",
-    #     n_features=10,
-    #     hyperparameter_dict=hyperparameter_dict['GRU'],
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.sequential_collate,
-    #     config=config
-    # ))
-    nn_model_list.append(rnn.GRU_GRID_L(
-        "GRU_NGRID_IND",
-        n_features=10,
-        n_grid_features=3*3*1,
-        # n_grid_features=3*3*3*3,
-        grid_compression_size=8,
-        hyperparameter_dict=hyperparameter_dict['GRU'],
-        embed_dict=embed_dict,
-        collate_fn=data_loader.sequential_grid_collate,
-        config=config
-    ))
-    nn_model_list.append(transformer.TRSF_L(
-        "TRSF",
-        n_features=10,
-        hyperparameter_dict=hyperparameter_dict['TRSF'],
-        embed_dict=embed_dict,
-        collate_fn=data_loader.sequential_collate,
-        config=config
-    ))
-    # nn_model_list.append(transformer.TRSF_GRID_L(
-    #     "TRSF_NGRID_IND",
-    #     n_features=10,
-    #     n_grid_features=3*3*1,
-    #     n_grid_features=3*3*3*3,
-    #     grid_compression_size=8,
-    #     hyperparameter_dict=hyperparameter_dict['TRSF'],
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.sequential_grid_collate,
-    #     config=config
-    # ))
-    # nn_model_list.append(DeepTTE.Net(
-    #     "DEEP_TTE",
-    #     hyperparameter_dict=hyperparameter_dict['DEEPTTE'],
-    #     collate_fn=data_loader.deeptte_collate,
-    #     config=config
-    # ))
-    # Load weights if applicable
-    if load_weights:
-        base_model_list = []
-        for b in base_model_list:
-            b = data_utils.load_pkl(f"{weight_folder}{b.name}_{fold_num}.pkl")
-        for m in nn_model_list:
-            last_ckpt = os.listdir(f"{weight_folder}../logs/{m.model_name}/version_{fold_num}/checkpoints")
-            m = m.load_from_checkpoint(f"{weight_folder}../logs/{m.model_name}/version_{fold_num}/checkpoints/{last_ckpt[0]}").eval()
-    base_model_list.extend(nn_model_list)
-    return base_model_list
-
-def make_all_models_nosch(hyperparameter_dict, embed_dict, config, load_weights=False, weight_folder=None, fold_num=None):
-    # Declare base models
-    base_model_list = []
-    base_model_list.append(avg_speed.AvgHourlySpeedModel("AVG"))
-    base_model_list.append(persistent.PersistentTimeSeqModel("PER_TIM"))
-    # Declare neural network models
-    nn_model_list = []
-    # nn_model_list.append(ff.FF_L(
-    #     "FF",
-    #     n_features=8,
-    #     hyperparameter_dict=hyperparameter_dict['FF'],
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.basic_collate_nosch,
-    #     config=config
-    # ))
-    # nn_model_list.append(conv.CONV_L(
-    #     "CONV",
-    #     n_features=4,
-    #     hyperparameter_dict=hyperparameter_dict['CONV'],
-    #     embed_dict=embed_dict,
-    #     collate_fn=data_loader.sequential_collate_nosch,
-    #     config=config
-    # ))
-    nn_model_list.append(rnn.GRU_L(
-        "GRU",
-        n_features=4,
-        hyperparameter_dict=hyperparameter_dict['GRU'],
-        embed_dict=embed_dict,
-        collate_fn=data_loader.sequential_collate_nosch,
-        config=config
-    ))
-    nn_model_list.append(transformer.TRSF_L(
-        "TRSF",
-        n_features=4,
-        hyperparameter_dict=hyperparameter_dict['TRSF'],
-        embed_dict=embed_dict,
-        collate_fn=data_loader.sequential_collate_nosch,
-        config=config
-    ))
-    # nn_model_list.append(DeepTTE.Net(
-    #     "DEEP_TTE",
-    #     hyperparameter_dict=hyperparameter_dict['DEEPTTE'],
-    #     collate_fn=data_loader.deeptte_collate_nosch,
-    #     config=config
-    # ))
-    # Load weights if applicable
-    if load_weights:
-        base_model_list = []
-        for b in base_model_list:
-            b = data_utils.load_pkl(f"{weight_folder}{b.name}_{fold_num}.pkl")
-        for m in nn_model_list:
-            last_ckpt = os.listdir(f"{weight_folder}/../logs/{m.model_name}/version_{fold_num}/checkpoints/")
-            m = m.load_from_checkpoint(f"{weight_folder}/../logs/{m.model_name}/version_{fold_num}/checkpoints/{last_ckpt[0]}").eval()
-    # Combine all models
-    base_model_list.extend(nn_model_list)
-    return base_model_list
-
-def make_param_search_models(hyperparameter_dict, embed_dict, config):
-    # Declare base models
-    base_model_list = []
-    # Declare neural network models
-    nn_model_list = []
-    for sample_num, sample_dict in enumerate(hyperparameter_dict):
-        nn_model_list.append(ff.FF_L(
-            f"FF_{sample_num}",
-            n_features=14,
-            hyperparameter_dict=sample_dict['FF'],
-            embed_dict=embed_dict,
-            collate_fn=data_loader.basic_collate,
-            config=config
-        ))
-        nn_model_list.append(conv.CONV_L(
-            f"CONV_{sample_num}",
-            n_features=10,
-            hyperparameter_dict=sample_dict['CONV'],
-            embed_dict=embed_dict,
-            collate_fn=data_loader.sequential_collate,
-            config=config
-        ))
-        nn_model_list.append(rnn.GRU_L(
-            f"GRU_{sample_num}",
-            n_features=10,
-            hyperparameter_dict=sample_dict['GRU'],
-            embed_dict=embed_dict,
-            collate_fn=data_loader.sequential_collate,
-            config=config
-        ))
-        nn_model_list.append(transformer.TRSF_L(
-            f"TRSF_{sample_num}",
-            n_features=10,
-            hyperparameter_dict=sample_dict['TRSF'],
-            embed_dict=embed_dict,
-            collate_fn=data_loader.sequential_collate,
-            config=config
-        ))
-    # Combine all models
-    base_model_list.extend(nn_model_list)
-    return base_model_list
