@@ -8,6 +8,7 @@ cd ~/Skrivebord/valle
 # cd ~/Desktop/valle
 
 
+# Run Models
 # python ./src/run_one_model.py "FF" "./results/$RUN_NAME/" "kcm/" False False
 # python ./src/run_one_model.py "CONV" "./results/$RUN_NAME/" "kcm/" False False
 # python ./src/run_one_model.py "GRU" "./results/$RUN_NAME/" "kcm/" False False
@@ -21,6 +22,7 @@ cd ~/Skrivebord/valle
 # python ./src/run_one_model.py "GRU_GRID" "./results/$RUN_NAME/" "kcm/" False False
 python ./src/run_one_model.py "TRSF_GRID" "./results/$RUN_NAME/" "kcm/" False False
 
+# Run Experiments
 python ./src/run_experiments.py "FF" "./results/$RUN_NAME/" "kcm/" "atb/" "atb/" False False
 python ./src/run_experiments.py "CONV" "./results/$RUN_NAME/" "kcm/" "atb/" "atb/" False False
 python ./src/run_experiments.py "GRU" "./results/$RUN_NAME/" "kcm/" "atb/" "atb/" False False
