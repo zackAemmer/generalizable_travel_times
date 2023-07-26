@@ -51,7 +51,7 @@ if __name__=="__main__":
     else:
         holdout_routes=None
 
-    NUM_WORKERS=4
+    NUM_WORKERS=8
     PIN_MEMORY=False
 
     print("="*30)
@@ -189,9 +189,9 @@ if __name__=="__main__":
         # Train/Test nn model
         train_dataset.add_grid_features = nn_model.requires_grid
         test_dataset.add_grid_features = nn_model.requires_grid
-        train_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=nn_model.collate_fn, sampler=train_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
-        val_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=nn_model.collate_fn, sampler=val_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
-        test_loader = DataLoader(test_dataset, batch_size=1024, collate_fn=nn_model.collate_fn, shuffle=True, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+        train_loader = DataLoader(train_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, sampler=train_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+        val_loader = DataLoader(train_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, sampler=val_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+        test_loader = DataLoader(test_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=True, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
         t0=time.time()
         trainer = pl.Trainer(
             limit_val_batches=.50,
