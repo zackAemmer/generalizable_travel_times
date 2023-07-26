@@ -91,31 +91,31 @@ if __name__=="__main__":
     }
     hyperparameter_dict = {
         'FF': {
-            'batch_size': 512,
+            'batch_size': 1024,
             'hidden_size': 128,
             'num_layers': 2,
             'dropout_rate': .2
         },
         'CONV': {
-            'batch_size': 512,
+            'batch_size': 1024,
             'hidden_size': 64,
             'num_layers': 3,
             'dropout_rate': .1
         },
         'GRU': {
-            'batch_size': 512,
+            'batch_size': 1024,
             'hidden_size': 64,
             'num_layers': 2,
             'dropout_rate': .05
         },
         'TRSF': {
-            'batch_size': 512,
+            'batch_size': 1024,
             'hidden_size': 64,
             'num_layers': 3,
             'dropout_rate': .1
         },
         'DEEPTTE': {
-            'batch_size': 512
+            'batch_size': 1024
         }
     }
 

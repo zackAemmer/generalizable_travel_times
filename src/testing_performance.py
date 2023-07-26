@@ -32,7 +32,7 @@ def run(run_folder, train_network_folder, **kwargs):
     print(f"RUN MODELS: '{run_folder}'")
     print(f"NETWORK: '{train_network_folder}'")
 
-    NUM_WORKERS=0
+    NUM_WORKERS=4
     PIN_MEMORY=False
     embed_dict = {
         'timeID': {
@@ -76,28 +76,39 @@ def run(run_folder, train_network_folder, **kwargs):
     
     with open(f"{run_folder}{train_network_folder}deeptte_formatted/train_summary_config.json", "r") as f:
         config = json.load(f)
-    train_dataset = data_loader.LoadSliceDataset(f"{run_folder}{train_network_folder}deeptte_formatted/train", config)
-    test_dataset = data_loader.LoadSliceDataset(f"{run_folder}{train_network_folder}deeptte_formatted/test", config)
+    train_dataset = data_loader.LoadSliceDataset(f"{run_folder}{train_network_folder}deeptte_formatted/test", config)
+    test_dataset = data_loader.LoadSliceHasGridDataset(f"{run_folder}{train_network_folder}deeptte_formatted/test", config, grid_bounds=config['grid_bounds'][0], grid_s_size=kwargs['grid_s_size'])
+    train_dataset.add_grid_features = True
+    test_dataset.add_grid_features = True
 
     train_ngrid = grids.NGridBetter(config['grid_bounds'][0], kwargs['grid_s_size'])
     train_ngrid.add_grid_content(train_dataset.get_all_samples(keep_cols=['shingle_id','locationtime','x','y','speed_m_s','bearing']), trace_format=True)
     train_ngrid.build_cell_lookup()
     train_dataset.grid = train_ngrid
-    train_dataset.add_grid_features = False
+    
+    train_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=data_loader.sequential_grid_collate, shuffle=True, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+    test_loader = DataLoader(test_dataset, batch_size=1024, collate_fn=data_loader.sequential_grid_collate, shuffle=True, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
 
     t0 = time.time()
-    for i in range(1024):
-        res = train_dataset.__getitem__(i)
+    res = [x for x in train_loader]
+    # for i in range(1024):
+    #     res = train_dataset.__getitem__(i)
     print(time.time()-t0)
 
-    x_idxs = np.concatenate([train_dataset.__getitem__(i)['samp'][:,7] for i in range(10000)])
-    y_idxs = np.concatenate([train_dataset.__getitem__(i)['samp'][:,8] for i in range(10000)])
-    locationtimes = np.concatenate([train_dataset.__getitem__(i)['samp'][:,4] for i in range(10000)])
+    # t0 = time.time()
+    # res = [x for x in test_loader]
+    # # for i in range(1024):
+    # #     res = test_dataset.__getitem__(i)
+    # print(time.time()-t0)
 
-    with cProfile.Profile() as pr:
-        x_idxs, y_idxs = train_ngrid.digitize_points(x_idxs, y_idxs)
-        buffer=1
-        n_points=3
+    # x_idxs = np.concatenate([train_dataset.__getitem__(i)['samp'][:,7] for i in range(10000)])
+    # y_idxs = np.concatenate([train_dataset.__getitem__(i)['samp'][:,8] for i in range(10000)])
+    # locationtimes = np.concatenate([train_dataset.__getitem__(i)['samp'][:,4] for i in range(10000)])
+
+    # with cProfile.Profile() as pr:
+    #     x_idxs, y_idxs = train_ngrid.digitize_points(x_idxs, y_idxs)
+    #     buffer=1
+    #     n_points=3
         
         # seq_len = len(x_idxs)
         # grid_size = (2 * buffer) + 1
@@ -119,54 +130,54 @@ def run(run_folder, train_network_folder, **kwargs):
         # y_queries = np.concatenate([y[1].flatten() for y in buffer_range]) #KINDA SLOW
         # t_queries = np.array(locationtimes).repeat(grid_size*grid_size)
         
-        x_queries = x_idxs
-        y_queries = y_idxs
-        t_queries = np.array(locationtimes)
+    #     x_queries = x_idxs
+    #     y_queries = y_idxs
+    #     t_queries = np.array(locationtimes)
 
 
-        locationtime_dict = defaultdict(list)
-        order_dict = defaultdict(list)
-        # Create lookup for unique cells, to time values that will be searched
-        for i, (x, y, t) in enumerate(zip(x_queries, y_queries, t_queries)):
-            locationtime_dict[(x,y)].append(t)
-            order_dict[(x,y)].append(i)
-        # Get point values for every unique cell, at the required times
-        res_dict = {}
-        for k in list(locationtime_dict.keys()):
-            # Want to get a set of n_points for every locationtime recorded in this cell
-            cell_res = np.full((len(locationtime_dict[k]), n_points, 5), np.nan)
-            # Get all points for this grid cell
-            cell = train_ngrid.cell_lookup.get(k, np.array([]))
-            if len(cell)!=0:
-                # Get the index of each locationtime that we need for this grid cell
-                t_idxs = np.searchsorted(cell[:,0], np.array(locationtime_dict[k]))
-                # Record the index through index-n_points for each locationtime that we need for this grid cell
-                for i,n_back in enumerate(range(n_points)):
-                    idx_back = t_idxs - n_back
-                    # Record which points should be filled with nan
-                    mask = idx_back < 0
-                    # Clip so that operation can still be performed
-                    idx_back = np.clip(idx_back, a_min=0, a_max=len(cell)-1)
-                    cell_res[:,i,:] = cell[idx_back]
-                    # Fill nans (instead of repeating the first cell value), this is more informative
-                    cell_res[mask] = np.nan
-                # Save all cell results
-            res_dict[k] = cell_res
-        # Reconstruct final result in the correct order (original locationtimes have been split among dict keys)
-        cell_points = np.full((len(t_queries), n_points, 6), np.nan)
-        for k in order_dict.keys():
-            loc_order = order_dict[k]
-            results = res_dict[k]
-            cell_points[loc_order,:,:5] = results
-        cell_points[:,:,-1] = np.repeat(np.expand_dims(np.array(t_queries),1),n_points,1) - cell_points[:,:,0]
-        n_recent_points = cell_points
+    #     locationtime_dict = defaultdict(list)
+    #     order_dict = defaultdict(list)
+    #     # Create lookup for unique cells, to time values that will be searched
+    #     for i, (x, y, t) in enumerate(zip(x_queries, y_queries, t_queries)):
+    #         locationtime_dict[(x,y)].append(t)
+    #         order_dict[(x,y)].append(i)
+    #     # Get point values for every unique cell, at the required times
+    #     res_dict = {}
+    #     for k in list(locationtime_dict.keys()):
+    #         # Want to get a set of n_points for every locationtime recorded in this cell
+    #         cell_res = np.full((len(locationtime_dict[k]), n_points, 5), np.nan)
+    #         # Get all points for this grid cell
+    #         cell = train_ngrid.cell_lookup.get(k, np.array([]))
+    #         if len(cell)!=0:
+    #             # Get the index of each locationtime that we need for this grid cell
+    #             t_idxs = np.searchsorted(cell[:,0], np.array(locationtime_dict[k]))
+    #             # Record the index through index-n_points for each locationtime that we need for this grid cell
+    #             for i,n_back in enumerate(range(n_points)):
+    #                 idx_back = t_idxs - n_back
+    #                 # Record which points should be filled with nan
+    #                 mask = idx_back < 0
+    #                 # Clip so that operation can still be performed
+    #                 idx_back = np.clip(idx_back, a_min=0, a_max=len(cell)-1)
+    #                 cell_res[:,i,:] = cell[idx_back]
+    #                 # Fill nans (instead of repeating the first cell value), this is more informative
+    #                 cell_res[mask] = np.nan
+    #             # Save all cell results
+    #         res_dict[k] = cell_res
+    #     # Reconstruct final result in the correct order (original locationtimes have been split among dict keys)
+    #     cell_points = np.full((len(t_queries), n_points, 6), np.nan)
+    #     for k in order_dict.keys():
+    #         loc_order = order_dict[k]
+    #         results = res_dict[k]
+    #         cell_points[loc_order,:,:5] = results
+    #     cell_points[:,:,-1] = np.repeat(np.expand_dims(np.array(t_queries),1),n_points,1) - cell_points[:,:,0]
+    #     n_recent_points = cell_points
 
 
-        n_recent_points = n_recent_points.reshape((seq_len,grid_size,grid_size,n_points,6))
-        # TxXxYxNxC -> TxCxYxNxX -> TxCxNxYxX
-        n_recent_points = np.swapaxes(n_recent_points, 1, 4)
-        n_recent_points = np.swapaxes(n_recent_points, 2, 3)
-    pr.print_stats()
+    #     n_recent_points = n_recent_points.reshape((seq_len,grid_size,grid_size,n_points,6))
+    #     # TxXxYxNxC -> TxCxYxNxX -> TxCxNxYxX
+    #     n_recent_points = np.swapaxes(n_recent_points, 1, 4)
+    #     n_recent_points = np.swapaxes(n_recent_points, 2, 3)
+    # pr.print_stats()
 
 
 
