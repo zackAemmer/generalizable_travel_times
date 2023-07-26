@@ -54,15 +54,21 @@ if __name__=="__main__":
     else:
         holdout_routes=None
 
-    NUM_WORKERS=4
-    PIN_MEMORY=False
+    if torch.cuda.is_available():
+        num_workers=4
+        pin_memory=False
+        accelerator="auto"
+    else:
+        num_workers=0
+        pin_memory=False
+        accelerator="cpu"
 
     print("="*30)
     print(f"RUN: '{run_folder}'")
     print(f"MODEL: {model_type}")
     print(f"NETWORK: '{network_folder}'")
-    print(f"NUM_WORKERS: {NUM_WORKERS}")
-    print(f"PIN_MEMORY: {PIN_MEMORY}")
+    print(f"num_workers: {num_workers}")
+    print(f"pin_memory: {pin_memory}")
 
     # Create folder structure; delete older results
     base_folder = f"{run_folder}{network_folder}"
@@ -176,9 +182,9 @@ if __name__=="__main__":
 
         # Train/Test baseline models
         for b_model in base_model_list:
-            train_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=b_model.collate_fn, sampler=train_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
-            val_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=b_model.collate_fn, sampler=val_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
-            test_loader = DataLoader(test_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+            train_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=b_model.collate_fn, sampler=train_sampler, drop_last=True, num_workers=num_workers, pin_memory=pin_memory)
+            val_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=b_model.collate_fn, sampler=val_sampler, drop_last=True, num_workers=num_workers, pin_memory=pin_memory)
+            test_loader = DataLoader(test_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
             print(f"Network {network_folder} Fold {fold_num} Model {b_model.model_name}")
             # Train base model on all fold data
             b_model.train_time = 0.0
@@ -192,15 +198,15 @@ if __name__=="__main__":
         # Train/Test nn model
         train_dataset.add_grid_features = nn_model.requires_grid
         test_dataset.add_grid_features = nn_model.requires_grid
-        train_loader = DataLoader(train_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, sampler=train_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
-        val_loader = DataLoader(train_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, sampler=val_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
-        test_loader = DataLoader(test_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+        train_loader = DataLoader(train_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, sampler=train_sampler, drop_last=True, num_workers=num_workers, pin_memory=pin_memory)
+        val_loader = DataLoader(train_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, sampler=val_sampler, drop_last=True, num_workers=num_workers, pin_memory=pin_memory)
+        test_loader = DataLoader(test_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
         t0=time.time()
         trainer = pl.Trainer(
             check_val_every_n_epoch=1,
             max_epochs=30,
             min_epochs=5,
-            # accelerator="cpu",
+            accelerator=accelerator,
             logger=CSVLogger(save_dir=f"{model_folder}logs/", name=nn_model.model_name),
             callbacks=[EarlyStopping(monitor=f"{nn_model.model_name}_valid_loss", min_delta=.001, patience=3)],
         )

@@ -4,8 +4,8 @@ set -e
 RUN_NAME="debug"
 
 
-cd ~/Skrivebord/valle
-# cd ~/Desktop/valle
+# cd ~/Skrivebord/valle
+cd ~/Desktop/valle
 
 
 # Run Models
