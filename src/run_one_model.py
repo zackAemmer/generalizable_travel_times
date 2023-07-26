@@ -181,18 +181,18 @@ if __name__=="__main__":
         train_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=nn_model.collate_fn, sampler=train_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
         val_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=nn_model.collate_fn, sampler=val_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
         test_loader = DataLoader(test_dataset, batch_size=1024, collate_fn=nn_model.collate_fn, shuffle=True, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
-        # profiler = SimpleProfiler(dirpath="./", filename="adv_prof")
+        profiler = SimpleProfiler(dirpath="./", filename="adv_prof")
         t0=time.time()
         trainer = pl.Trainer(
             limit_val_batches=.50,
             limit_test_batches=.50,
             check_val_every_n_epoch=2,
-            max_epochs=50,
-            min_epochs=10,
-            accelerator="cpu",
+            max_epochs=2,
+            min_epochs=1,
+            # accelerator="cpu",
             logger=CSVLogger(save_dir=f"{model_folder}logs/", name=nn_model.model_name),
             callbacks=[EarlyStopping(monitor=f"{nn_model.model_name}_valid_loss", min_delta=.001, patience=3)],
-            # profiler=profiler
+            profiler=profiler
         )
         trainer.fit(model=nn_model, train_dataloaders=train_loader, val_dataloaders=val_loader)
         nn_model.train_time = time.time() - t0
