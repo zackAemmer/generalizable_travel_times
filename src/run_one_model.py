@@ -47,7 +47,7 @@ if __name__=="__main__":
     if network_folder=="kcm/":
         holdout_routes=[100252,100139,102581,100341,102720]
     elif network_folder=="atb/":
-        holdout_routs=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
+        holdout_routes=["ATB:Line:2_28","ATB:Line:2_3","ATB:Line:2_9","ATB:Line:2_340","ATB:Line:2_299"]
     else:
         holdout_routes=None
 
