@@ -152,7 +152,7 @@ if __name__=="__main__":
         print(f"BEGIN FOLD: {fold_num}")
 
         # Declare models
-        base_model_list, nn_model = model_utils.make_one_model(model_type, hyperparameter_dict=hyperparameter_dict, embed_dict=embed_dict, config=config)
+        base_model_list, nn_model = model_utils.make_one_model(model_type, hyperparameter_dict=hyperparameter_dict, embed_dict=embed_dict, config=config, skip_gtfs=skip_gtfs)
         train_sampler = SubsetRandomSampler(train_idx)
         val_sampler = SubsetRandomSampler(val_idx)
         model_names = [m.model_name for m in base_model_list]

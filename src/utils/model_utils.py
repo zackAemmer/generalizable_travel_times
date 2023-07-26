@@ -94,11 +94,12 @@ def random_param_search(hyperparameter_sample_dict, model_names):
         set_of_random_dicts.append(all_model_dict)
     return set_of_random_dicts
 
-def make_one_model(model_type, hyperparameter_dict, embed_dict, config, load_weights=False, weight_folder=None, fold_num=None):
+def make_one_model(model_type, hyperparameter_dict, embed_dict, config, load_weights=False, weight_folder=None, fold_num=None, skip_gtfs=False):
     # Declare base models
     base_model_list = []
     base_model_list.append(avg_speed.AvgHourlySpeedModel("AVG"))
-    base_model_list.append(schedule.TimeTableModel("SCH"))
+    if not skip_gtfs:
+        base_model_list.append(schedule.TimeTableModel("SCH"))
     base_model_list.append(persistent.PersistentTimeSeqModel("PER_TIM"))
     # Declare neural network models
     match model_type:
