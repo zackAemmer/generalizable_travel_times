@@ -51,7 +51,7 @@ if __name__=="__main__":
     else:
         holdout_routes=None
 
-    NUM_WORKERS=8
+    NUM_WORKERS=4
     PIN_MEMORY=False
 
     print("="*30)
