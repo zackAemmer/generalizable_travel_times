@@ -98,9 +98,9 @@ def make_one_model(model_type, hyperparameter_dict, embed_dict, config, load_wei
     # Declare base models
     base_model_list = []
     base_model_list.append(avg_speed.AvgHourlySpeedModel("AVG"))
+    base_model_list.append(persistent.PersistentTimeSeqModel("PER_TIM"))
     if not skip_gtfs:
         base_model_list.append(schedule.TimeTableModel("SCH"))
-    base_model_list.append(persistent.PersistentTimeSeqModel("PER_TIM"))
     # Declare neural network models
     match model_type:
         case "FF":
@@ -239,12 +239,13 @@ def make_one_model(model_type, hyperparameter_dict, embed_dict, config, load_wei
             )
     # Load weights if applicable
     if load_weights:
-        base_model_list = []
+        new_base_model_list = []
         for b in base_model_list:
-            b = data_utils.load_pkl(f"{weight_folder}{b.name}_{fold_num}.pkl")
-        last_ckpt = os.listdir(f"{weight_folder}logs/version_{fold_num}/checkpoints")
+            new_base_model_list.append(data_utils.load_pkl(f"{weight_folder}../../../../../{b.model_name}_{fold_num}.pkl"))
+            base_model_list = new_base_model_list
+        last_ckpt = os.listdir(weight_folder)
         if not torch.cuda.is_available():
-            model = model.load_from_checkpoint(f"{weight_folder}logs/version_{fold_num}/checkpoints/{last_ckpt[0]}", map_location=torch.device('cpu')).eval()
+            model = model.load_from_checkpoint(f"{weight_folder}{last_ckpt[0]}", map_location=torch.device('cpu')).eval()
         else:
-            model = model.load_from_checkpoint(f"{weight_folder}logs/version_{fold_num}/checkpoints/{last_ckpt[0]}").eval()
+            model = model.load_from_checkpoint(f"{weight_folder}{last_ckpt[0]}").eval()
     return base_model_list, model

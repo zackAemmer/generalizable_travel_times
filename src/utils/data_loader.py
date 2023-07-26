@@ -36,6 +36,7 @@ FEATURE_COLS = [
     "stop_dist_km",
     "passed_stops_n"
 ]
+# Must remain in order with prior
 SKIP_FEATURE_COLS = [
     "shingle_id",
     "weekID",

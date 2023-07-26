@@ -35,6 +35,10 @@ if __name__=="__main__":
     network_folder = sys.argv[3]
     skip_gtfs = sys.argv[4]
     is_param_search = sys.argv[5]
+
+    grid_s_size=500
+    n_folds=5
+
     if skip_gtfs=="True":
         skip_gtfs=True
     else:
@@ -43,8 +47,6 @@ if __name__=="__main__":
         is_param_search=True
     else:
         is_param_search=False
-    grid_s_size=500
-    n_folds=5
     if network_folder=="kcm/":
         holdout_routes=[100252,100139,102581,100341,102720]
     elif network_folder=="atb/":
@@ -176,7 +178,7 @@ if __name__=="__main__":
         for b_model in base_model_list:
             train_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=b_model.collate_fn, sampler=train_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
             val_loader = DataLoader(train_dataset, batch_size=1024, collate_fn=b_model.collate_fn, sampler=val_sampler, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
-            test_loader = DataLoader(test_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=True, drop_last=True, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
+            test_loader = DataLoader(test_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=NUM_WORKERS, pin_memory=PIN_MEMORY, multiprocessing_context="fork")
             print(f"Network {network_folder} Fold {fold_num} Model {b_model.model_name}")
             # Train base model on all fold data
             b_model.train_time = 0.0
@@ -206,8 +208,8 @@ if __name__=="__main__":
         nn_model.train_time = time.time() - t0
         trainer.test(model=nn_model, dataloaders=test_loader)
         preds_and_labels = trainer.predict(model=nn_model, dataloaders=test_loader)
-        preds = np.concatenate([p[0] for p in preds_and_labels])
-        labels = np.concatenate([l[1] for l in preds_and_labels])
+        preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
+        labels = np.concatenate([l['y_agg'] for l in preds_and_labels])
         model_fold_results[nn_model.model_name]["Labels"].extend(list(labels))
         model_fold_results[nn_model.model_name]["Preds"].extend(list(preds))
 
@@ -233,4 +235,4 @@ if __name__=="__main__":
 
     # Save full run results
     data_utils.write_pkl(run_results, f"{model_folder}model_results.pkl")
-    print(f"MODEL RUN COMPLETED '{model_folder}'")
+    print(f"MODEL RUN COMPLETED {model_folder}")

@@ -83,9 +83,9 @@ class FF_L(pl.LightningModule):
         out = torch.cat([x_ct, timeID_embedded, weekID_embedded], dim=1)
         out = self.linear_relu_stack(out)
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze()
-        out  = (out * self.config['time_std']) + self.config['time_mean']
-        y = (y * self.config['time_std']) + self.config['time_mean']
-        return (out.detach().cpu().numpy(), y.detach().cpu().numpy())
+        out  = (out.detach().cpu().numpy() * self.config['time_std']) + self.config['time_mean']
+        y = (y.detach().cpu().numpy() * self.config['time_std']) + self.config['time_mean']
+        return {"out_agg":out, "y_agg":y}
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
@@ -202,9 +202,9 @@ class FF_GRID_L(pl.LightningModule):
         # Make prediction
         out = self.linear_relu_stack(out)
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze()
-        out  = (out * self.config['time_std']) + self.config['time_mean']
-        y = (y * self.config['time_std']) + self.config['time_mean']
-        return (out.detach().cpu().numpy(), y.detach().cpu().numpy())
+        out  = (out.detach().cpu().numpy() * self.config['time_std']) + self.config['time_mean']
+        y = (y.detach().cpu().numpy() * self.config['time_std']) + self.config['time_mean']
+        return {"out_agg":out, "y_agg":y}
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer

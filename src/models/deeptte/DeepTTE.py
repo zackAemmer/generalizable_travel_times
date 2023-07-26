@@ -56,7 +56,7 @@ class EntireEstimator(nn.Module):
         loss = loss_fn(pred, label)
         # loss = torch.abs(pred - label) / label   ### size [batch, 1]
 
-        return {'label': label, 'pred': pred}, loss
+        return {'label': label.detach().cpu().numpy(), 'pred': pred.detach().cpu().numpy()}, loss
         # return {'label': label, 'pred': pred}, loss.mean()
 
 
@@ -227,7 +227,7 @@ class Net(pl.LightningModule):
         config = self.config
         entire_out = self(attr, traj, config)
         pred_dict, entire_loss = self.entire_estimate.eval_on_batch(entire_out, attr['time'], config['time_mean'], config['time_std'])
-        return (pred_dict['pred'], pred_dict['label'])
+        return {"out_agg": pred_dict['pred'], "y_agg": pred_dict['label']}
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
