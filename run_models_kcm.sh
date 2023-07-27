@@ -11,7 +11,7 @@ cd ~/Skrivebord/valle
 
 # Run Models
 # python ./src/run_one_model.py "FF" "./results/$RUN_NAME/" "kcm/" False False
-python ./src/run_one_model.py "CONV" "./results/$RUN_NAME/" "kcm/" False False
+# python ./src/run_one_model.py "CONV" "./results/$RUN_NAME/" "kcm/" False False
 python ./src/run_one_model.py "GRU" "./results/$RUN_NAME/" "kcm/" False False
 python ./src/run_one_model.py "TRSF" "./results/$RUN_NAME/" "kcm/" False False
 python ./src/run_one_model.py "DEEP_TTE" "./results/$RUN_NAME/" "kcm/" False False

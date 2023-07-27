@@ -76,6 +76,12 @@ def run(run_folder, train_network_folder, **kwargs):
     
     with open(f"{run_folder}{train_network_folder}deeptte_formatted/train_summary_config.json", "r") as f:
         config = json.load(f)
+        
+    base_models, nn_model = model_utils.make_one_model("DEEP_TTE_GTFS", hyperparameter_dict, embed_dict, config)
+    print(sum(p.numel() for p in nn_model.parameters()))
+        
+        
+        
     train_dataset = data_loader.LoadSliceDataset(f"{run_folder}{train_network_folder}deeptte_formatted/test", config)
     test_dataset = data_loader.LoadSliceHasGridDataset(f"{run_folder}{train_network_folder}deeptte_formatted/test", config, grid_bounds=config['grid_bounds'][0], grid_s_size=kwargs['grid_s_size'])
     train_dataset.add_grid_features = True
