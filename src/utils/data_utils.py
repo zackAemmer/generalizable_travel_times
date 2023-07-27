@@ -744,34 +744,34 @@ def format_deeptte_to_features(deeptte_data, resampled_deeptte_data):
     df = np.hstack((df, resampled_features))
     return df, times
 
-def extract_lightning_results(base_folder, city_name):
+def extract_lightning_results(model_name, base_folder, city_name):
     all_data = []
     col_names = ["train_loss_epoch","valid_loss","test_loss"]
-    for model_name in os.listdir(base_folder):
-        model_folder = os.path.join(base_folder, model_name)
-        if not os.path.isdir(model_folder):
+    # for model_name in os.listdir(base_folder):
+    #     model_folder = os.path.join(base_folder, model_name)
+    #     if not os.path.isdir(model_folder):
+    #         continue
+    for fold_folder in os.listdir(base_folder):
+        fold_path = os.path.join(base_folder, fold_folder)
+        if not os.path.isdir(fold_path):
             continue
-        for fold_folder in os.listdir(model_folder):
-            fold_path = os.path.join(model_folder, fold_folder)
-            if not os.path.isdir(fold_path):
-                continue
-            metrics_file = os.path.join(fold_path, "metrics.csv")
-            if not os.path.exists(metrics_file):
-                continue
-            # Read metrics file into a dataframe
-            df = pd.read_csv(metrics_file)
-            # Rename the columns to include model and fold names
-            col_names_mapping = [f"{model_name}_{c}" for c in col_names]
-            for i in range(len(col_names)):
-                df_sub = df[["epoch", col_names_mapping[i]]].dropna()
-                col_remap = {f"{col_names_mapping[i]}": "Loss", "epoch": "Epoch"}
-                df_sub.rename(columns=col_remap, inplace=True)
-                df_sub["Model"] = model_name
-                df_sub["Loss Set"] = col_names[i]
-                df_sub["Fold"] = fold_folder.split("_")[1]
-                df_sub["City"] = city_name
-                df_sub["Loss Set"].replace(to_replace=col_names, value=["Train","Valid","Test"], inplace=True)
-                all_data.append(df_sub)
+        metrics_file = os.path.join(fold_path, "metrics.csv")
+        if not os.path.exists(metrics_file):
+            continue
+        # Read metrics file into a dataframe
+        df = pd.read_csv(metrics_file)
+        # Rename the columns to include model and fold names
+        col_names_mapping = [f"{model_name}_{c}" for c in col_names]
+        for i in range(len(col_names)):
+            df_sub = df[["epoch", col_names_mapping[i]]].dropna()
+            col_remap = {f"{col_names_mapping[i]}": "Loss", "epoch": "Epoch"}
+            df_sub.rename(columns=col_remap, inplace=True)
+            df_sub["Model"] = model_name
+            df_sub["Loss Set"] = col_names[i]
+            df_sub["Fold"] = fold_folder.split("_")[1]
+            df_sub["City"] = city_name
+            df_sub["Loss Set"].replace(to_replace=col_names, value=["Train","Valid","Test"], inplace=True)
+            all_data.append(df_sub)
     # Concatenate all dataframes into a single dataframe
     result_df = pd.concat(all_data, axis=0)
     return result_df
@@ -833,7 +833,7 @@ def extract_results(model_results, city):
     })
     return result_df, train_time_df
 
-def extract_gen_results(city, gen_results):
+def extract_gen_results(gen_results, city):
     # Extract generalization results
     res = []
     experiments = ["Train_Losses","Test_Losses","Holdout_Losses","Tune_Train_Losses","Tune_Test_Losses"]
