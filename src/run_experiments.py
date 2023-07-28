@@ -35,7 +35,7 @@ if __name__=="__main__":
     tune_epochs=5
     grid_s_size=500
     n_tune_samples=100
-    fold_num=4
+    n_folds=5
 
     if skip_gtfs=="True":
         skip_gtfs=True
@@ -155,164 +155,166 @@ if __name__=="__main__":
 
     run_results = []
 
-    # Declare models
-    base_model_list, nn_model = model_utils.make_one_model(model_type, hyperparameter_dict=hyperparameter_dict, embed_dict=embed_dict, config=train_network_config, skip_gtfs=skip_gtfs, load_weights=True, weight_folder=f"{model_folder}logs/{model_type}/version_{fold_num}/checkpoints/", fold_num=4)
-    model_names = [m.model_name for m in base_model_list]
-    model_names.append(nn_model.model_name)
-    print(f"Model name: {model_names}")
-    print(f"NN model total parameters: {sum(p.numel() for p in nn_model.parameters())}")
+    for fold_num in range(n_folds):
+        # Declare models
+        base_model_list, nn_model = model_utils.make_one_model(model_type, hyperparameter_dict=hyperparameter_dict, embed_dict=embed_dict, config=train_network_config, skip_gtfs=skip_gtfs, load_weights=True, weight_folder=f"{model_folder}logs/{model_type}/version_{fold_num}/checkpoints/", fold_num=fold_num)
+        model_names = [m.model_name for m in base_model_list]
+        model_names.append(nn_model.model_name)
+        print(f"Model name: {model_names}")
+        print(f"NN model total parameters: {sum(p.numel() for p in nn_model.parameters())}")
 
-    # Keep track of all model performances
-    model_fold_results = {}
-    for x in model_names:
-        model_fold_results[x] = {
-            "Train_Labels":[],
-            "Train_Preds":[],
-            "Test_Labels":[],
-            "Test_Preds":[],
-            "Holdout_Labels":[],
-            "Holdout_Preds":[],
-            "Tune_Train_Labels":[],
-            "Tune_Train_Preds":[],
-            "Tune_Test_Labels":[],
-            "Tune_Test_Preds":[]
-        }
+        # Keep track of all model performances
+        model_fold_results = {}
+        for x in model_names:
+            model_fold_results[x] = {
+                "Train_Labels":[],
+                "Train_Preds":[],
+                "Test_Labels":[],
+                "Test_Preds":[],
+                "Holdout_Labels":[],
+                "Holdout_Preds":[],
+                "Tune_Train_Labels":[],
+                "Tune_Train_Preds":[],
+                "Tune_Test_Labels":[],
+                "Tune_Test_Preds":[]
+            }
 
-    print(f"EXPERIMENT: SAME NETWORK")
-    for b_model in base_model_list:
-        print(f"Fold final evaluation for: {b_model.model_name}")
-        loader = DataLoader(train_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
-        labels, preds = b_model.evaluate(loader, train_network_config)
-        model_fold_results[b_model.model_name]["Train_Labels"].extend(list(labels))
-        model_fold_results[b_model.model_name]["Train_Preds"].extend(list(preds))
-    print(f"Fold final evaluation for: {nn_model.model_name}")
-    train_network_dataset.add_grid_features = nn_model.requires_grid
-    loader = DataLoader(train_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
-    trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_SAME"), accelerator=accelerator)
-    preds_and_labels = trainer.predict(model=nn_model, dataloaders=loader)
-    preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
-    labels = np.concatenate([l['y_agg'] for l in preds_and_labels])
-    model_fold_results[nn_model.model_name]["Train_Labels"].extend(list(labels))
-    model_fold_results[nn_model.model_name]["Train_Preds"].extend(list(preds))
-
-    print(f"EXPERIMENT: DIFFERENT NETWORK")
-    for b_model in base_model_list:
-        print(f"Fold final evaluation for: {b_model.model_name}")
-        loader = DataLoader(test_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
-        labels, preds = b_model.evaluate(loader, train_network_config)
-        model_fold_results[b_model.model_name]["Test_Labels"].extend(list(labels))
-        model_fold_results[b_model.model_name]["Test_Preds"].extend(list(preds))
-    print(f"Fold final evaluation for: {nn_model.model_name}")
-    test_network_dataset.add_grid_features = nn_model.requires_grid
-    loader = DataLoader(test_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
-    trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_DIFF"), accelerator=accelerator)
-    preds_and_labels = trainer.predict(model=nn_model, dataloaders=loader)
-    preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
-    labels = np.concatenate([l['y_agg'] for l in preds_and_labels])
-    model_fold_results[nn_model.model_name]["Test_Labels"].extend(list(labels))
-    model_fold_results[nn_model.model_name]["Test_Preds"].extend(list(preds))
-
-    if not skip_gtfs:
-        print(f"EXPERIMENT: HOLDOUT ROUTES")
-        for b_model in base_model_list:
-            print(f"Fold final evaluation for: {b_model.model_name}")
-            loader = DataLoader(holdout_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
-            labels, preds = b_model.evaluate(loader, train_network_config)
-            model_fold_results[b_model.model_name]["Holdout_Labels"].extend(list(labels))
-            model_fold_results[b_model.model_name]["Holdout_Preds"].extend(list(preds))
-        print(f"Fold final evaluation for: {nn_model.model_name}")
-        holdout_network_dataset.add_grid_features = nn_model.requires_grid
-        loader = DataLoader(holdout_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
-        trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_HOLDOUT"), accelerator=accelerator)
-        preds_and_labels = trainer.predict(model=nn_model, dataloaders=loader)
-        preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
-        labels = np.concatenate([l['y_agg'] for l in preds_and_labels])
-        model_fold_results[nn_model.model_name]["Holdout_Labels"].extend(list(labels))
-        model_fold_results[nn_model.model_name]["Holdout_Preds"].extend(list(preds))
-
-        print(f"EXPERIMENT: FINE TUNING")
-        # Re-declare models with original weights
-        base_model_list, nn_model = model_utils.make_one_model(model_type, hyperparameter_dict=hyperparameter_dict, embed_dict=embed_dict, config=train_network_config, skip_gtfs=skip_gtfs, load_weights=True, weight_folder=f"{model_folder}logs/{model_type}/version_{fold_num}/checkpoints/", fold_num=4)
+        print(f"EXPERIMENT: SAME NETWORK")
         for b_model in base_model_list:
             print(f"Fold final evaluation for: {b_model.model_name}")
             loader = DataLoader(train_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
             labels, preds = b_model.evaluate(loader, train_network_config)
-            model_fold_results[b_model.model_name]["Tune_Train_Labels"].extend(list(labels))
-            model_fold_results[b_model.model_name]["Tune_Train_Preds"].extend(list(preds))
-            loader = DataLoader(test_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
-            labels, preds = b_model.evaluate(loader, train_network_config)
-            model_fold_results[b_model.model_name]["Tune_Test_Labels"].extend(list(labels))
-            model_fold_results[b_model.model_name]["Tune_Test_Preds"].extend(list(preds))
-        print(f"Fold training for: {nn_model.model_name}")
-        tune_network_dataset.add_grid_features = nn_model.requires_grid
-        loader = DataLoader(tune_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=True, drop_last=True, num_workers=num_workers, pin_memory=pin_memory)
-        trainer = pl.Trainer(
-            max_epochs=tune_epochs,
-            min_epochs=1,
-            logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_TUNE"),
-            accelerator=accelerator
-        )
-        trainer.fit(model=nn_model, train_dataloaders=loader)
+            model_fold_results[b_model.model_name]["Train_Labels"].extend(list(labels))
+            model_fold_results[b_model.model_name]["Train_Preds"].extend(list(preds))
         print(f"Fold final evaluation for: {nn_model.model_name}")
         train_network_dataset.add_grid_features = nn_model.requires_grid
         loader = DataLoader(train_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
-        trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_TUNE_TRAIN"), accelerator=accelerator)
+        trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_SAME"), accelerator=accelerator)
         preds_and_labels = trainer.predict(model=nn_model, dataloaders=loader)
         preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
         labels = np.concatenate([l['y_agg'] for l in preds_and_labels])
-        model_fold_results[nn_model.model_name]["Tune_Train_Labels"].extend(list(labels))
-        model_fold_results[nn_model.model_name]["Tune_Train_Preds"].extend(list(preds))
+        model_fold_results[nn_model.model_name]["Train_Labels"].extend(list(labels))
+        model_fold_results[nn_model.model_name]["Train_Preds"].extend(list(preds))
+
+        print(f"EXPERIMENT: DIFFERENT NETWORK")
+        for b_model in base_model_list:
+            print(f"Fold final evaluation for: {b_model.model_name}")
+            loader = DataLoader(test_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
+            labels, preds = b_model.evaluate(loader, train_network_config)
+            model_fold_results[b_model.model_name]["Test_Labels"].extend(list(labels))
+            model_fold_results[b_model.model_name]["Test_Preds"].extend(list(preds))
+        print(f"Fold final evaluation for: {nn_model.model_name}")
         test_network_dataset.add_grid_features = nn_model.requires_grid
         loader = DataLoader(test_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
-        trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_TUNE_TEST"), accelerator=accelerator)
+        trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_DIFF"), accelerator=accelerator)
         preds_and_labels = trainer.predict(model=nn_model, dataloaders=loader)
         preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
         labels = np.concatenate([l['y_agg'] for l in preds_and_labels])
-        model_fold_results[nn_model.model_name]["Tune_Test_Labels"].extend(list(labels))
-        model_fold_results[nn_model.model_name]["Tune_Test_Preds"].extend(list(preds))
+        model_fold_results[nn_model.model_name]["Test_Labels"].extend(list(labels))
+        model_fold_results[nn_model.model_name]["Test_Preds"].extend(list(preds))
 
-    # Calculate various losses:
-    fold_results = {
-        "Model_Names": model_names,
-        "Fold": fold_num,
-        "Train_Losses": [],
-        "Test_Losses": [],
-        "Holdout_Losses": [],
-        "Tune_Train_Losses": [],
-        "Tune_Test_Losses": [],
-        "Extract_Train_Losses": [],
-        "Extract_Test_Losses": []
-    }
-    for mname in fold_results["Model_Names"]:
-        _ = [mname]
-        _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Train_Labels"], model_fold_results[mname]["Train_Preds"]), 2))
-        _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Train_Labels"], model_fold_results[mname]["Train_Preds"])), 2))
-        _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Train_Labels"], model_fold_results[mname]["Train_Preds"]), 2))
-        fold_results['Train_Losses'].append(_)
-        _ = [mname]
-        _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Test_Labels"], model_fold_results[mname]["Test_Preds"]), 2))
-        _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Test_Labels"], model_fold_results[mname]["Test_Preds"])), 2))
-        _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Test_Labels"], model_fold_results[mname]["Test_Preds"]), 2))
-        fold_results['Test_Losses'].append(_)
         if not skip_gtfs:
-            _ = [mname]
-            _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Holdout_Labels"], model_fold_results[mname]["Holdout_Preds"]), 2))
-            _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Holdout_Labels"], model_fold_results[mname]["Holdout_Preds"])), 2))
-            _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Holdout_Labels"], model_fold_results[mname]["Holdout_Preds"]), 2))
-            fold_results['Holdout_Losses'].append(_)
-            _ = [mname]
-            _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Tune_Train_Labels"], model_fold_results[mname]["Tune_Train_Preds"]), 2))
-            _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Tune_Train_Labels"], model_fold_results[mname]["Tune_Train_Preds"])), 2))
-            _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Tune_Train_Labels"], model_fold_results[mname]["Tune_Train_Preds"]), 2))
-            fold_results['Tune_Train_Losses'].append(_)
-            _ = [mname]
-            _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Tune_Test_Labels"], model_fold_results[mname]["Tune_Test_Preds"]), 2))
-            _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Tune_Test_Labels"], model_fold_results[mname]["Tune_Test_Preds"])), 2))
-            _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Tune_Test_Labels"], model_fold_results[mname]["Tune_Test_Preds"]), 2))
-            fold_results['Tune_Test_Losses'].append(_)
+            print(f"EXPERIMENT: HOLDOUT ROUTES")
+            for b_model in base_model_list:
+                print(f"Fold final evaluation for: {b_model.model_name}")
+                loader = DataLoader(holdout_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
+                labels, preds = b_model.evaluate(loader, train_network_config)
+                model_fold_results[b_model.model_name]["Holdout_Labels"].extend(list(labels))
+                model_fold_results[b_model.model_name]["Holdout_Preds"].extend(list(preds))
+            print(f"Fold final evaluation for: {nn_model.model_name}")
+            holdout_network_dataset.add_grid_features = nn_model.requires_grid
+            loader = DataLoader(holdout_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
+            trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_HOLDOUT"), accelerator=accelerator)
+            preds_and_labels = trainer.predict(model=nn_model, dataloaders=loader)
+            preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
+            labels = np.concatenate([l['y_agg'] for l in preds_and_labels])
+            model_fold_results[nn_model.model_name]["Holdout_Labels"].extend(list(labels))
+            model_fold_results[nn_model.model_name]["Holdout_Preds"].extend(list(preds))
 
-    # Save fold
-    run_results.append(fold_results)
+            print(f"EXPERIMENT: FINE TUNING")
+            # Re-declare models with original weights
+            base_model_list, nn_model = model_utils.make_one_model(model_type, hyperparameter_dict=hyperparameter_dict, embed_dict=embed_dict, config=train_network_config, skip_gtfs=skip_gtfs, load_weights=True, weight_folder=f"{model_folder}logs/{model_type}/version_{fold_num}/checkpoints/", fold_num=fold_num)
+            for b_model in base_model_list:
+                print(f"Fold final evaluation for: {b_model.model_name}")
+                loader = DataLoader(train_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
+                labels, preds = b_model.evaluate(loader, train_network_config)
+                model_fold_results[b_model.model_name]["Tune_Train_Labels"].extend(list(labels))
+                model_fold_results[b_model.model_name]["Tune_Train_Preds"].extend(list(preds))
+                loader = DataLoader(test_network_dataset, batch_size=1024, collate_fn=b_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
+                labels, preds = b_model.evaluate(loader, train_network_config)
+                model_fold_results[b_model.model_name]["Tune_Test_Labels"].extend(list(labels))
+                model_fold_results[b_model.model_name]["Tune_Test_Preds"].extend(list(preds))
+            print(f"Fold training for: {nn_model.model_name}")
+            tune_network_dataset.add_grid_features = nn_model.requires_grid
+            loader = DataLoader(tune_network_dataset, batch_size=10, collate_fn=nn_model.collate_fn, shuffle=True, drop_last=True, num_workers=num_workers, pin_memory=pin_memory)
+            trainer = pl.Trainer(
+                max_epochs=tune_epochs,
+                min_epochs=1,
+                limit_train_batches=10,
+                logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_TUNE"),
+                accelerator=accelerator
+            )
+            trainer.fit(model=nn_model, train_dataloaders=loader)
+            print(f"Fold final evaluation for: {nn_model.model_name}")
+            train_network_dataset.add_grid_features = nn_model.requires_grid
+            loader = DataLoader(train_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
+            trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_TUNE_TRAIN"), accelerator=accelerator)
+            preds_and_labels = trainer.predict(model=nn_model, dataloaders=loader)
+            preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
+            labels = np.concatenate([l['y_agg'] for l in preds_and_labels])
+            model_fold_results[nn_model.model_name]["Tune_Train_Labels"].extend(list(labels))
+            model_fold_results[nn_model.model_name]["Tune_Train_Preds"].extend(list(preds))
+            test_network_dataset.add_grid_features = nn_model.requires_grid
+            loader = DataLoader(test_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=False, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
+            trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_TUNE_TEST"), accelerator=accelerator)
+            preds_and_labels = trainer.predict(model=nn_model, dataloaders=loader)
+            preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
+            labels = np.concatenate([l['y_agg'] for l in preds_and_labels])
+            model_fold_results[nn_model.model_name]["Tune_Test_Labels"].extend(list(labels))
+            model_fold_results[nn_model.model_name]["Tune_Test_Preds"].extend(list(preds))
+
+        # Calculate various losses:
+        fold_results = {
+            "Model_Names": model_names,
+            "Fold": fold_num,
+            "Train_Losses": [],
+            "Test_Losses": [],
+            "Holdout_Losses": [],
+            "Tune_Train_Losses": [],
+            "Tune_Test_Losses": [],
+            "Extract_Train_Losses": [],
+            "Extract_Test_Losses": []
+        }
+        for mname in fold_results["Model_Names"]:
+            _ = [mname]
+            _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Train_Labels"], model_fold_results[mname]["Train_Preds"]), 2))
+            _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Train_Labels"], model_fold_results[mname]["Train_Preds"])), 2))
+            _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Train_Labels"], model_fold_results[mname]["Train_Preds"]), 2))
+            fold_results['Train_Losses'].append(_)
+            _ = [mname]
+            _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Test_Labels"], model_fold_results[mname]["Test_Preds"]), 2))
+            _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Test_Labels"], model_fold_results[mname]["Test_Preds"])), 2))
+            _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Test_Labels"], model_fold_results[mname]["Test_Preds"]), 2))
+            fold_results['Test_Losses'].append(_)
+            if not skip_gtfs:
+                _ = [mname]
+                _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Holdout_Labels"], model_fold_results[mname]["Holdout_Preds"]), 2))
+                _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Holdout_Labels"], model_fold_results[mname]["Holdout_Preds"])), 2))
+                _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Holdout_Labels"], model_fold_results[mname]["Holdout_Preds"]), 2))
+                fold_results['Holdout_Losses'].append(_)
+                _ = [mname]
+                _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Tune_Train_Labels"], model_fold_results[mname]["Tune_Train_Preds"]), 2))
+                _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Tune_Train_Labels"], model_fold_results[mname]["Tune_Train_Preds"])), 2))
+                _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Tune_Train_Labels"], model_fold_results[mname]["Tune_Train_Preds"]), 2))
+                fold_results['Tune_Train_Losses'].append(_)
+                _ = [mname]
+                _.append(np.round(metrics.mean_absolute_percentage_error(model_fold_results[mname]["Tune_Test_Labels"], model_fold_results[mname]["Tune_Test_Preds"]), 2))
+                _.append(np.round(np.sqrt(metrics.mean_squared_error(model_fold_results[mname]["Tune_Test_Labels"], model_fold_results[mname]["Tune_Test_Preds"])), 2))
+                _.append(np.round(metrics.mean_absolute_error(model_fold_results[mname]["Tune_Test_Labels"], model_fold_results[mname]["Tune_Test_Preds"]), 2))
+                fold_results['Tune_Test_Losses'].append(_)
+
+        # Save fold
+        run_results.append(fold_results)
 
     # Save run results
     data_utils.write_pkl(run_results, f"{model_folder}model_generalization_results.pkl")
