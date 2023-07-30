@@ -114,6 +114,7 @@ class LoadSliceDataset(Dataset):
         return len(self.shingle_keys)
     def get_all_samples(self, keep_cols, indexes=None):
         # Read all h5 files in run base directory; get all point obs
+        # Much faster way to get all points, but does not maintain unique samples
         res = []
         for k in list(self.h5_lookup.keys()):
             df = self.h5_lookup[k][:]
@@ -126,6 +127,23 @@ class LoadSliceDataset(Dataset):
             # Indexes are in order, but shingle_id's are not; get shingle id for each keep index and filter
             keep_shingles = [self.shingle_lookup[self.shingle_keys[i]]['shingle_id'] for i in indexes]
             res = res[res['shingle_id'].isin(keep_shingles)]
+        return res
+    def get_all_samples_shingle_accurate(self, n_samples):
+        # Iterate every item in dataset
+        # Slower way to get data out, but keeps all samples unique
+        idxs = sample(list(np.arange(self.__len__())), n_samples)
+        z = []
+        for i in idxs:
+            z_data = pd.DataFrame(self.__getitem__(i)['samp'], columns=self.col_names)
+            z_dict = self.shingle_lookup[str(i)]
+            z_data['file'] = z_dict['file']
+            z_data['trip_id'] = z_dict['trip_id']
+            z_data['route_id'] = z_dict['route_id']
+            z_data['file_num'] = z_dict['file_num']
+            z.append(z_data)
+        res = pd.concat(z)
+        res['stop_x'] = res['stop_x_cent'] + self.config['coord_ref_center'][0][0]
+        res['stop_y'] = res['stop_y_cent'] + self.config['coord_ref_center'][0][1]
         return res
 
 class ContentDataset(Dataset):

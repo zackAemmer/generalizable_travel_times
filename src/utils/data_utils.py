@@ -126,26 +126,13 @@ def get_date_list(start, n_days):
     date_list = [base + timedelta(days=x) for x in range(n_days)]
     return [f"{date.strftime('%Y_%m_%d')}.pkl" for date in date_list]
 
-def load_all_inputs(run_folder, network_folder):
+def load_all_inputs(run_folder, network_folder, n_samples):
     with open(f"{run_folder}{network_folder}/deeptte_formatted/train_summary_config.json") as f:
         summary_config = json.load(f)
     with open(f"{run_folder}{network_folder}/deeptte_formatted/train_shingle_config.json") as f:
         shingle_config = json.load(f)
     train_dataset = data_loader.LoadSliceDataset(f"{run_folder}{network_folder}deeptte_formatted/train", summary_config)
-    train_traces = train_dataset.get_all_samples(data_loader.FEATURE_COLS)
-    # Need to invert the dictionary to go from shingle -> values
-    # Dict is set up for index -> shingle
-    vals = list(shingle_config.values())
-    vals = [v['shingle_id'] for v in vals]
-    indexes = list(shingle_config.keys())
-    mapping_dict = dict(zip(vals, indexes))
-    files = [shingle_config[mapping_dict[i]]['file'] for i in train_traces.shingle_id.values]
-    trip_ids = [shingle_config[mapping_dict[i]]['trip_id'] for i in train_traces.shingle_id.values]
-    train_traces['file'] = files
-    train_traces['trip_id'] = trip_ids
-    # Add back correct stop coords
-    train_traces['stop_x'] = train_traces['stop_x_cent'] + summary_config['coord_ref_center'][0][0]
-    train_traces['stop_y'] = train_traces['stop_y_cent'] + summary_config['coord_ref_center'][0][1]
+    train_traces = train_dataset.get_all_samples_shingle_accurate(n_samples)
     return {
         "summary_config": summary_config,
         "shingle_config": shingle_config,
