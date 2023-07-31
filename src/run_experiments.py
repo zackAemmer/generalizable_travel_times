@@ -134,13 +134,13 @@ if __name__=="__main__":
     train_network_ngrid.build_cell_lookup()
     train_network_dataset.grid = train_network_ngrid
     print(f"Building grid on validation data from testing network")
-    test_network_dataset = data_loader.LoadSliceDataset(f"{run_folder}{test_network_folder}deeptte_formatted/test", test_network_config, holdout_routes=holdout_routes, skip_gtfs=skip_gtfs)
+    test_network_dataset = data_loader.LoadSliceDataset(f"{run_folder}{test_network_folder}deeptte_formatted/test", train_network_config, holdout_routes=holdout_routes, skip_gtfs=skip_gtfs)
     test_network_ngrid = grids.NGridBetter(test_network_config['grid_bounds'][0],grid_s_size)
     test_network_ngrid.add_grid_content(test_network_dataset.get_all_samples(keep_cols=['shingle_id','locationtime','x','y','speed_m_s','bearing']), trace_format=True)
     test_network_ngrid.build_cell_lookup()
     test_network_dataset.grid = test_network_ngrid
     print(f"Building tune grid on training data from testing network")
-    tune_network_dataset = data_loader.LoadSliceDataset(f"{run_folder}{tune_network_folder}deeptte_formatted/train", tune_network_config, holdout_routes=holdout_routes, skip_gtfs=skip_gtfs)
+    tune_network_dataset = data_loader.LoadSliceDataset(f"{run_folder}{tune_network_folder}deeptte_formatted/train", train_network_config, holdout_routes=holdout_routes, skip_gtfs=skip_gtfs)
     tune_network_ngrid = grids.NGridBetter(tune_network_config['grid_bounds'][0],grid_s_size)
     tune_network_ngrid.add_grid_content(tune_network_dataset.get_all_samples(keep_cols=['shingle_id','locationtime','x','y','speed_m_s','bearing']), trace_format=True)
     tune_network_ngrid.build_cell_lookup()
