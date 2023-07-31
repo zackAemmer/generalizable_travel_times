@@ -1,12 +1,11 @@
 #!/bin/bash
 set -e
 
-# RUN_NAME="debug"
-RUN_NAME="full_run"
+RUN_NAME="debug"
+# RUN_NAME="full_run"
 
 
-cd ~/Skrivebord/valle
-# cd ~/Desktop/valle
+cd ~/Desktop/valle
 
 
 # Run Models

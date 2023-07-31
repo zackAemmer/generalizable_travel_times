@@ -5,8 +5,7 @@ set -e
 RUN_NAME="full_run_nosch"
 
 
-cd ~/Skrivebord/valle
-# cd ~/Desktop/valle
+cd ~/Desktop/valle
 
 
 # Run Models

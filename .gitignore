@@ -9,6 +9,7 @@ current_scraping_files.zip
 /data/*
 /figures/*
 /plots/*
+/plots_trb/*
 /results/*
 /aws/*
 /src/scraped_data/*
