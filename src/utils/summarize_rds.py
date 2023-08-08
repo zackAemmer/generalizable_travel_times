@@ -1,18 +1,6 @@
-"""Gathers the last 24hrs of speed data, aggregates it, and uploads it.
-
-This module takes speeds from a SQL data-warehouse and summarizes them to then
-upload to the dynamodb database which our visualization draws from. This is
-a necessity because querying large (24hrs+) amounts of data from the warehouse
-can take upwards of 10 minutes, rendering the tool slow and useless. This script
-is run once per day to summarize the daily speeds to the segments created by the
-initialize_dynamodb module, however it is also possible to do many days at once.
-RAM must be managed carefully to avoid OOM errors, so for a 24hr query at least
-3gb is recommended. If using less, the query time period should be split up
-smaller than 24hrs.
-"""
 import os
 import pickle
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from zipfile import ZipFile
 
 import numpy as np

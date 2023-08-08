@@ -1,48 +1,17 @@
-"""
-Functions for processing and working with tracked bus data.
-"""
 import warnings
 from random import sample
 
 import geopandas
-import matplotlib.animation as animation
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import shapely
-import shapely.geometry
 from scipy.spatial import KDTree
 from shapely.errors import ShapelyDeprecationWarning
 
 from utils import data_utils
 
+
 warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
 
-
-def apply_bbox(lat, lons, bbox):
-    min_lat = bbox[0]
-    min_lon = bbox[1]
-    max_lat = bbox[2]
-    max_lon = bbox[3]
-    a = [lat>=min_lat]
-    b = [lat>=min_lat]
-    c = [lons>=min_lon]
-    d = [lons>=min_lon]
-    return [a and b and c and d]
-
-def upscale(rast, scalar_dims):
-    scalars = [np.ones((x,x), dtype=float) for x in scalar_dims]
-    res = [np.kron(rast[x], scalars[x]) for x in range(len(scalar_dims))]
-    return res
-
-def get_points_within_dist(points, query_points, distance):
-    """
-    Get unique indices in points for all that are within distance of a query point.
-    """
-    tree = KDTree(points)
-    idxs = tree.query_ball_point(query_points, distance)
-    flat_list = [item for sublist in idxs for item in sublist]
-    return flat_list
 
 def get_closest_point(points, query_points):
     tree = KDTree(points)
@@ -90,70 +59,7 @@ def get_adjacent_metric(shingle_group, adj_traces, d_buffer, t_buffer, b_buffer=
         pred = np.nan
     return (target, pred)
 
-def interpolate_trajectories(df, group_col):
-    traj_bounds = df.groupby(group_col)['timeID_s'].agg(['min', 'max'])
-    ary_len = np.sum(traj_bounds['max']+1 - traj_bounds['min'])
-    interp_lon = np.empty((ary_len,), dtype=float)
-    interp_lat = np.empty((ary_len,), dtype=float)
-    interp_t = np.empty((ary_len,), dtype=int)
-    interp_id = np.empty((ary_len,), dtype=object)
-    i = 0
-    for traj_id, (traj_min, traj_max) in traj_bounds.iterrows():
-        time_steps = np.arange(traj_min, traj_max+1)
-        num_steps = len(time_steps)
-        traj_data = df[df[group_col] == traj_id][['lon', 'lat', 'timeID_s']].values
-        lonint = np.interp(time_steps, traj_data[:,2], traj_data[:,0])
-        latint = np.interp(time_steps, traj_data[:,2], traj_data[:,1])
-        interp_lon[i:i+num_steps] = lonint
-        interp_lat[i:i+num_steps] = latint
-        interp_t[i:i+num_steps] = time_steps
-        interp_id[i:i+num_steps] = np.full((num_steps,), traj_id)
-        i += num_steps
-    # Put in dataframe and format
-    interp = pd.DataFrame({
-        'lon':interp_lon,
-        'lat': interp_lat,
-        'timeID_s': interp_t,
-        group_col: interp_id
-    })
-    return interp
-
-def fill_trajectories(df, min_timeID, max_timeID, group_id):
-    traj_bounds = df.groupby(group_id)['timeID_s'].agg(['min', 'max'])
-    time_steps = np.arange(min_timeID, max_timeID + 1)
-    # Create an array to hold the filled trajectories
-    num_trajectories = len(traj_bounds)
-    num_steps = len(time_steps)
-    fill_arr = np.empty((num_trajectories * num_steps, 4), dtype=object)
-    # Loop over each trajectory and fill in the positions at each time step
-    i = 0
-    for traj_id, (traj_min, traj_max) in traj_bounds.iterrows():
-        traj_data = df[df[group_id] == traj_id][['lat', 'lon', 'timeID_s']].values
-        for j, t in enumerate(time_steps):
-            if t < traj_min:
-                # Use the first observation for this trajectory before the trajectory start time
-                fill_arr[i+j] = [traj_data[0,1], traj_data[0,0], t, traj_id]
-            elif t > traj_max:
-                # Use the last observation for this trajectory after the trajectory end time
-                fill_arr[i+j] = [traj_data[-1,1], traj_data[-1,0], t, traj_id]
-            else:
-                # Use the most recent observation for this trajectory at the current time step
-                mask = traj_data[:,2].astype(int) <= t
-                if np.any(mask):
-                    fill_arr[i+j] = [traj_data[mask][-1,1], traj_data[mask][-1,0], t, traj_id]
-                else:
-                    # There are no observations for this trajectory at or before the current time step
-                    fill_arr[i+j] = [np.nan, np.nan, t, traj_id]
-        i += num_steps
-    # Put in dataframe and format
-    fill = pd.DataFrame(fill_arr)
-    fill.columns = ['lon','lat','timeID_s',group_id]
-    fill['lon'] = fill['lon'].astype(float)
-    fill['lat'] = fill['lat'].astype(float)
-    fill['timeID_s'] = fill['timeID_s'].astype(int)
-    return fill
-
-def plot_gtfsrt_trip(ax, trace_df, epsg, gtfs_folder, coord_ref_center):
+def plot_gtfsrt_trip(ax, trace_df, epsg, gtfs_folder):
     """
     Plot a single real-time bus trajectory on a map.
     ax: where to plot

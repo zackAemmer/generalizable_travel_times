@@ -1,9 +1,7 @@
+from math import asin, cos, radians, sin, sqrt
+
 import torch
 from torch.autograd import Variable
-
-import json
-
-from math import radians, cos, sin, asin, sqrt
 
 
 def geo_distance(lon1, lat1, lon2, lat2):
@@ -18,16 +16,6 @@ def geo_distance(lon1, lat1, lon2, lat2):
     c = 2 * asin(sqrt(a))
     r = 6371
     return c * r
-
-# def normalize(x, key):
-#     mean = config[key + '_mean']
-#     std = config[key + '_std']
-#     return (x - mean) / std
-
-# def unnormalize(x, key):
-#     mean = config[key + '_mean']
-#     std = config[key + '_std']
-#     return x * std + mean
 
 def pad_sequence(sequences, lengths):
     padded = torch.zeros(len(sequences), lengths[0]).float()

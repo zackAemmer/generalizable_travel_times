@@ -1,16 +1,13 @@
 import json
 import os
 from random import sample
-import time
 
 import h5py
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import Dataset, DataLoader, IterableDataset
+from torch.utils.data import Dataset
 
-from models import grids
-from utils import data_utils, shape_utils
 
 FEATURE_COLS = [
     "shingle_id",
@@ -36,7 +33,6 @@ FEATURE_COLS = [
     "stop_dist_km",
     "passed_stops_n"
 ]
-# Must remain in order with prior
 SKIP_FEATURE_COLS = [
     "shingle_id",
     "weekID",
@@ -56,6 +52,7 @@ SKIP_FEATURE_COLS = [
     "speed_m_s",
     "bearing",
 ]
+
 
 class LoadSliceDataset(Dataset):
     def __init__(self, file_path, config, grid=None, holdout_routes=None, keep_only_holdout=False, add_grid_features=False, skip_gtfs=False):
@@ -173,34 +170,6 @@ class ContentDataset(Dataset):
         return {"samp": samp, "norm_label": norm_label, "norm_label_seq": norm_label_seq}
     def __len__(self):
         return len(pd.unique(self.dataframe.shingle_id))
-
-def apply_normalization(sample, config):
-    for var_name in sample.keys():
-        if f"{var_name}_mean" in config.keys():
-            sample[var_name] = data_utils.normalize(np.array(sample[var_name]), config[f"{var_name}_mean"], config[f"{var_name}_std"])
-    return sample
-
-def apply_grid_normalization(grid_features, config):
-    # Get the average age of observations in this shingle; or use estimate of global mean if all observations are nan
-    obs_ages = grid_features[:,-1,:,:,:]
-    obs_ages = obs_ages[~np.isnan(obs_ages)]
-    if len(obs_ages)==0:
-        # Estimate of global distribution
-        obs_mean = 82000
-        obs_std = 51000
-    else:
-        obs_mean = np.mean(obs_ages)
-        obs_std = np.std(obs_ages)
-    # Fill all nan values with the mean, then normalize
-    grid_features[:,3,:,:,:] = np.nan_to_num(grid_features[:,3,:,:,:], config['speed_m_s_mean'])
-    grid_features[:,4,:,:,:] = np.nan_to_num(grid_features[:,4,:,:,:], config['bearing_mean'])
-    grid_features[:,-1,:,:,:] = np.nan_to_num(grid_features[:,-1,:,:,:], obs_mean)
-    grid_features[:,3,:,:,:] = data_utils.normalize(grid_features[:,3,:,:,:], config[f"speed_m_s_mean"], config[f"speed_m_s_std"])
-    grid_features[:,4,:,:,:] = data_utils.normalize(grid_features[:,4,:,:,:], config[f"bearing_mean"], config[f"bearing_std"])
-    grid_features[:,-1,:,:,:] = data_utils.normalize(grid_features[:,-1,:,:,:], obs_mean, obs_std)
-    # Only return the features we are interested in
-    grid_features = grid_features[:,3:,:,:,:]
-    return grid_features
 
 def avg_collate(batch):
     cols = ["speed_m_s","dist_calc_km","timeID_s","time_cumulative_s"]

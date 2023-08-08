@@ -1,7 +1,3 @@
-"""
-Gather all trips from a given database table, and save the distinct tracked locations 
-locally.
-"""
 from dotenv import load_dotenv
 
 from utils import data_utils, summarize_rds

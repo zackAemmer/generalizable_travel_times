@@ -3,19 +3,17 @@
 
 import json
 import shutil
-import random
-import lightning.pytorch as pl
 import sys
-from lightning.pytorch.loggers import CSVLogger
-from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 
+import lightning.pytorch as pl
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, SubsetRandomSampler
+from lightning.pytorch.loggers import CSVLogger
 from sklearn import metrics
+from torch.utils.data import DataLoader
 
 from models import grids
-from utils import data_utils, model_utils, data_loader
+from utils import data_loader, data_utils, model_utils
 
 
 if __name__=="__main__":

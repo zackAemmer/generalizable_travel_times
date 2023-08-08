@@ -1,68 +1,12 @@
-import numpy as np
-import torch
-from torch.utils.data import Dataset, DataLoader
-import time
 import os
 
-from models import ff, conv, rnn, transformer, avg_speed, schedule, persistent
+import numpy as np
+import torch
+
+from models import avg_speed, conv, ff, persistent, rnn, schedule, transformer
 from models.deeptte import DeepTTE
-from utils import data_loader
-from utils import data_utils
+from utils import data_loader, data_utils
 
-
-def train(model, dataloader, optimizer):
-    # Use gradients while training
-    model.train()
-    running_tloss = 0.0
-    # Iterate over all batches per training epoch
-    num_batches = len(dataloader)
-    for data in dataloader:
-        # Run forward/backward
-        optimizer.zero_grad()
-        # Handles discrepancies in how data/forward differs between models
-        loss = model.batch_step(data)[2]
-        loss.backward()
-        # Adjust weights, save loss
-        optimizer.step()
-        running_tloss += loss.item()
-    avg_batch_tloss = running_tloss / num_batches
-    return avg_batch_tloss
-
-def predict(model, dataloader, sequential_flag=False):
-    # Don't use dropout etc.
-    model.eval()
-    # Don't track gradients
-    with torch.no_grad():
-        running_vloss = 0.0
-        labels = []
-        preds = []
-        seq_lens = []
-        num_batches = len(dataloader)
-        for vdata in dataloader:
-            if sequential_flag:
-                vlabels, vpreds, loss, vseq_lens = model.batch_step(vdata)
-            else:
-                vlabels, vpreds, loss = model.batch_step(vdata)
-            # Handle batch of 1
-            if vpreds.dim()==0:
-                vpreds = torch.unsqueeze(vpreds, 0)
-            # Accumulate batch loss
-            running_vloss += loss.item()
-            # Save predictions and labels
-            labels.append(vlabels)
-            preds.append(vpreds)
-            if sequential_flag:
-                seq_lens.append(vseq_lens)
-        if sequential_flag:
-            labels = data_utils.pad_tensors(labels, 1).cpu().detach().numpy()
-            preds = data_utils.pad_tensors(preds, 1).cpu().detach().numpy()
-            avg_batch_loss = running_vloss / num_batches
-            return labels, preds, avg_batch_loss, seq_lens
-        else:
-            labels = torch.concat(labels).cpu().detach().numpy()
-            preds = torch.concat(preds).cpu().detach().numpy()
-            avg_batch_loss = running_vloss / num_batches
-            return labels, preds, avg_batch_loss
 
 def set_feature_extraction(model, feature_extraction=True):
     if feature_extraction==False:

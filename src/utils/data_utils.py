@@ -1,25 +1,17 @@
-"""
-Functions for processing tracked bus and timetable data.
-"""
-import itertools
-import json
 import os
 import pickle
+import shutil
 from datetime import date, datetime, timedelta
 from multiprocessing import Pool
 from random import sample
-import shutil
 
 import numpy as np
 import pandas as pd
 import pyproj
-# import pyarrow.dataset as ds
-# from sklearn import metrics
-from statsmodels.stats.weightstats import DescrStatsW
 import torch
+from statsmodels.stats.weightstats import DescrStatsW
 
-from models import grids
-from utils import shape_utils, data_loader
+from utils import shape_utils
 
 
 # Set of unified feature names and dtypes for variables in the GTFS-RT data
@@ -45,33 +37,6 @@ def write_pkl(data, path):
     with open(path, 'wb') as f:
         pickle.dump(data, f)
     return None
-
-def normalize(ary, mean, std):
-    """
-    Z = (x - u) / sigma
-    """
-    ary[ary==0] = 1e-6
-    if mean==0:
-        mean = 1e-6
-    if std==0:
-        std = 1e-6
-    return (ary - mean) / std
-
-def de_normalize(ary, mean, std):
-    """
-    x = (Z * sigma) + u
-    """
-    return (ary * std) + mean
-
-def recode_nums(ary):
-    """
-    Get new numeric codes starting from 0 for an array with random numbers.
-    ary: array to recode
-    Returns: dictionary that maps old numbers to new numbers starting from 0
-    """
-    old_codes = np.sort(ary).astype(int)
-    new_codes = np.arange(0,len(old_codes))
-    return dict(zip(old_codes, new_codes))
 
 def calculate_gps_dist(end_x, end_y, start_x, start_y):
     """
@@ -125,35 +90,6 @@ def get_date_list(start, n_days):
     base = date(int(year), int(month), int(day))
     date_list = [base + timedelta(days=x) for x in range(n_days)]
     return [f"{date.strftime('%Y_%m_%d')}.pkl" for date in date_list]
-
-def load_all_inputs(run_folder, network_folder, n_samples):
-    with open(f"{run_folder}{network_folder}/deeptte_formatted/train_summary_config.json") as f:
-        summary_config = json.load(f)
-    with open(f"{run_folder}{network_folder}/deeptte_formatted/train_shingle_config.json") as f:
-        shingle_config = json.load(f)
-    train_dataset = data_loader.LoadSliceDataset(f"{run_folder}{network_folder}deeptte_formatted/train", summary_config)
-    train_traces = train_dataset.get_all_samples_shingle_accurate(n_samples)
-    return {
-        "summary_config": summary_config,
-        "shingle_config": shingle_config,
-        "train_traces": train_traces
-    }
-
-def combine_config_files(cfg_folder, n_save_files, train_or_test):
-    temp = []
-    for i in range(n_save_files):
-        # Load config
-        with open(f"{cfg_folder}{train_or_test}{i}_config.json") as f:
-            config = json.load(f)
-        # Save temp
-        temp.append(config)
-        # Delete existing config
-        os.remove(f"{cfg_folder}{train_or_test}{i}_config.json")
-    # Set up train config
-    summary_config = combine_config_list(temp, avoid_dup=True)
-    # Save final configs
-    with open(f"{cfg_folder}{train_or_test}_config.json", mode="a") as out_file:
-        json.dump(summary_config, out_file)
 
 def combine_config_list(temp, avoid_dup=False):
     summary_config = {}
@@ -444,89 +380,6 @@ def clean_trace_df_w_timetables(traces, gtfs_folder, epsg, coord_ref_center):
     result = result.sort_values(["file","shingle_id","locationtime"], ascending=True)
     return result
 
-def remap_ids(df_list, id_col):
-    """
-    Remap each ID in all dfs to start from 0, maintaining order.
-    df_list: list of pandas dataframes with unified bus data
-    id_col: the column to re-index the unique values of
-    Returns: list of pandas dataframes with new column for id_recode.
-    """
-    all_ids = pd.concat([x[id_col] for x in df_list]).values.flatten()
-    # Recode ids to start from 0
-    mapping = {v:k for k,v in enumerate(set(all_ids))}
-    for df in df_list:
-        recode = [mapping[y] for y in df[id_col].values.flatten()]
-        df[f"{id_col}_recode"] = recode
-    return (df_list, len(pd.unique(all_ids)), mapping)
-
-def map_to_records(trace_data, skip_gtfs):
-    """
-    Reshape pandas dataframe to the json format needed to use deeptte.
-    trace_data: dataframe with bus trajectories
-    Returns: path to json file where deeptte trajectories are saved.
-    """    
-    # Group by the desired column use correct naming schema
-    # These will be trip-totals
-    trace_data['dist'] = trace_data['dist_cumulative_km']
-    trace_data['time'] = trace_data['time_cumulative_s']
-
-    # Gather by shingle
-    groups = trace_data.groupby('shingle_id')
-
-    # Get necessary features as scalar or lists
-    if not skip_gtfs:
-        result = groups.agg({
-            # Totals
-            'dist': 'max',
-            'time': 'max',
-            # GPS features
-            'shingle_id': 'min',
-            'weekID': 'min',
-            'timeID': 'min',
-            'timeID_s': lambda x: x.tolist(),
-            'locationtime': lambda x: x.tolist(),
-            'lon': lambda x: x.tolist(),
-            'lat': lambda x: x.tolist(),
-            'x': lambda x: x.tolist(),
-            'y': lambda y: y.tolist(),
-            'x_cent': lambda x: x.tolist(),
-            'y_cent': lambda y: y.tolist(),
-            'dist_calc_km': lambda x: x.tolist(),
-            'time_calc_s': lambda x: x.tolist(),
-            'speed_m_s': lambda x: x.tolist(),
-            'bearing': lambda x: x.tolist(),
-            # GTFS Features
-            'route_id': 'min',
-            'stop_x_cent': lambda x: x.tolist(),
-            'stop_y_cent': lambda x: x.tolist(),
-            'scheduled_time_s': lambda x: x.tolist(),
-            'stop_dist_km': lambda x: x.tolist(),
-            'passed_stops_n': lambda x: x.tolist()
-        })
-    else:
-        result = groups.agg({
-            # Totals
-            'dist': 'max',
-            'time': 'max',
-            # GPS features
-            'shingle_id': 'min',
-            'weekID': 'min',
-            'timeID': 'min',
-            'timeID_s': lambda x: x.tolist(),
-            'locationtime': lambda x: x.tolist(),
-            'lon': lambda x: x.tolist(),
-            'lat': lambda x: x.tolist(),
-            'x': lambda x: x.tolist(),
-            'y': lambda y: y.tolist(),
-            'x_cent': lambda x: x.tolist(),
-            'y_cent': lambda y: y.tolist(),
-            'dist_calc_km': lambda x: x.tolist(),
-            'time_calc_s': lambda x: x.tolist(),
-            'speed_m_s': lambda x: x.tolist(),
-            'bearing': lambda x: x.tolist()
-        })
-    return result.to_dict(orient="records")
-
 def get_summary_config(trace_data, **kwargs):
     """
     Get a dict of means and sds which are used to normalize data by DeepTTE.
@@ -626,18 +479,6 @@ def get_summary_config(trace_data, **kwargs):
         }
     return summary_dict
 
-def map_from_deeptte(datalist, keys):
-    lengths = [len(x['lat']) for x in datalist]
-    res = np.ones((sum(lengths), len(keys)))
-    for i,key in enumerate(keys):
-        vals = [sample[key] for sample in datalist]
-        if isinstance(vals[0], list):
-            vals = [item for sublist in vals for item in sublist]
-        else:
-            vals = np.concatenate([np.repeat(vals[i], lengths[i]) for i, val in enumerate(vals)])
-        res[:,i] = vals
-    return res
-
 def extract_operator(old_folder, new_folder, source_col, op_name):
     """
     Make a copy of raw bus data with only a single operator.
@@ -699,38 +540,6 @@ def merge_gtfs_files(gtfs_folder, epsg, coord_ref_center):
     gtfs_data['stop_y_cent'] = gtfs_data['stop_y'] - coord_ref_center[1]
     return gtfs_data
 
-def get_date_from_filename(filename):
-    """
-    Get the date from a .pkl raw bus data filename.
-    filename: string in format "YYYY_MM_DD.pkl"
-    Returns: Datetime object.
-    """
-    file_parts = filename.split("_")
-    date_obj = datetime(int(file_parts[0]), int(file_parts[1]), int(file_parts[2].split(".")[0]))
-    return date_obj
-
-def format_deeptte_to_features(deeptte_data, resampled_deeptte_data):
-    """
-    Reformat the DeepTTE json format into a numpy array that can be used for modeling with sklearn.
-    deeptte_data: json loaded from a training/testing file formatted for DeepTTE
-    resampled_deeptte_data: resampled dataframe from 'resample_deeptte_gps' in which all tracks have the same length
-    Returns: 2d numpy array (samples x features) and 1d numpy array (tt true values). Each point in a trace has a set of resampled features, which are concatenated such that each value at each point is its own feature.
-    """
-    # Gather the trip attribute features
-    timeIDs = np.array([x['timeID'] for x in deeptte_data]).reshape(len(deeptte_data),1)
-    weekIDs = np.array([x['weekID'] for x in deeptte_data]).reshape(len(deeptte_data),1)
-    dateIDs = np.array([x['dateID'] for x in deeptte_data]).reshape(len(deeptte_data),1)
-    driverIDs = np.array([x['driverID'] for x in deeptte_data]).reshape(len(deeptte_data),1)
-    dists = np.array([x['dist'] for x in deeptte_data]).reshape(len(deeptte_data),1)
-    df = np.concatenate((timeIDs, weekIDs, dateIDs, driverIDs, dists), axis=1) # X
-    times = np.array([x['time'] for x in deeptte_data]).reshape(len(deeptte_data),1).ravel() # y
-    # Add resampled features (each point is own feature)
-    # resampled_features = resampled_deeptte_data.groupby("deeptte_index").apply(lambda x: np.concatenate([x['dist'].values, x['lat'].values, x['lng'].values]))
-    resampled_features = resampled_deeptte_data.groupby("deeptte_index").apply(lambda x: np.concatenate([x['lat'].values, x['lng'].values]))
-    resampled_features = np.array([x for x in resampled_features])
-    df = np.hstack((df, resampled_features))
-    return df, times
-
 def extract_lightning_results(model_name, base_folder, city_name):
     all_data = []
     col_names = ["train_loss_epoch","valid_loss","test_loss"]
@@ -762,95 +571,6 @@ def extract_lightning_results(model_name, base_folder, city_name):
     # Concatenate all dataframes into a single dataframe
     result_df = pd.concat(all_data, axis=0)
     return result_df
-
-def extract_results(model_results, city):
-    # Extract metric results
-    fold_results = [x['All_Losses'] for x in model_results]
-    cities = []
-    models = []
-    mapes = []
-    rmses = []
-    maes = []
-    fold_nums = []
-    for fold_num in range(0,len(fold_results)):
-        for value in range(0,len(fold_results[0])):
-            cities.append(city)
-            fold_nums.append(fold_num)
-            models.append(fold_results[fold_num][value][0])
-            mapes.append(fold_results[fold_num][value][1])
-            rmses.append(fold_results[fold_num][value][2])
-            maes.append(fold_results[fold_num][value][3])
-    result_df = pd.DataFrame({
-        "Model": models,
-        "City": cities,
-        "Fold": fold_nums,
-        "MAPE": mapes,
-        "RMSE": rmses,
-        "MAE": maes
-    })
-    # # Extract NN loss curves
-    # loss_df = []
-    # # Iterate folds
-    # for fold_results in model_results:
-    #     # Iterate models
-    #     for model in fold_results['Loss_Curves']:
-    #         for mname, loss_curves in model.items():
-    #             # Iterate loss curves
-    #             for lname, loss in loss_curves.items():
-    #                 df = pd.DataFrame({
-    #                     "City": city,
-    #                     "Fold": fold_results['Fold'],
-    #                     "Model": mname,
-    #                     "Loss Set": lname,
-    #                     "Epoch": np.arange(len(loss)),
-    #                     "Loss": loss
-    #                 })
-    #                 loss_df.append(df)
-    # loss_df = pd.concat(loss_df)
-    # Extract train times
-    names_df = np.array([x['Model_Names'] for x in model_results]).flatten()
-    train_time_df = np.array([x['Train_Times'] for x in model_results]).flatten()
-    folds_df = np.array([np.repeat(i,len(model_results[i]['Model_Names'])) for i in range(len(model_results))]).flatten()
-    city_df = np.array(np.repeat(city,len(folds_df))).flatten()
-    train_time_df = pd.DataFrame({
-        "City": city_df,
-        "Fold": folds_df,
-        "Model":  names_df,
-        "Time": train_time_df
-    })
-    return result_df, train_time_df
-
-def extract_gen_results(gen_results, city):
-    # Extract generalization results
-    res = []
-    experiments = ["Train_Losses","Test_Losses","Holdout_Losses","Tune_Train_Losses","Tune_Test_Losses"]
-    for ex in experiments:
-        fold_results = [x[ex] for x in gen_results]
-        cities = []
-        models = []
-        mapes = []
-        rmses = []
-        maes = []
-        fold_nums = []
-        for fold_num in range(0,len(fold_results)):
-            for value in range(0,len(fold_results[0])):
-                cities.append(city)
-                fold_nums.append(fold_num)
-                models.append(fold_results[fold_num][value][0])
-                mapes.append(fold_results[fold_num][value][1])
-                rmses.append(fold_results[fold_num][value][2])
-                maes.append(fold_results[fold_num][value][3])
-        gen_df = pd.DataFrame({
-            "Model": models,
-            "City": cities,
-            "Loss": ex,
-            "Fold": fold_nums,
-            "MAPE": mapes,
-            "RMSE": rmses,
-            "MAE": maes
-        })
-        res.append(gen_df)
-    return pd.concat(res, axis=0)
 
 def create_tensor_mask(seq_lens, device, drop_first=True):
     """

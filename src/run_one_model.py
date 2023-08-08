@@ -3,24 +3,21 @@
 
 import json
 import os
-import random
 import shutil
-import time
 import sys
+import time
 
 import lightning.pytorch as pl
 import numpy as np
 import torch
-from tabulate import tabulate
-from lightning.pytorch.loggers import CSVLogger
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
+from lightning.pytorch.loggers import CSVLogger
 from sklearn import metrics
 from sklearn.model_selection import KFold
-from lightning.pytorch.profilers import AdvancedProfiler, SimpleProfiler
-from torch.utils.data import DataLoader, SubsetRandomSampler, SequentialSampler
+from tabulate import tabulate
+from torch.utils.data import DataLoader, SequentialSampler, SubsetRandomSampler
 
 from models import grids
-from models import ff, conv, rnn, transformer, avg_speed, schedule, persistent
 from utils import data_loader, data_utils, model_utils
 
 
