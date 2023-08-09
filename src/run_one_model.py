@@ -123,8 +123,8 @@ if __name__=="__main__":
             },
             'TRSF': {
                 'batch_size': 512,
-                'hidden_size': 64,
-                'num_layers': 3,
+                'hidden_size': 128,
+                'num_layers': 4,
                 'dropout_rate': .1
             },
             'DEEPTTE': {
