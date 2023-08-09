@@ -58,7 +58,16 @@ class CONV_L(pl.LightningModule):
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
         mask = data_utils.create_tensor_mask(x_sl, self.device)
         loss = self.loss_fn(out, y, mask)
-        self.log(f"{self.model_name}_train_loss", loss, on_epoch=True, prog_bar=True, logger=True)
+        self.log_dict(
+            {
+                'train_loss': loss,
+            },
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+        )
+        for name, param in self.named_parameters():
+            self.logger.experiment.add_histogram(name, param, self.current_epoch)
         return loss
     def validation_step(self, batch, batch_idx):
         x,y = batch
@@ -80,29 +89,14 @@ class CONV_L(pl.LightningModule):
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
         mask = data_utils.create_tensor_mask(x_sl, self.device)
         loss = self.loss_fn(out, y, mask)
-        self.log(f"{self.model_name}_valid_loss", loss, on_epoch=True, prog_bar=True, logger=True)
-        return loss
-    def test_step(self, batch, batch_idx):
-        x,y = batch
-        x_em = x[0]
-        x_ct = x[1]
-        x_sl = x[2]
-        # Embed categorical variables
-        timeID_embedded = self.timeID_em(x_em[:,0])
-        weekID_embedded = self.weekID_em(x_em[:,1])
-        x_em = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
-        x_em = x_em.expand(-1, x_ct.shape[1], -1)
-        x_em = torch.swapaxes(x_em, 1, 2)
-        # Get conv pred
-        x_ct = torch.swapaxes(x_ct, 1, 2)
-        x_ct = self.conv1d(x_ct)
-        # Combine all variables
-        out = torch.cat([x_em, x_ct], dim=1)
-        out = torch.swapaxes(out, 1, 2)
-        out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
-        mask = data_utils.create_tensor_mask(x_sl, self.device)
-        loss = self.loss_fn(out, y, mask)
-        self.log(f"{self.model_name}_test_loss", loss, on_epoch=True, prog_bar=True, logger=True)
+        self.log_dict(
+            {
+                'valid_loss': loss,
+            },
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+        )
         return loss
     def predict_step(self, batch, batch_idx):
         x,y = batch
@@ -202,7 +196,16 @@ class CONV_GRID_L(pl.LightningModule):
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
         mask = data_utils.create_tensor_mask(x_sl, self.device)
         loss = self.loss_fn(out, y, mask)
-        self.log(f"{self.model_name}_train_loss", loss, on_epoch=True, prog_bar=True, logger=True)
+        self.log_dict(
+            {
+                'train_loss': loss,
+            },
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+        )
+        for name, param in self.named_parameters():
+            self.logger.experiment.add_histogram(name, param, self.current_epoch)
         return loss
     def validation_step(self, batch, batch_idx):
         x,y = batch
@@ -232,37 +235,14 @@ class CONV_GRID_L(pl.LightningModule):
         out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
         mask = data_utils.create_tensor_mask(x_sl, self.device)
         loss = self.loss_fn(out, y, mask)
-        self.log(f"{self.model_name}_valid_loss", loss, on_epoch=True, prog_bar=True, logger=True)
-        return loss
-    def test_step(self, batch, batch_idx):
-        x,y = batch
-        x_em = x[0]
-        x_ct = x[1]
-        x_gr = x[2]
-        x_sl = x[3]
-        # Embed categorical variables
-        timeID_embedded = self.timeID_em(x_em[:,0])
-        weekID_embedded = self.weekID_em(x_em[:,1])
-        x_em = torch.cat((timeID_embedded,weekID_embedded), dim=1).unsqueeze(1)
-        x_em = x_em.expand(-1, x_ct.shape[1], -1)
-        x_em = torch.swapaxes(x_em, 1, 2)
-        # Feed grid data through model
-        x_gr = torch.flatten(x_gr, 2)
-        x_gr = torch.swapaxes(x_gr, 1, 2)
-        x_gr = self.grid_norm(x_gr)
-        x_gr = torch.swapaxes(x_gr, 1, 2)
-        x_gr = self.linear_relu_stack_grid(x_gr)
-        # Get conv pred
-        x_ct = torch.cat([x_ct, x_gr], dim=2)
-        x_ct = torch.swapaxes(x_ct, 1, 2)
-        x_ct = self.conv1d(x_ct)
-        # Combine all variables
-        out = torch.cat([x_em, x_ct], dim=1)
-        out = torch.swapaxes(out, 1, 2)
-        out = self.feature_extract(self.feature_extract_activation(out)).squeeze(2)
-        mask = data_utils.create_tensor_mask(x_sl, self.device)
-        loss = self.loss_fn(out, y, mask)
-        self.log(f"{self.model_name}_test_loss", loss, on_epoch=True, prog_bar=True, logger=True)
+        self.log_dict(
+            {
+                'valid_loss': loss,
+            },
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+        )
         return loss
     def predict_step(self, batch, batch_idx):
         x,y = batch

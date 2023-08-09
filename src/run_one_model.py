@@ -11,7 +11,7 @@ import lightning.pytorch as pl
 import numpy as np
 import torch
 from lightning.pytorch.callbacks.early_stopping import EarlyStopping
-from lightning.pytorch.loggers import CSVLogger
+from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
 from sklearn import metrics
 from sklearn.model_selection import KFold
 from tabulate import tabulate
@@ -104,31 +104,31 @@ if __name__=="__main__":
     else:
         hyperparameter_dict = {
             'FF': {
-                'batch_size': 1024,
+                'batch_size': 512,
                 'hidden_size': 128,
                 'num_layers': 2,
                 'dropout_rate': .2
             },
             'CONV': {
-                'batch_size': 1024,
+                'batch_size': 512,
                 'hidden_size': 64,
                 'num_layers': 3,
                 'dropout_rate': .1
             },
             'GRU': {
-                'batch_size': 1024,
+                'batch_size': 512,
                 'hidden_size': 64,
                 'num_layers': 2,
                 'dropout_rate': .05
             },
             'TRSF': {
-                'batch_size': 1024,
+                'batch_size': 512,
                 'hidden_size': 64,
                 'num_layers': 3,
                 'dropout_rate': .1
             },
             'DEEPTTE': {
-                'batch_size': 1024
+                'batch_size': 512
             }
         }
 
@@ -201,15 +201,14 @@ if __name__=="__main__":
         t0=time.time()
         trainer = pl.Trainer(
             check_val_every_n_epoch=1,
-            max_epochs=30,
+            max_epochs=50,
             min_epochs=5,
             accelerator=accelerator,
-            logger=CSVLogger(save_dir=f"{model_folder}logs/", name=nn_model.model_name),
-            callbacks=[EarlyStopping(monitor=f"{nn_model.model_name}_valid_loss", min_delta=.001, patience=3)],
+            logger=TensorBoardLogger(save_dir=f"{model_folder}logs/", name=nn_model.model_name),
+            callbacks=[EarlyStopping(monitor=f"valid_loss", min_delta=.001, patience=3)],
         )
         trainer.fit(model=nn_model, train_dataloaders=train_loader, val_dataloaders=val_loader)
         nn_model.train_time = time.time() - t0
-        trainer.test(model=nn_model, dataloaders=test_loader)
         preds_and_labels = trainer.predict(model=nn_model, dataloaders=test_loader)
         preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
         labels = np.concatenate([l['y_agg'] for l in preds_and_labels])

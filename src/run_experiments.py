@@ -8,7 +8,7 @@ import sys
 import lightning.pytorch as pl
 import numpy as np
 import torch
-from lightning.pytorch.loggers import CSVLogger
+from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
 from sklearn import metrics
 from torch.utils.data import DataLoader
 
@@ -187,7 +187,7 @@ if __name__=="__main__":
         print(f"Fold final evaluation for: {nn_model.model_name}")
         train_network_dataset.add_grid_features = nn_model.requires_grid
         loader = DataLoader(train_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=True, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
-        trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_SAME"), accelerator=accelerator, limit_predict_batches=5)
+        trainer = pl.Trainer(accelerator=accelerator, limit_predict_batches=10)
         preds_and_labels = trainer.predict(model=nn_model, dataloaders=loader)
         preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
         labels = np.concatenate([l['y_agg'] for l in preds_and_labels])
@@ -204,7 +204,7 @@ if __name__=="__main__":
         print(f"Fold final evaluation for: {nn_model.model_name}")
         test_network_dataset.add_grid_features = nn_model.requires_grid
         loader = DataLoader(test_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=True, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
-        trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_DIFF"), accelerator=accelerator, limit_predict_batches=5)
+        trainer = pl.Trainer(accelerator=accelerator, limit_predict_batches=10)
         preds_and_labels = trainer.predict(model=nn_model, dataloaders=loader)
         preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
         labels = np.concatenate([l['y_agg'] for l in preds_and_labels])
@@ -222,7 +222,7 @@ if __name__=="__main__":
             print(f"Fold final evaluation for: {nn_model.model_name}")
             holdout_network_dataset.add_grid_features = nn_model.requires_grid
             loader = DataLoader(holdout_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=True, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
-            trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_HOLDOUT"), accelerator=accelerator, limit_predict_batches=5)
+            trainer = pl.Trainer(accelerator=accelerator, limit_predict_batches=10)
             preds_and_labels = trainer.predict(model=nn_model, dataloaders=loader)
             preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
             labels = np.concatenate([l['y_agg'] for l in preds_and_labels])
@@ -244,19 +244,23 @@ if __name__=="__main__":
                 model_fold_results[b_model.model_name]["Tune_Test_Preds"].extend(list(preds))
             print(f"Fold training for: {nn_model.model_name}")
             tune_network_dataset.add_grid_features = nn_model.requires_grid
+            train_network_dataset.add_grid_features = nn_model.requires_grid
             loader = DataLoader(tune_network_dataset, batch_size=10, collate_fn=nn_model.collate_fn, shuffle=True, drop_last=True, num_workers=num_workers, pin_memory=pin_memory)
+            val_loader = DataLoader(train_network_dataset, batch_size=10, collate_fn=nn_model.collate_fn, shuffle=True, drop_last=True, num_workers=num_workers, pin_memory=pin_memory)
             trainer = pl.Trainer(
+                check_val_every_n_epoch=1,
                 max_epochs=tune_epochs,
                 min_epochs=1,
                 limit_train_batches=10,
-                logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_TUNE"),
+                limit_val_batches=10,
+                logger=TensorBoardLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_TUNE"),
                 accelerator=accelerator
             )
-            trainer.fit(model=nn_model, train_dataloaders=loader)
+            trainer.fit(model=nn_model, train_dataloaders=loader, val_dataloaders=val_loader)
             print(f"Fold final evaluation for: {nn_model.model_name}")
             train_network_dataset.add_grid_features = nn_model.requires_grid
             loader = DataLoader(train_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=True, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
-            trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_TUNE_TRAIN"), accelerator=accelerator, limit_predict_batches=5)
+            trainer = pl.Trainer(accelerator=accelerator, limit_predict_batches=10)
             preds_and_labels = trainer.predict(model=nn_model, dataloaders=loader)
             preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
             labels = np.concatenate([l['y_agg'] for l in preds_and_labels])
@@ -265,7 +269,7 @@ if __name__=="__main__":
 
             test_network_dataset.add_grid_features = nn_model.requires_grid
             loader = DataLoader(test_network_dataset, batch_size=nn_model.batch_size, collate_fn=nn_model.collate_fn, shuffle=True, drop_last=False, num_workers=num_workers, pin_memory=pin_memory)
-            trainer = pl.Trainer(logger=CSVLogger(save_dir=f"{model_folder}gen_logs/", name=f"{nn_model.model_name}_TUNE_TEST"), accelerator=accelerator, limit_predict_batches=5)
+            trainer = pl.Trainer(accelerator=accelerator, limit_predict_batches=10)
             preds_and_labels = trainer.predict(model=nn_model, dataloaders=loader)
             preds = np.concatenate([p['out_agg'] for p in preds_and_labels])
             labels = np.concatenate([l['y_agg'] for l in preds_and_labels])

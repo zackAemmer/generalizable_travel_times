@@ -1,12 +1,10 @@
 #!/bin/bash
 set -e
 
-# RUN_NAME="debug_nosch"
-RUN_NAME="full_run_nosch"
+RUN_NAME="debug_nosch"
 
 
 cd ~/Desktop/valle
-
 
 # Run Models
 python ./src/run_one_model.py "FF" "./results/$RUN_NAME/" "kcm_atb/" True False

@@ -2,11 +2,9 @@
 set -e
 
 RUN_NAME="debug"
-# RUN_NAME="full_run"
 
 
 cd ~/Desktop/valle
-
 
 # Run Models
 python ./src/run_one_model.py "FF" "./results/$RUN_NAME/" "kcm/" False False

@@ -168,7 +168,16 @@ class Net(pl.LightningModule):
         local_label = deeptte_utils.get_local_seq(traj['time_calc_s'], self.kernel_size, mean, std)
         local_loss = self.local_estimate.eval_on_batch(local_out, local_length, local_label, mean, std)
         loss = (1 - self.alpha) * entire_loss + self.alpha * local_loss ### According to eqn 8 of paper
-        self.log(f"{self.model_name}_train_loss", loss, on_epoch=True, prog_bar=True, logger=True)
+        self.log_dict(
+            {
+                'train_loss': loss,
+            },
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+        )
+        for name, param in self.named_parameters():
+            self.logger.experiment.add_histogram(name, param, self.current_epoch)
         return loss
     def validation_step(self, batch, batch_idx):
         attr = batch[0]
@@ -188,27 +197,14 @@ class Net(pl.LightningModule):
         entire_out = self(attr, traj, config)
         pred_dict, entire_loss = self.entire_estimate.eval_on_batch(entire_out, attr['time'], config['time_mean'], config['time_std'])
         loss = entire_loss
-        self.log(f"{self.model_name}_valid_loss", loss, on_epoch=True, prog_bar=True, logger=True)
-        return entire_loss
-    def test_step(self, batch, batch_idx):
-        attr = batch[0]
-        traj = batch[1]
-        config = self.config
-        # Norm
-        for k in list(attr.keys()):
-            try:
-                attr[k] = (attr[k] - self.config[f"{k}_mean"]) / self.config[f"{k}_std"]
-            except:
-                continue
-        for k in list(traj.keys()):
-            try:
-                traj[k] = (traj[k] - self.config[f"{k}_mean"]) / self.config[f"{k}_std"]
-            except:
-                continue
-        entire_out = self(attr, traj, config)
-        pred_dict, entire_loss = self.entire_estimate.eval_on_batch(entire_out, attr['time'], config['time_mean'], config['time_std'])
-        loss = entire_loss
-        self.log(f"{self.model_name}_test_loss", loss, on_epoch=True, prog_bar=True, logger=True)
+        self.log_dict(
+            {
+                'valid_loss': loss,
+            },
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+        )
         return entire_loss
     def predict_step(self, batch, batch_idx):
         attr = batch[0]

@@ -1,12 +1,10 @@
 #!/bin/bash
 set -e
 
-# RUN_NAME="debug"
-RUN_NAME="full_run"
+RUN_NAME="debug"
 
 
 cd ~/Desktop/valle
-
 
 # Run Models
 python ./src/run_one_model.py "FF" "./results/$RUN_NAME/" "atb/" False False
