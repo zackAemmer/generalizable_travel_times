@@ -13,6 +13,7 @@ current_scraping_files.zip
 /results/*
 /aws/*
 /src/scraped_data/*
+/lightning_logs/*
 profile.prof
 trace.json
 
