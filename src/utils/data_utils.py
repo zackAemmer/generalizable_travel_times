@@ -1,3 +1,4 @@
+import json
 import os
 import pickle
 import shutil
@@ -11,7 +12,7 @@ import pyproj
 import torch
 from statsmodels.stats.weightstats import DescrStatsW
 
-from utils import shape_utils
+from utils import shape_utils, data_loader
 
 
 # Set of unified feature names and dtypes for variables in the GTFS-RT data
@@ -115,6 +116,19 @@ def combine_config_list(temp, avoid_dup=False):
                 values = [x[k] for x in temp]
             summary_config.update({k:values})
     return summary_config
+
+def load_all_inputs(run_folder, network_folder, n_samples):
+    with open(f"{run_folder}{network_folder}/deeptte_formatted/train_summary_config.json") as f:
+        summary_config = json.load(f)
+    with open(f"{run_folder}{network_folder}/deeptte_formatted/train_shingle_config.json") as f:
+        shingle_config = json.load(f)
+    train_dataset = data_loader.LoadSliceDataset(f"{run_folder}{network_folder}deeptte_formatted/train", summary_config)
+    train_traces = train_dataset.get_all_samples_shingle_accurate(n_samples)
+    return {
+        "summary_config": summary_config,
+        "shingle_config": shingle_config,
+        "train_traces": train_traces
+    }
 
 def combine_pkl_data(folder, file_list, given_names):
     """
