@@ -93,9 +93,9 @@ if __name__=="__main__":
         hyperparameter_sample_dict = {
             'n_param_samples': 1,
             'batch_size': [512],
-            'hidden_size': [16, 32, 64, 128],
-            'num_layers': [2, 3, 4, 5],
-            'dropout_rate': [.05, .1, .2, .4]
+            'hidden_size': [32, 64, 128, 256, 512],
+            'num_layers': [2, 3, 4, 5, 6],
+            'dropout_rate': [.05, .1, .2, .4, .5]
         }
         hyperparameter_dict = model_utils.random_param_search(hyperparameter_sample_dict, ["FF","CONV","GRU","TRSF"])
         data_utils.write_pkl(hyperparameter_sample_dict, f"{model_folder}param_search_dict.pkl")
@@ -123,8 +123,8 @@ if __name__=="__main__":
             },
             'TRSF': {
                 'batch_size': 512,
-                'hidden_size': 128,
-                'num_layers': 4,
+                'hidden_size': 512,
+                'num_layers': 6,
                 'dropout_rate': .1
             },
             'DEEPTTE': {
