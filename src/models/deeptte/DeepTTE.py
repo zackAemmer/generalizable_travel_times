@@ -176,8 +176,8 @@ class Net(pl.LightningModule):
             on_epoch=True,
             prog_bar=True,
         )
-        for name, param in self.named_parameters():
-            self.logger.experiment.add_histogram(name, param, self.current_epoch)
+        # for name, param in self.named_parameters():
+        #     self.logger.experiment.add_histogram(name, param, self.current_epoch)
         return loss
     def validation_step(self, batch, batch_idx):
         attr = batch[0]

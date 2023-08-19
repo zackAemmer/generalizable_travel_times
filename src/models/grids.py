@@ -1,5 +1,5 @@
-import matplotlib.animation as animation
-import matplotlib.pyplot as plt
+# import matplotlib.animation as animation
+# import matplotlib.pyplot as plt
 import numpy as np
 from collections import defaultdict
 import pandas as pd
@@ -136,22 +136,22 @@ class NGridBetter:
     #     cell_points[:,:,-1] = np.repeat(np.expand_dims(np.array(locationtime),1),n_points,1) - cell_points[:,:,0]
     #     return cell_points
 
-def save_grid_anim(data, file_name):
-    # Plot first 4 channels of second axis
-    fig, axes = plt.subplots(1, data.shape[1])
-    axes = axes.reshape(-1)
-    fig.tight_layout()
-    # Define the update function that will be called for each frame of the animation
-    def update(frame):
-        fig.suptitle(f"Frame {frame}")
-        for i in range(data.shape[1]):
-            d = data[:,i,:,:]
-            vmin=np.min(d[~np.isnan(d)])
-            vmax=np.max(d[~np.isnan(d)])
-            ax = axes[i]
-            ax.clear()
-            im = ax.imshow(data[frame,i,:,:], cmap='plasma', vmin=vmin, vmax=vmax, origin="lower")
-    # Create the animation object
-    ani = animation.FuncAnimation(fig, update, frames=data.shape[0])
-    # Save the animation object
-    ani.save(f"../plots/{file_name}", fps=10, dpi=300)
+# def save_grid_anim(data, file_name):
+#     # Plot first 4 channels of second axis
+#     fig, axes = plt.subplots(1, data.shape[1])
+#     axes = axes.reshape(-1)
+#     fig.tight_layout()
+#     # Define the update function that will be called for each frame of the animation
+#     def update(frame):
+#         fig.suptitle(f"Frame {frame}")
+#         for i in range(data.shape[1]):
+#             d = data[:,i,:,:]
+#             vmin=np.min(d[~np.isnan(d)])
+#             vmax=np.max(d[~np.isnan(d)])
+#             ax = axes[i]
+#             ax.clear()
+#             im = ax.imshow(data[frame,i,:,:], cmap='plasma', vmin=vmin, vmax=vmax, origin="lower")
+#     # Create the animation object
+#     ani = animation.FuncAnimation(fig, update, frames=data.shape[0])
+#     # Save the animation object
+#     ani.save(f"../plots/{file_name}", fps=10, dpi=300)

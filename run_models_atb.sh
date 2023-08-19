@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-RUN_NAME="debug"
+RUN_NAME="full_run"
 
 
 cd ~/Desktop/valle

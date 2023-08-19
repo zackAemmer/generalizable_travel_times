@@ -53,7 +53,7 @@ if __name__=="__main__":
 
     if torch.cuda.is_available():
         num_workers=4
-        pin_memory=False
+        pin_memory=True
         accelerator="auto"
     else:
         num_workers=0

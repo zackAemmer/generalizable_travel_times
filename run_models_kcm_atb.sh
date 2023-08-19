@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-RUN_NAME="debug_nosch"
+RUN_NAME="full_run_nosch"
 
 
 cd ~/Desktop/valle
