@@ -1,4 +1,4 @@
-## Valle
+## Generalizable Bus Travel Times
 #### Bus Travel Time Prediction with GTFS and GTFS-RT Data
 
 ### Introduction
