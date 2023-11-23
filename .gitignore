@@ -14,6 +14,7 @@ current_scraping_files.zip
 /aws/*
 /src/scraped_data/*
 /lightning_logs/*
+/obt_venv/*
 profile.prof
 trace.json
 
